@@ -1,96 +1,88 @@
 import React from 'react';
-import { Zap, Clock, Shield, Sparkles, Users, Swords } from 'lucide-react';
+import { Cpu, Users, Settings2 } from 'lucide-react';
+
+export interface TimeControlOption {
+  display: string;
+  name: string;
+  minutes: number;
+  increment: number;
+  type: 'bullet' | 'blitz' | 'rapid' | 'classical';
+}
 
 interface QuickPairingGridProps {
-  onSelectTimeControl: (minutes: number, isRanked: boolean) => void;
+  onSelectTimeControl: (minutes: number, increment: number, isRanked: boolean) => void;
   onStartPassAndPlay: () => void;
   onOpenCustomModal: () => void;
+  onOpenComputerModal: () => void;
 }
+
+export const TIME_CONTROL_PRESETS: TimeControlOption[] = [
+  { display: '1+0', name: 'Bullet', minutes: 1, increment: 0, type: 'bullet' },
+  { display: '2+1', name: 'Bullet', minutes: 2, increment: 1, type: 'bullet' },
+  { display: '3+0', name: 'Blitz', minutes: 3, increment: 0, type: 'blitz' },
+  { display: '3+2', name: 'Blitz', minutes: 3, increment: 2, type: 'blitz' },
+  { display: '5+0', name: 'Blitz', minutes: 5, increment: 0, type: 'blitz' },
+  { display: '5+3', name: 'Blitz', minutes: 5, increment: 3, type: 'blitz' },
+  { display: '10+0', name: 'Rapid', minutes: 10, increment: 0, type: 'rapid' },
+  { display: '10+5', name: 'Rapid', minutes: 10, increment: 5, type: 'rapid' },
+  { display: '15+10', name: 'Rapid', minutes: 15, increment: 10, type: 'rapid' },
+  { display: '30+0', name: 'Classical', minutes: 30, increment: 0, type: 'classical' },
+  { display: '30+20', name: 'Classical', minutes: 30, increment: 20, type: 'classical' },
+];
 
 export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
   onSelectTimeControl,
   onStartPassAndPlay,
   onOpenCustomModal,
+  onOpenComputerModal,
 }) => {
-  const options = [
-    {
-      minutes: 3,
-      label: 'Blitz',
-      icon: <Zap size={22} color="var(--accent-gold)" />,
-      desc: '3 min • Ranked',
-      ranked: true,
-    },
-    {
-      minutes: 5,
-      label: 'Rapid',
-      icon: <Clock size={22} color="var(--accent-blue)" />,
-      desc: '5 min • Ranked',
-      ranked: true,
-    },
-    {
-      minutes: 10,
-      label: 'Classical',
-      icon: <Shield size={22} color="var(--accent-green)" />,
-      desc: '10 min • Ranked',
-      ranked: true,
-    },
-    {
-      minutes: 0,
-      label: 'Casual',
-      icon: <Sparkles size={22} color="var(--accent-gold)" />,
-      desc: 'Unlimited time',
-      ranked: false,
-    },
-  ];
-
   return (
-    <div>
-      <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>Quick Pair</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          Select a time control to find a ranked opponent or start playing immediately.
-        </p>
-      </div>
-
+    <div className="quick-pairing-container">
+      {/* 3x4 Quick Pairing Grid */}
       <div className="pairing-grid">
-        {options.map((opt) => (
+        {TIME_CONTROL_PRESETS.map((opt) => (
           <div
-            key={opt.label}
+            key={opt.display}
             className="pairing-card"
-            onClick={() => onSelectTimeControl(opt.minutes, opt.ranked)}
+            onClick={() => onSelectTimeControl(opt.minutes, opt.increment, true)}
           >
-            <div style={{ marginBottom: '0.4rem' }}>{opt.icon}</div>
-            <div className="time">{opt.minutes > 0 ? `${opt.minutes} min` : '∞'}</div>
-            <div className="label">{opt.label}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              {opt.desc}
-            </div>
+            <div className="time">{opt.display}</div>
+            <div className="label">{opt.name}</div>
           </div>
         ))}
 
-        {/* Pass and Play Sandbox */}
-        <div className="pairing-card" onClick={onStartPassAndPlay}>
-          <div style={{ marginBottom: '0.4rem' }}>
-            <Users size={22} color="var(--accent-blue)" />
-          </div>
-          <div className="time">Pass & Play</div>
-          <div className="label">Solo Sandbox</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            Local 2-Player / Rules Lab
+        {/* 12th Slot: Custom */}
+        <div className="pairing-card custom-card" onClick={onOpenCustomModal}>
+          <div className="time" style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Settings2 size={18} style={{ opacity: 0.8 }} />
+            <span>Custom</span>
           </div>
         </div>
+      </div>
 
-        {/* Custom Challenge */}
-        <div className="pairing-card" onClick={onOpenCustomModal}>
-          <div style={{ marginBottom: '0.4rem' }}>
-            <Swords size={22} color="var(--accent-green)" />
-          </div>
-          <div className="time">Custom</div>
-          <div className="label">Create Match</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            Bespoke clocks & friend invite
-          </div>
-        </div>
+      {/* Prominent Play Against Computer Button */}
+      <div style={{ marginTop: '1rem', width: '100%' }}>
+        <button
+          type="button"
+          className="lichess-cta-btn"
+          onClick={onOpenComputerModal}
+          style={{ width: '100%', padding: '0.85rem 1.25rem', fontSize: '1.05rem', fontWeight: 600 }}
+        >
+          <Cpu size={22} className="lichess-cta-icon" />
+          <span>Play Against Computer</span>
+        </button>
+      </div>
+
+      {/* Secondary Pass & Play Action */}
+      <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
+        <button
+          type="button"
+          className="pass-play-btn"
+          onClick={onStartPassAndPlay}
+        >
+          <Users size={16} />
+          <span>Pass & Play (Local 2-Player Sandbox)</span>
+        </button>
       </div>
     </div>
   );

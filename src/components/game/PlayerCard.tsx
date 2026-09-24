@@ -11,6 +11,7 @@ interface PlayerCardProps {
   remainingMs: number;
   capturedPieces: Piece[];
   isUser?: boolean;
+  isThinking?: boolean;
 }
 
 export const PlayerCard: React.FC<PlayerCardProps> = ({
@@ -21,6 +22,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   remainingMs,
   capturedPieces,
   isUser,
+  isThinking,
 }) => {
   return (
     <div className={`player-bar ${isTurn ? 'turn-active' : ''}`}>
@@ -31,7 +33,12 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
         <div className="player-meta">
           <span className="player-name">
             {username}
-            {isUser && <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>(You)</span>}
+            {isUser && <span style={{ fontSize: '0.75rem', opacity: 0.7 }}> (You)</span>}
+            {isThinking && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold, #f59e0b)', marginLeft: '0.35rem', fontStyle: 'italic' }}>
+                Thinking...
+              </span>
+            )}
           </span>
           <span className="player-elo">{elo}</span>
         </div>

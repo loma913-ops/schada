@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/layout/Navbar';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
+import { PlayAgainstComputerModal } from './components/lobby/PlayAgainstComputerModal';
 import { Arena, type ArenaPlayer } from './components/game/Arena';
 import { LeaderboardTable } from './components/leaderboard/LeaderboardTable';
 import { RulesGuide } from './components/learn/RulesGuide';
@@ -19,8 +20,11 @@ interface ActiveMatch {
   bluePlayer: ArenaPlayer;
   greenPlayer: ArenaPlayer;
   timeControlMinutes: number;
+  incrementSeconds?: number;
   isRanked: boolean;
   userColor?: PieceColor;
+  isComputer?: boolean;
+  botLevel?: number;
   initialState: BoardState;
 }
 
@@ -35,12 +39,13 @@ const MainApp: React.FC = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [customGameOpen, setCustomGameOpen] = useState(false);
+  const [computerModalOpen, setComputerModalOpen] = useState(false);
 
   // Start a Quick Pair game
-  const handleStartQuickPair = (minutes: number, isRanked: boolean) => {
+  const handleStartQuickPair = (minutes: number, increment: number, isRanked: boolean) => {
     const defaultOpponent: ArenaPlayer = {
       id: 'bot_tactician',
-      username: 'Boogerd1936',
+      username: 'Boogerd1936 (Bot)',
       elo: 1420,
     };
 
@@ -52,8 +57,11 @@ const MainApp: React.FC = () => {
       bluePlayer: currentUserPlayer,
       greenPlayer: defaultOpponent,
       timeControlMinutes: minutes,
+      incrementSeconds: increment,
       isRanked: isRanked && Boolean(user),
       userColor: 'blue',
+      isComputer: true,
+      botLevel: 1,
       initialState: createInitialGameState(),
     });
   };
@@ -64,8 +72,49 @@ const MainApp: React.FC = () => {
       bluePlayer: { id: 'p1', username: 'Player 1 (Blue)', elo: 1200 },
       greenPlayer: { id: 'p2', username: 'Player 2 (Green)', elo: 1200 },
       timeControlMinutes: 0,
+      incrementSeconds: 0,
       isRanked: false,
       userColor: undefined, // pass and play allows both colors
+      isComputer: false,
+      initialState: createInitialGameState(),
+    });
+  };
+
+  // Start Play Against Computer
+  const handleStartComputerMatch = ({
+    timeControlMinutes,
+    incrementSeconds,
+    difficultyLevel,
+    userColor,
+  }: {
+    timeControlMinutes: number;
+    incrementSeconds: number;
+    difficultyLevel: number;
+    userColor: PieceColor;
+  }) => {
+    const botElo = 1000 + difficultyLevel * 80;
+    const botOpponent: ArenaPlayer = {
+      id: `bot_level_${difficultyLevel}`,
+      username: `SchadaBot (Level ${difficultyLevel})`,
+      elo: botElo,
+    };
+
+    const currentUserPlayer: ArenaPlayer = user
+      ? { id: user.id, username: user.username, elo: user.eloRating }
+      : { id: 'guest', username: 'GuestPlayer', elo: 1200 };
+
+    const bluePlayer = userColor === 'blue' ? currentUserPlayer : botOpponent;
+    const greenPlayer = userColor === 'blue' ? botOpponent : currentUserPlayer;
+
+    setActiveMatch({
+      bluePlayer,
+      greenPlayer,
+      timeControlMinutes,
+      incrementSeconds,
+      isRanked: false,
+      userColor,
+      isComputer: true,
+      botLevel: difficultyLevel,
       initialState: createInitialGameState(),
     });
   };
@@ -79,8 +128,10 @@ const MainApp: React.FC = () => {
       bluePlayer: { id: user.id, username: user.username, elo: user.eloRating },
       greenPlayer: { id: friend.id, username: friend.username, elo: friend.eloRating },
       timeControlMinutes: 5,
+      incrementSeconds: 0,
       isRanked: true,
       userColor: 'blue',
+      isComputer: false,
       initialState: createInitialGameState(),
     });
   };
@@ -89,7 +140,7 @@ const MainApp: React.FC = () => {
   const handleCreateCustom = (minutes: number, isRanked: boolean, colorPref?: PieceColor) => {
     const defaultOpponent: ArenaPlayer = {
       id: 'opponent',
-      username: 'SchadaGrandmaster',
+      username: 'SchadaGrandmaster (Bot)',
       elo: 1650,
     };
 
@@ -105,8 +156,11 @@ const MainApp: React.FC = () => {
       bluePlayer,
       greenPlayer,
       timeControlMinutes: minutes,
+      incrementSeconds: 0,
       isRanked: isRanked && Boolean(user),
       userColor,
+      isComputer: true,
+      botLevel: 1,
       initialState: createInitialGameState(),
     });
   };
@@ -161,8 +215,11 @@ const MainApp: React.FC = () => {
               bluePlayer={activeMatch.bluePlayer}
               greenPlayer={activeMatch.greenPlayer}
               timeControlMinutes={activeMatch.timeControlMinutes}
+              incrementSeconds={activeMatch.incrementSeconds || 0}
               isRanked={activeMatch.isRanked}
               userColor={activeMatch.userColor}
+              isComputer={activeMatch.isComputer}
+              botLevel={activeMatch.botLevel}
               onGameComplete={handleGameComplete}
               onExit={() => setActiveMatch(null)}
             />
@@ -172,6 +229,7 @@ const MainApp: React.FC = () => {
                 onSelectTimeControl={handleStartQuickPair}
                 onStartPassAndPlay={handleStartPassAndPlay}
                 onOpenCustomModal={() => setCustomGameOpen(true)}
+                onOpenComputerModal={() => setComputerModalOpen(true)}
               />
             </div>
           )
@@ -194,6 +252,11 @@ const MainApp: React.FC = () => {
         isOpen={customGameOpen}
         onClose={() => setCustomGameOpen(false)}
         onCreateGame={handleCreateCustom}
+      />
+      <PlayAgainstComputerModal
+        isOpen={computerModalOpen}
+        onClose={() => setComputerModalOpen(false)}
+        onStartGame={handleStartComputerMatch}
       />
     </div>
   );

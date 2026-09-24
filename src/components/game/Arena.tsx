@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { BoardState, Move, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
+import { selectBotMove, getBotThinkingDelayMs } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
 import { SchadaBoard } from '../board/SchadaBoard';
 import { PlayerCard } from './PlayerCard';
@@ -19,8 +20,11 @@ interface ArenaProps {
   bluePlayer: ArenaPlayer;
   greenPlayer: ArenaPlayer;
   timeControlMinutes?: number; // 0 for unlimited
+  incrementSeconds?: number; // Fischer increment
   isRanked?: boolean;
   userColor?: PieceColor; // undefined for pass & play / spectator
+  isComputer?: boolean;
+  botLevel?: number;
   onGameComplete?: (finalState: BoardState) => void;
   onExit: () => void;
 }
@@ -30,13 +34,23 @@ export const Arena: React.FC<ArenaProps> = ({
   bluePlayer,
   greenPlayer,
   timeControlMinutes = 5,
+  incrementSeconds = 0,
   isRanked = false,
   userColor,
+  isComputer = false,
+  botLevel = 1,
   onGameComplete,
   onExit,
 }) => {
   const [gameState, setGameState] = useState<BoardState>(initialState);
   const [orientation, setOrientation] = useState<'blue' | 'green'>(userColor || 'blue');
+  const [isBotThinking, setIsBotThinking] = useState(false);
+
+  const gameStateRef = useRef<BoardState>(gameState);
+  gameStateRef.current = gameState;
+
+  const computerColor: PieceColor | undefined =
+    isComputer && userColor ? (userColor === 'blue' ? 'green' : 'blue') : undefined;
 
   const initialMs = timeControlMinutes > 0 ? timeControlMinutes * 60 * 1000 : 0;
   const [blueTime, setBlueTime] = useState<number>(initialMs);
@@ -86,7 +100,8 @@ export const Arena: React.FC<ArenaProps> = ({
   };
 
   const handleMakeMove = (move: Move) => {
-    if (gameState.isGameOver) return;
+    const currentState = gameStateRef.current;
+    if (currentState.isGameOver) return;
 
     // Play appropriate sound effect
     if (move.captured) {
@@ -95,7 +110,7 @@ export const Arena: React.FC<ArenaProps> = ({
       soundService.playMove();
     }
 
-    const nextState = executeMove(gameState, move);
+    const nextState = executeMove(currentState, move);
 
     // If a high piece reached goal, chime!
     if (move.piece.type !== 'pawn') {
@@ -106,12 +121,48 @@ export const Arena: React.FC<ArenaProps> = ({
       }
     }
 
+    // Apply Fischer increment to player who just moved
+    if (incrementSeconds > 0 && timeControlMinutes > 0) {
+      const addMs = incrementSeconds * 1000;
+      if (currentState.currentTurn === 'blue') {
+        setBlueTime((prev) => prev + addMs);
+      } else {
+        setGreenTime((prev) => prev + addMs);
+      }
+    }
+
     setGameState(nextState);
 
     if (nextState.isGameOver && onGameComplete) {
       onGameComplete(nextState);
     }
   };
+
+  // Bot Turn Automation
+  useEffect(() => {
+    if (!isComputer || !computerColor || gameState.isGameOver) return;
+    if (gameState.currentTurn !== computerColor) return;
+
+    setIsBotThinking(true);
+    const delay = getBotThinkingDelayMs(botLevel);
+    const timer = setTimeout(() => {
+      const botMove = selectBotMove(
+        gameStateRef.current.board,
+        computerColor,
+        botLevel,
+        gameStateRef.current.moveHistory
+      );
+      setIsBotThinking(false);
+      if (botMove) {
+        handleMakeMove(botMove);
+      }
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+      setIsBotThinking(false);
+    };
+  }, [gameState.currentTurn, gameState.isGameOver, isComputer, computerColor, botLevel]);
 
   const handleResign = () => {
     if (gameState.isGameOver) return;
@@ -149,6 +200,7 @@ export const Arena: React.FC<ArenaProps> = ({
           remainingMs={topTime}
           capturedPieces={gameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue']}
           isUser={userColor === topColor}
+          isThinking={isBotThinking && gameState.currentTurn === topColor}
         />
 
         {/* Board Component */}
@@ -159,7 +211,7 @@ export const Arena: React.FC<ArenaProps> = ({
           orientation={orientation}
           lastMove={lastMove}
           onMakeMove={handleMakeMove}
-          disabled={gameState.isGameOver}
+          disabled={gameState.isGameOver || (isComputer && gameState.currentTurn === computerColor)}
         />
 
         {/* Bottom Player Card */}
@@ -171,6 +223,7 @@ export const Arena: React.FC<ArenaProps> = ({
           remainingMs={bottomTime}
           capturedPieces={gameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue']}
           isUser={userColor === bottomColor}
+          isThinking={isBotThinking && gameState.currentTurn === bottomColor}
         />
       </div>
 
@@ -179,9 +232,9 @@ export const Arena: React.FC<ArenaProps> = ({
         {/* Match Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            {timeControlMinutes > 0 ? `${timeControlMinutes} min` : 'Casual'} •{' '}
+            {timeControlMinutes > 0 ? `${timeControlMinutes}+${incrementSeconds}` : 'Unlimited'} •{' '}
             <span style={{ color: isRanked ? 'var(--accent-gold)' : 'var(--text-secondary)' }}>
-              {isRanked ? 'Ranked' : 'Unrated'}
+              {isComputer ? `Level ${botLevel} Bot` : isRanked ? 'Ranked' : 'Casual'}
             </span>
           </div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
