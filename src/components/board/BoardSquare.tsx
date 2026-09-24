@@ -44,7 +44,7 @@ export const BoardSquare: React.FC<BoardSquareProps> = ({
       data-square={square}
     >
       {/* Background vector indicators */}
-      <VectorOverlay square={square} isSelected={isSelected} />
+      <VectorOverlay square={square} isSelected={isSelected} orientation={orientation} />
 
       {/* Coordinate labels */}
       {showRank && <span className="coord-rank">{square[1]}</span>}

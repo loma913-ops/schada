@@ -5,9 +5,14 @@ import { BOARD_VISUALS } from '@/core/schada/board_visual_data';
 interface VectorOverlayProps {
   square: Square;
   isSelected?: boolean;
+  orientation?: 'blue' | 'green';
 }
 
-export const VectorOverlay: React.FC<VectorOverlayProps> = ({ square, isSelected }) => {
+export const VectorOverlay: React.FC<VectorOverlayProps> = ({
+  square,
+  isSelected,
+  orientation = 'blue',
+}) => {
   const visual = BOARD_VISUALS[square];
   if (!visual) return null;
 
@@ -16,10 +21,13 @@ export const VectorOverlay: React.FC<VectorOverlayProps> = ({ square, isSelected
   const centerFill = isSelected ? '#10b981' : 'var(--sq-vector-dot)';
   const strokeW = isSelected ? 2.4 : 1.8;
 
+  const isFlipped = orientation === 'green';
+
   return (
     <svg viewBox="0 0 100 100" className="square-vector-svg">
-      {/* Central anchor circle (hole/peg) */}
-      <circle cx={50} cy={50} r={7.0} fill={centerFill} />
+      <g transform={isFlipped ? 'rotate(180 50 50)' : undefined}>
+        {/* Central anchor circle (hole/peg) */}
+        <circle cx={50} cy={50} r={7.0} fill={centerFill} />
 
       {/* Vector lines strictly inside the square */}
       {visual.lines.map(([p1, p2], idx) => (
@@ -49,6 +57,7 @@ export const VectorOverlay: React.FC<VectorOverlayProps> = ({ square, isSelected
           strokeWidth="1"
         />
       ))}
+      </g>
     </svg>
   );
 };
