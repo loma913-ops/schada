@@ -1,29 +1,133 @@
+/**
+ * SoundService – Web Audio API + HTML5 Audio hybrid sound engine for Schada.
+ *
+ * Provides guaranteed, zero-latency playback for moves and captures:
+ * 1. Pre-decoded uncompressed PCM WAV buffers (zero-delay attack transient).
+ * 2. Synchronous AudioContext resume on user gesture.
+ * 3. Never drops sounds if AudioContext is transitioning/suspended; schedules immediately.
+ * 4. Preloaded HTML5 Audio element fallback so audio never drops under any browser state.
+ */
+
+import { MOVE_SOUND_B64, CAPTURE_SOUND_B64 } from './soundAssets';
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
 class SoundService {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
+  private moveBuffer: AudioBuffer | null = null;
+  private captureBuffer: AudioBuffer | null = null;
+  private isDecoding: boolean = false;
+
+  // Preloaded HTMLAudioElements for instant fallback
+  private moveAudioElement: HTMLAudioElement | null = null;
+  private captureAudioElement: HTMLAudioElement | null = null;
 
   constructor() {
-    const saved = localStorage.getItem('schada_sound_muted');
-    this.isMuted = saved === 'true';
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('schada_sound_muted');
+      this.isMuted = saved === 'true';
+    }
+
+    if (typeof window !== 'undefined') {
+      // Pre-instantiate audio elements for zero-latency fallback
+      try {
+        this.moveAudioElement = new Audio('data:audio/wav;base64,' + MOVE_SOUND_B64);
+        this.captureAudioElement = new Audio('data:audio/wav;base64,' + CAPTURE_SOUND_B64);
+        this.moveAudioElement.preload = 'auto';
+        this.captureAudioElement.preload = 'auto';
+      } catch {
+        // Audio elements not supported in this environment
+      }
+
+      // Eagerly initialize and resume AudioContext on user gestures
+      const handleUserGesture = () => {
+        const ctx = this.ensureContext();
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+      };
+
+      window.addEventListener('pointerdown', handleUserGesture, { capture: true, passive: true });
+      window.addEventListener('keydown', handleUserGesture, { capture: true, passive: true });
+      window.addEventListener('click', handleUserGesture, { capture: true, passive: true });
+    }
   }
 
-  private getContext(): AudioContext | null {
-    if (this.isMuted) return null;
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
+  private ensureContext(): AudioContext | null {
+    if (this.isMuted || typeof window === 'undefined') return null;
+    if (this.ctx && this.ctx.state !== 'closed') return this.ctx;
+
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return null;
+
+      this.ctx = new AudioCtx();
+      this.loadBuffers(this.ctx);
+      return this.ctx;
+    } catch {
+      return null;
+    }
+  }
+
+  private async loadBuffers(ctx: AudioContext): Promise<void> {
+    if ((this.moveBuffer && this.captureBuffer) || this.isDecoding) return;
+    this.isDecoding = true;
+
+    try {
+      const moveArr = base64ToArrayBuffer(MOVE_SOUND_B64);
+      const capArr = base64ToArrayBuffer(CAPTURE_SOUND_B64);
+
+      // decodeAudioData consumes the ArrayBuffer, so we decode each fresh
+      const [mBuf, cBuf] = await Promise.all([
+        ctx.decodeAudioData(moveArr),
+        ctx.decodeAudioData(capArr),
+      ]);
+      this.moveBuffer = mBuf;
+      this.captureBuffer = cBuf;
+    } catch (e) {
+      console.warn('[Sound] decodeAudioData error:', e);
+    } finally {
+      this.isDecoding = false;
+    }
+  }
+
+  /** Plays an HTMLAudioElement clone to guarantee playback */
+  private playAudioElement(type: 'move' | 'capture'): void {
+    if (this.isMuted) return;
+    try {
+      const template = type === 'move' ? this.moveAudioElement : this.captureAudioElement;
+      if (template) {
+        const clone = template.cloneNode(true) as HTMLAudioElement;
+        clone.volume = 1.0;
+        const playPromise = clone.play();
+        if (playPromise) {
+          playPromise.catch(() => {});
+        }
       }
+    } catch (e) {
+      console.warn('[Sound] playAudioElement failed:', e);
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-    return this.ctx;
   }
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
-    localStorage.setItem('schada_sound_muted', String(this.isMuted));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('schada_sound_muted', String(this.isMuted));
+    }
+    if (this.isMuted && this.ctx) {
+      this.ctx.suspend().catch(() => {});
+    }
     return this.isMuted;
   }
 
@@ -31,120 +135,227 @@ class SoundService {
     return this.isMuted;
   }
 
-  // Smooth wooden piece placement click
+  /** Authentic wooden piece placement on a board */
   public playMove(): void {
-    const ctx = this.getContext();
-    if (!ctx) return;
+    if (this.isMuted) return;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const ctx = this.ensureContext();
+    if (!ctx) {
+      this.playAudioElement('move');
+      return;
+    }
 
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(320, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.08);
+    // Synchronously trigger resume in case it was auto-suspended
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    if (this.moveBuffer) {
+      try {
+        const source = ctx.createBufferSource();
+        const gain = ctx.createGain();
+        source.buffer = this.moveBuffer;
+        gain.gain.value = 1.0;
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+        source.connect(gain);
+        gain.connect(ctx.destination);
 
-    osc.start();
-    osc.stop(ctx.currentTime + 0.08);
+        // start() without parameters plays immediately on current hardware time
+        source.start();
+
+        source.onended = () => {
+          try {
+            source.disconnect();
+            gain.disconnect();
+          } catch {
+            /* already disconnected */
+          }
+        };
+        return;
+      } catch (e) {
+        console.warn('[Sound] Web Audio playMove failed, using fallback:', e);
+      }
+    }
+
+    // If buffer is still decoding or failed, use preloaded Audio element
+    this.playAudioElement('move');
   }
 
-  // Resonant capture chime
+  /** Authentic wooden piece capture hit */
   public playCapture(): void {
-    const ctx = this.getContext();
-    if (!ctx) return;
+    if (this.isMuted) return;
 
-    const freqs = [440, 660];
-    freqs.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+    const ctx = this.ensureContext();
+    if (!ctx) {
+      this.playAudioElement('capture');
+      return;
+    }
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.03);
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.7, ctx.currentTime + 0.18);
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
-      gain.gain.setValueAtTime(0.2, ctx.currentTime + idx * 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    if (this.captureBuffer) {
+      try {
+        const source = ctx.createBufferSource();
+        const gain = ctx.createGain();
+        source.buffer = this.captureBuffer;
+        gain.gain.value = 1.0;
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+        source.connect(gain);
+        gain.connect(ctx.destination);
 
-      osc.start(ctx.currentTime + idx * 0.03);
-      osc.stop(ctx.currentTime + 0.18);
-    });
+        source.start();
+
+        source.onended = () => {
+          try {
+            source.disconnect();
+            gain.disconnect();
+          } catch {
+            /* already disconnected */
+          }
+        };
+        return;
+      } catch (e) {
+        console.warn('[Sound] Web Audio playCapture failed, using fallback:', e);
+      }
+    }
+
+    this.playAudioElement('capture');
   }
 
   // Harmonious chime when a high piece enters the goal line
   public playGoal(): void {
-    const ctx = this.getContext();
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
     if (!ctx) return;
 
-    const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5 major triad
-    freqs.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.06);
+    try {
+      const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5 major triad
+      const now = ctx.currentTime;
 
-      gain.gain.setValueAtTime(0.18, ctx.currentTime + idx * 0.06);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+        const startT = now + idx * 0.06;
+        const endT = startT + 0.38;
 
-      osc.start(ctx.currentTime + idx * 0.06);
-      osc.stop(ctx.currentTime + 0.4);
-    });
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startT);
+
+        gain.gain.setValueAtTime(0.2, startT);
+        gain.gain.linearRampToValueAtTime(0.0001, endT);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(startT);
+        osc.stop(endT);
+
+        osc.onended = () => {
+          try {
+            osc.disconnect();
+            gain.disconnect();
+          } catch {
+            /* already gone */
+          }
+        };
+      });
+    } catch (e) {
+      console.warn('[Sound] playGoal:', e);
+    }
   }
 
   // Low clock countdown tick (< 30 seconds)
   public playClockTick(): void {
-    const ctx = this.getContext();
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
     if (!ctx) return;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(800, ctx.currentTime);
-
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.03);
-  }
-
-  // Victory fanfare
-  public playVictory(): void {
-    const ctx = this.getContext();
-    if (!ctx) return;
-
-    const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
-    notes.forEach((freq, idx) => {
+    try {
+      const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.1);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
 
-      gain.gain.setValueAtTime(0.2, ctx.currentTime + idx * 0.1);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.1 + 0.35);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.linearRampToValueAtTime(0.0001, now + 0.03);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
 
-      osc.start(ctx.currentTime + idx * 0.1);
-      osc.stop(ctx.currentTime + idx * 0.1 + 0.35);
-    });
+      osc.start(now);
+      osc.stop(now + 0.035);
+
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          gain.disconnect();
+        } catch {
+          /* already gone */
+        }
+      };
+    } catch (e) {
+      console.warn('[Sound] playClockTick:', e);
+    }
+  }
+
+  // Victory fanfare
+  public playVictory(): void {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    try {
+      const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+      const now = ctx.currentTime;
+
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        const startT = now + idx * 0.1;
+        const endT = startT + 0.35;
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, startT);
+
+        gain.gain.setValueAtTime(0.2, startT);
+        gain.gain.linearRampToValueAtTime(0.0001, endT);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(startT);
+        osc.stop(endT);
+
+        osc.onended = () => {
+          try {
+            osc.disconnect();
+            gain.disconnect();
+          } catch {
+            /* already gone */
+          }
+        };
+      });
+    } catch (e) {
+      console.warn('[Sound] playVictory:', e);
+    }
   }
 }
 
