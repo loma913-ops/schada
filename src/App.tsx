@@ -53,13 +53,19 @@ const MainApp: React.FC = () => {
       elo: user ? user.eloRating : 1200,
     };
 
+    // Randomly select starting colors for each player (50/50 chance for Blue or Green)
+    const isUserBlue = Math.random() < 0.5;
+    const userColor: PieceColor = isUserBlue ? 'blue' : 'green';
+    const bluePlayer = isUserBlue ? currentUserPlayer : opponentPlayer;
+    const greenPlayer = isUserBlue ? opponentPlayer : currentUserPlayer;
+
     setActiveMatch({
-      bluePlayer: currentUserPlayer,
-      greenPlayer: opponentPlayer,
+      bluePlayer,
+      greenPlayer,
       timeControlMinutes: minutes,
       incrementSeconds: increment,
       isRanked: isRanked && Boolean(user),
-      userColor: 'blue',
+      userColor,
       isComputer: false,
       initialState: createInitialGameState(),
     });
@@ -147,7 +153,7 @@ const MainApp: React.FC = () => {
       ? { id: user.id, username: user.username, elo: user.eloRating }
       : { id: 'player_1', username: 'Player 1', elo: 1200 };
 
-    const userColor = colorPref || 'blue';
+    const userColor: PieceColor = colorPref || (Math.random() < 0.5 ? 'blue' : 'green');
     const bluePlayer = userColor === 'blue' ? currentUserPlayer : opponentPlayer;
     const greenPlayer = userColor === 'blue' ? opponentPlayer : currentUserPlayer;
 
@@ -183,6 +189,11 @@ const MainApp: React.FC = () => {
       const won = outcome === 'blue';
       const isDraw = outcome === 'draw';
       mockBackend.updateStats(user.id, won, isDraw, eloResult.blueDelta);
+      refreshUser();
+    } else if (user && activeMatch.greenPlayer.id === user.id) {
+      const won = outcome === 'green';
+      const isDraw = outcome === 'draw';
+      mockBackend.updateStats(user.id, won, isDraw, eloResult.greenDelta);
       refreshUser();
     }
   };
