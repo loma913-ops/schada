@@ -255,7 +255,7 @@ const MainApp: React.FC = () => {
                     onExit={() => setActiveMatch(null)}
                   />
                 ) : (
-                  <div style={{ maxWidth: '640px', margin: '2rem auto' }}>
+                  <div className="lobby-wrapper">
                     <QuickPairingGrid
                       onSelectTimeControl={handleStartQuickPair}
                       onStartPassAndPlay={handleStartPassAndPlay}

@@ -7,6 +7,7 @@ import {
 import {
   doc,
   getDoc,
+  updateDoc,
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -86,20 +87,42 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
   if (isFirebaseConfigured() && auth && db) {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
     const uid = userCredential.user.uid;
-    const userDoc = await getDoc(doc(db, 'users', uid));
+    const userDocRef = doc(db, 'users', uid);
+    const userDoc = await getDoc(userDocRef);
 
     if (!userDoc.exists()) {
       throw new Error('User profile record not found in Firestore.');
     }
 
-    return userDoc.data() as UserProfile;
+    try {
+      await updateDoc(userDocRef, {
+        status: 'online',
+        lastSeen: serverTimestamp(),
+      });
+    } catch (e) {
+      console.warn('Could not update status to online:', e);
+    }
+
+    const data = userDoc.data() as UserProfile;
+    return { ...data, status: 'online' };
   }
 
   return mockBackend.login(email, pass);
 }
 
 export async function logoutUser(): Promise<void> {
-  if (isFirebaseConfigured() && auth) {
+  if (isFirebaseConfigured() && auth && db) {
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      try {
+        await updateDoc(doc(db, 'users', uid), {
+          status: 'offline',
+          lastSeen: serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn('Could not update status to offline on logout:', e);
+      }
+    }
     await signOut(auth);
   }
   mockBackend.logout();
@@ -169,7 +192,12 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db!, 'users', firebaseUser.uid));
+          const userDocRef = doc(db!, 'users', firebaseUser.uid);
+          await updateDoc(userDocRef, {
+            status: 'online',
+            lastSeen: serverTimestamp(),
+          });
+          const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
             callback(userDoc.data() as UserProfile);
             return;

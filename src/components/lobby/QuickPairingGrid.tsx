@@ -1,6 +1,7 @@
 import React from 'react';
 import { Cpu, Users, Settings2, Share2 } from 'lucide-react';
 import { OpenRoomsList } from './OpenRoomsList';
+import { OnlinePlayersCount } from './OnlinePlayersCount';
 
 export interface TimeControlOption {
   display: string;
@@ -41,6 +42,9 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
 }) => {
   return (
     <div className="quick-pairing-container">
+      {/* Real-time Players Online Indicator */}
+      <OnlinePlayersCount />
+
       {/* 3x4 Quick Pairing Grid */}
       <div className="pairing-grid">
         {TIME_CONTROL_PRESETS.map((opt) => (
@@ -76,6 +80,7 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
             fontWeight: 600,
             background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(34, 197, 94, 0.15))',
             borderColor: 'rgba(56, 189, 248, 0.4)',
+            color: 'var(--text-primary)',
           }}
         >
           <Share2 size={22} className="lichess-cta-icon" color="var(--accent-blue)" />

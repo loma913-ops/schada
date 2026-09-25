@@ -35,7 +35,8 @@ class MockBackend {
   }
 
   private seedDefaultUsers() {
-    if (!localStorage.getItem(this.usersKey)) {
+    const existing = localStorage.getItem(this.usersKey);
+    if (!existing) {
       const defaultUsers: Record<string, UserProfile> = {
         'mock-grandmaster': {
           id: 'mock-grandmaster',
@@ -48,7 +49,7 @@ class MockBackend {
           gamesWon: 36,
           gamesLost: 8,
           gamesDrawn: 4,
-          status: 'online',
+          status: 'offline',
           createdAt: new Date().toISOString(),
         },
         'mock-tactician': {
@@ -62,7 +63,7 @@ class MockBackend {
           gamesWon: 16,
           gamesLost: 7,
           gamesDrawn: 2,
-          status: 'online',
+          status: 'offline',
           createdAt: new Date().toISOString(),
         },
         'mock-learner': {
@@ -81,6 +82,24 @@ class MockBackend {
         },
       };
       localStorage.setItem(this.usersKey, JSON.stringify(defaultUsers));
+    } else {
+      // Sanitize existing cached users so offline accounts are not erroneously marked online
+      try {
+        const users: Record<string, UserProfile> = JSON.parse(existing);
+        const currentUid = localStorage.getItem(this.currentUserIdKey);
+        let changed = false;
+        for (const [uid, u] of Object.entries(users)) {
+          if ((!currentUid || uid !== currentUid) && u.status === 'online') {
+            u.status = 'offline';
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem(this.usersKey, JSON.stringify(users));
+        }
+      } catch {
+        // Ignore parse error
+      }
     }
   }
 
@@ -138,12 +157,34 @@ class MockBackend {
       throw new Error('No user found with this email. Please check your credentials or register.');
     }
 
+    user.status = 'online';
+    users[user.id] = user;
+    this.saveUsers(users);
+
     localStorage.setItem(this.currentUserIdKey, user.id);
     return user;
   }
 
   public logout() {
+    const currentId = localStorage.getItem(this.currentUserIdKey);
+    if (currentId) {
+      const users = this.getUsers();
+      if (users[currentId]) {
+        users[currentId].status = 'offline';
+        this.saveUsers(users);
+      }
+    }
     localStorage.removeItem(this.currentUserIdKey);
+  }
+
+  public getOnlineRegisteredUsersCount(): number {
+    const currentUid = localStorage.getItem(this.currentUserIdKey);
+    if (!currentUid) {
+      return 0;
+    }
+    const users = this.getUsers();
+    const user = users[currentUid];
+    return user && (user.status === 'online' || user.status === 'in-game') ? 1 : 0;
   }
 
   public changeUsername(newUsername: string): UserProfile {
