@@ -71,21 +71,79 @@ VITE_USE_FIREBASE_EMULATOR=true
 
 ---
 
-## 4. Production Build & Deployment
+## 4. Updating & Deploying to Production
 
-### Production Build
+The live application is hosted on **Firebase Hosting** and backed by **Cloud Firestore** under the Google Cloud / Firebase project **`schada-online`**:
+- **Primary Domain:** [https://schada.org](https://schada.org) *(once DNS propagation completes)*
+- **Firebase Default URL:** [https://schada-online.web.app](https://schada-online.web.app) / [https://schada-online.firebaseapp.com](https://schada-online.firebaseapp.com)
+- **Firebase Console:** [https://console.firebase.google.com/project/schada-online/overview](https://console.firebase.google.com/project/schada-online/overview)
+
+---
+
+### Routine Update Workflow
+
+Whenever you make changes to UI components, game mechanics, or styles, follow these steps to test, build, and deploy the latest version:
+
 ```bash
+# 1. Run tests to ensure engine correctness
+npm test
+
+# 2. Build the production bundle (compiles TypeScript & bundles via Vite into /dist)
 npm run build
+
+# 3. Deploy the updated frontend to Firebase Hosting
+npx firebase-tools deploy --only hosting
 ```
 
-### Deploy to Firebase Hosting
+Your live site at `https://schada.org` and `https://schada-online.web.app` will update within seconds.
+
+---
+
+### Deploying Firestore Security Rules & Indexes
+
+If you modify `firestore.rules` or `firestore.indexes.json`:
+
 ```bash
-npx firebase-tools deploy
+# Deploy only Firestore rules and composite indexes
+npx firebase-tools deploy --only firestore
 ```
 
-### Deploy to Google Cloud Run
+To deploy **both** frontend and Firestore rules together:
 ```bash
-# Build and deploy using Google Cloud Build
+npm run build && npx firebase-tools deploy
+```
+
+---
+
+### Domain & DNS Configuration (`schada.org`)
+
+To link your purchased domain `schada.org` to Firebase Hosting, configure these DNS records at your domain registrar (Namecheap, Cloudflare, GoDaddy, Google Domains, etc.):
+
+| Type | Name / Host | Value / Target | Purpose |
+| :--- | :--- | :--- | :--- |
+| **A** | `@` (or blank) | `199.36.158.100` | Points root domain `schada.org` to Firebase Hosting |
+| **CNAME** | `www` | `schada-online.web.app` | Points `www.schada.org` to the web app |
+
+> **SSL / HTTPS:** Firebase automatically provisions a free Let's Encrypt SSL certificate within 10–30 minutes after DNS records propagate.
+
+---
+
+### Firebase Authentication Setup (One-Time)
+
+If not already completed, ensure Email/Password login and authorized domains are enabled:
+1. Open the [Firebase Authentication Console](https://console.firebase.google.com/project/schada-online/authentication).
+2. Click **Get started**.
+3. Under the **Sign-in method** tab, click **Email/Password**, toggle **Enable**, and click **Save**.
+4. Under the **Settings** tab > **Authorized domains**, add `schada.org` and `www.schada.org` to the list.
+
+---
+
+### Optional: Container Deployment (Google Cloud Run)
+
+If you prefer running a containerized nginx instance on Google Cloud Run instead of static Firebase Hosting:
+
+```bash
+# Build container image and deploy using Google Cloud Build
 gcloud builds submit --config=cloudbuild.yaml
 ```
 

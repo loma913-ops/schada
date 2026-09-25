@@ -73,6 +73,7 @@ function generateToken(): string {
 class MockGameStore {
   private channel: BroadcastChannel | null = null;
   private listeners: Map<string, Set<(game: GameRoom | null) => void>> = new Map();
+  private globalListeners: Set<() => void> = new Set();
   private memoryStore: Record<string, GameRoom> = {};
 
   constructor() {
@@ -86,6 +87,7 @@ class MockGameStore {
             subs.forEach((cb) => cb(game));
           }
         }
+        this.globalListeners.forEach((cb) => cb());
       };
     }
 
@@ -97,6 +99,7 @@ class MockGameStore {
             const game = games[gameId] || null;
             subs.forEach((cb) => cb(game));
           });
+          this.globalListeners.forEach((cb) => cb());
         }
       });
     }
@@ -131,6 +134,7 @@ class MockGameStore {
     if (subs) {
       subs.forEach((cb) => cb(game));
     }
+    this.globalListeners.forEach((cb) => cb());
 
     // Broadcast to other tabs
     if (this.channel) {
@@ -160,6 +164,13 @@ class MockGameStore {
           this.listeners.delete(gameId);
         }
       }
+    };
+  }
+
+  public subscribeToAnyChange(callback: () => void): () => void {
+    this.globalListeners.add(callback);
+    return () => {
+      this.globalListeners.delete(callback);
     };
   }
 }
@@ -493,4 +504,33 @@ export async function getOpenRooms(): Promise<GameRoom[]> {
 
   const all = mockStore.getAll();
   return Object.values(all).filter((g) => !g.isPrivate && g.status === 'waiting');
+}
+
+export function subscribeToOpenRooms(callback: (rooms: GameRoom[]) => void): () => void {
+  if (isFirebaseConfigured() && db) {
+    const q = query(
+      collection(db, 'games'),
+      where('isPrivate', '==', false),
+      where('status', '==', 'waiting')
+    );
+    return onSnapshot(
+      q,
+      (snap) => {
+        const rooms = snap.docs.map((docSnap) => docSnap.data() as GameRoom);
+        callback(rooms);
+      },
+      (err) => {
+        console.error('Error listening to open rooms:', err);
+        callback([]);
+      }
+    );
+  }
+
+  const update = () => {
+    const all = mockStore.getAll();
+    callback(Object.values(all).filter((g) => !g.isPrivate && g.status === 'waiting'));
+  };
+
+  update();
+  return mockStore.subscribeToAnyChange(update);
 }

@@ -374,27 +374,38 @@ export const GameRoomView: React.FC = () => {
 
       {/* Guest Name Confirmation Modal */}
       {guestPromptOpen && (
-        <div className="modal-backdrop">
+        <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '400px', width: '90%' }}>
-            <h3 style={{ margin: '0 0 0.5rem' }}>Join Game</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Join Game</h2>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
               Choose a display name for this game:
             </p>
             <form onSubmit={handleConfirmGuestName}>
-              <input
-                type="text"
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                maxLength={20}
-                placeholder="Enter your name"
-                className="input-field"
-                style={{ width: '100%', marginBottom: '1rem', padding: '0.65rem' }}
-                autoFocus
-              />
+              <div className="form-group">
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  maxLength={20}
+                  placeholder="Enter your name"
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.8rem',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'inherit',
+                  }}
+                  autoFocus
+                />
+              </div>
               <button
                 type="submit"
-                className="btn btn-primary"
-                style={{ width: '100%', padding: '0.75rem' }}
+                className="btn-primary"
+                style={{ width: '100%', padding: '0.65rem', marginTop: '0.5rem' }}
               >
                 Join as Player
               </button>

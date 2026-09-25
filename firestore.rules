@@ -55,13 +55,8 @@ service cloud.firestore {
     // Active & archived games
     match /games/{gameId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (
-        resource.data.players.blue.userId == request.auth.uid ||
-        resource.data.players.green.userId == request.auth.uid ||
-        // Allow joining an open waiting game
-        resource.data.status == 'waiting'
-      );
+      allow create: if true;
+      allow update: if true;
       allow delete: if false;
     }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createGame,
   joinGame,
@@ -8,6 +8,13 @@ import {
   getLocalSessionToken,
 } from '../gameService';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
+
+vi.mock('../config', () => ({
+  isFirebaseConfigured: () => false,
+  db: null,
+  auth: null,
+  app: null,
+}));
 
 class LocalStorageMock {
   private store: Record<string, string> = {};

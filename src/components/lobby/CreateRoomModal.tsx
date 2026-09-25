@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, Users, Globe, Lock, Share2 } from 'lucide-react';
-import type { PieceColor } from '@/core/schada/types';
+import { X, Copy, Check, Users, Play } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createGame } from '@/services/firebase/gameService';
 import { useNavigate } from 'react-router-dom';
@@ -16,12 +15,12 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
 
   const [timeControl, setTimeControl] = useState<number>(5);
   const [increment, setIncrement] = useState<number>(0);
-  const [colorPref, setColorPref] = useState<PieceColor | 'random'>('random');
+  const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
   const [isPrivate, setIsPrivate] = useState<boolean>(true);
-  const [isRanked, setIsRanked] = useState<boolean>(false);
+  const [isRanked, setIsRanked] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
 
-  // Once created, display share screen
+  // Once created, display share box
   const [createdGameId, setCreatedGameId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -48,9 +47,10 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
       });
 
       setCreatedGameId(result.gameId);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to create room:', err);
-      alert('Failed to create room. Please try again.');
+      const message = err instanceof Error ? err.message : String(err);
+      alert(`Failed to create room: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
     if (!shareableUrl) return;
     navigator.clipboard.writeText(shareableUrl);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleEnterRoom = () => {
@@ -74,127 +74,134 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal-content"
-        style={{ maxWidth: '520px', width: '92%' }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Share2 size={20} color="var(--accent-gold)" />
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
-              {createdGameId ? 'Game Room Created' : 'Create Multiplayer Game'}
-            </h2>
-          </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close modal">
-            <X size={20} />
+          <h2 className="modal-title">
+            {createdGameId ? 'Room Created' : 'Create Multiplayer Room'}
+          </h2>
+          <button className="modal-close-btn" onClick={onClose}>
+            <X size={18} />
           </button>
         </div>
 
         {createdGameId ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1rem 0' }}>
+          <div>
             <div
               style={{
-                background: 'rgba(56, 189, 248, 0.08)',
-                border: '1px solid rgba(56, 189, 248, 0.25)',
-                borderRadius: '8px',
-                padding: '1.25rem',
-                textAlign: 'center',
+                padding: '0.9rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-subtle)',
+                marginBottom: '1.25rem',
               }}
             >
-              <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Share this link with your opponent to play:
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
+                Share this link with a friend to play:
               </div>
               <div
                 style={{
-                  background: 'var(--bg-card)',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '6px',
-                  fontFamily: 'monospace',
-                  fontSize: '0.95rem',
-                  wordBreak: 'break-all',
-                  userSelect: 'all',
-                  border: '1px solid var(--border-color)',
-                  marginBottom: '1rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '0.5rem',
+                  padding: '0.4rem 0.6rem',
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-subtle)',
                 }}
               >
-                <span>{shareableUrl}</span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.85rem',
+                    color: 'var(--accent-gold)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {shareableUrl}
+                </span>
                 <button
                   type="button"
+                  className="action-btn"
+                  style={{ padding: '0.3rem 0.65rem', flexShrink: 0 }}
                   onClick={handleCopyLink}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
-                  {copied ? <Check size={16} color="var(--accent-green)" /> : <Copy size={16} />}
-                  {copied ? 'Copied!' : 'Copy'}
+                  {copied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
 
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {isPrivate
-                  ? '🔒 Private room: Only people with this link can join.'
-                  : '🌐 Open room: Visible in the public lobby as well.'}
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
+                {isPrivate ? '🔒 Private invite room' : '🌐 Open public room in lobby'}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleEnterRoom}
-                style={{ width: '100%', padding: '0.8rem' }}
-              >
-                Enter Waiting Room
-              </button>
-            </div>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleEnterRoom}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}
+            >
+              <Play size={16} />
+              <span>Enter Game Room</span>
+            </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0.5rem 0' }}>
+          <div>
             {/* Room Visibility */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Room Visibility
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div className="form-group">
+              <label className="form-label">Room Access</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   type="button"
+                  className={`action-btn ${isPrivate ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isPrivate ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: isPrivate ? '#1a1a1a' : 'var(--text-primary)',
+                    fontWeight: 700,
+                  }}
                   onClick={() => setIsPrivate(true)}
-                  className={`btn ${isPrivate ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.6rem' }}
                 >
-                  <Lock size={16} /> Private Invite
+                  Private Link
                 </button>
                 <button
                   type="button"
+                  className={`action-btn ${!isPrivate ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    backgroundColor: !isPrivate ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: !isPrivate ? '#1a1a1a' : 'var(--text-primary)',
+                    fontWeight: 700,
+                  }}
                   onClick={() => setIsPrivate(false)}
-                  className={`btn ${!isPrivate ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.6rem' }}
                 >
-                  <Globe size={16} /> Open Lobby
+                  Open in Lobby
                 </button>
               </div>
             </div>
 
-            {/* Time Control */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Time Control (Minutes)
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {[1, 3, 5, 10, 0].map((mins) => (
+            {/* Time Control Selector */}
+            <div className="form-group">
+              <label className="form-label">Time Control (Minutes per player)</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
+                {[1, 3, 5, 10, 0].map((m) => (
                   <button
-                    key={mins}
+                    key={m}
                     type="button"
-                    onClick={() => setTimeControl(mins)}
-                    className={`btn ${timeControl === mins ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1, padding: '0.55rem' }}
+                    className={`action-btn ${timeControl === m ? 'active' : ''}`}
+                    style={{
+                      backgroundColor: timeControl === m ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                      color: timeControl === m ? '#1a1a1a' : 'var(--text-primary)',
+                      fontWeight: 700,
+                      padding: '0.5rem',
+                    }}
+                    onClick={() => setTimeControl(m)}
                   >
-                    {mins === 0 ? '∞' : `${mins}m`}
+                    {m === 0 ? 'Unlimited' : `${m} min`}
                   </button>
                 ))}
               </div>
@@ -202,18 +209,21 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
 
             {/* Increment */}
             {timeControl > 0 && (
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                  Fischer Increment
-                </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="form-group">
+                <label className="form-label">Increment per move</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
                   {[0, 1, 2, 5].map((sec) => (
                     <button
                       key={sec}
                       type="button"
+                      className={`action-btn ${increment === sec ? 'active' : ''}`}
+                      style={{
+                        backgroundColor: increment === sec ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                        color: increment === sec ? '#1a1a1a' : 'var(--text-primary)',
+                        fontWeight: 700,
+                        padding: '0.5rem',
+                      }}
                       onClick={() => setIncrement(sec)}
-                      className={`btn ${increment === sec ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ flex: 1, padding: '0.55rem' }}
                     >
                       {sec === 0 ? 'None' : `+${sec}s`}
                     </button>
@@ -222,68 +232,103 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
               </div>
             )}
 
-            {/* Color Preference */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Your Side
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+            {/* Match Type (Ranked vs Casual) */}
+            <div className="form-group">
+              <label className="form-label">Match Grading</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   type="button"
-                  onClick={() => setColorPref('blue')}
-                  className={`btn ${colorPref === 'blue' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '0.6rem' }}
+                  className={`action-btn ${isRanked ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isRanked ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: isRanked ? '#1a1a1a' : 'var(--text-primary)',
+                    fontWeight: 700,
+                  }}
+                  onClick={() => setIsRanked(true)}
                 >
-                  🔵 Blue
+                  Ranked (Elo)
                 </button>
                 <button
                   type="button"
+                  className={`action-btn ${!isRanked ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    backgroundColor: !isRanked ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: !isRanked ? '#1a1a1a' : 'var(--text-primary)',
+                    fontWeight: 700,
+                  }}
+                  onClick={() => setIsRanked(false)}
+                >
+                  Casual / Friendly
+                </button>
+              </div>
+            </div>
+
+            {/* Preferred Army Color */}
+            <div className="form-group">
+              <label className="form-label">Preferred Army Color</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className={`action-btn ${colorPref === 'random' ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colorPref === 'random' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: colorPref === 'random' ? '#1a1a1a' : 'var(--text-primary)',
+                    fontWeight: 700,
+                  }}
                   onClick={() => setColorPref('random')}
-                  className={`btn ${colorPref === 'random' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '0.6rem' }}
                 >
-                  🎲 Random
+                  Random
                 </button>
                 <button
                   type="button"
-                  onClick={() => setColorPref('green')}
-                  className={`btn ${colorPref === 'green' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '0.6rem' }}
+                  className={`action-btn ${colorPref === 'blue' ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colorPref === 'blue' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: colorPref === 'blue' ? '#1a1a1a' : 'var(--piece-blue)',
+                    fontWeight: 700,
+                  }}
+                  onClick={() => setColorPref('blue')}
                 >
-                  🟢 Green
+                  Blue (First)
+                </button>
+                <button
+                  type="button"
+                  className={`action-btn ${colorPref === 'green' ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colorPref === 'green' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: colorPref === 'green' ? '#1a1a1a' : 'var(--piece-green)',
+                    fontWeight: 700,
+                  }}
+                  onClick={() => setColorPref('green')}
+                >
+                  Green
                 </button>
               </div>
             </div>
 
-            {/* Rated toggle if logged in */}
-            {user && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0' }}>
-                <label htmlFor="ranked-checkbox" style={{ fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>
-                  Ranked Match (Elo rating changes)
-                </label>
-                <input
-                  id="ranked-checkbox"
-                  type="checkbox"
-                  checked={isRanked}
-                  onChange={(e) => setIsRanked(e.target.checked)}
-                  style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
-                />
-              </div>
-            )}
-
-            {/* Create Button */}
-            <div style={{ marginTop: '0.5rem' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleCreate}
-                disabled={loading}
-                style={{ width: '100%', padding: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-              >
-                <Users size={18} />
-                {loading ? 'Creating Room...' : 'Create Room & Get Link'}
-              </button>
-            </div>
+            {/* Launch / Create Button */}
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleCreate}
+              disabled={loading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                width: '100%',
+                marginTop: '1.25rem',
+              }}
+            >
+              <Users size={16} />
+              <span>{loading ? 'Creating Room...' : 'Create & Generate Link'}</span>
+            </button>
           </div>
         )}
       </div>
