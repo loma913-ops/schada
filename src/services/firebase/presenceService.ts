@@ -22,9 +22,9 @@ export const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
 
 // Timing constants for presence & activity detection
 export const IDLE_TIMEOUT_MS = 120_000;       // 2 minutes of no user interactions = idle/inactive
-export const HIDDEN_GRACE_PERIOD_MS = 15_000; // 15 seconds after tab is hidden = inactive
-export const SESSION_TTL_MS = 15_000;         // 15 seconds without heartbeat = session expired
-export const HEARTBEAT_INTERVAL_MS = 4_000;   // Heartbeat ping interval
+export const HIDDEN_GRACE_PERIOD_MS = 60_000; // 60 seconds after tab is hidden = inactive
+export const SESSION_TTL_MS = 60_000;         // 60 seconds without heartbeat = session expired
+export const HEARTBEAT_INTERVAL_MS = 30_000;   // Heartbeat ping interval
 
 // In-memory tab activity state
 let lastUserActivityTime = Date.now();

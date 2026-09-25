@@ -3,10 +3,12 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   addDoc,
   updateDoc,
   deleteDoc,
   doc,
+  setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
@@ -85,11 +87,21 @@ export async function respondToFriendRequest(
 ): Promise<void> {
   if (isFirebaseConfigured() && db) {
     const reqRef = doc(db, 'friendRequests', requestId);
+    const reqSnap = await getDoc(reqRef);
+    if (!reqSnap.exists()) return;
+    const reqData = reqSnap.data();
+
     if (accept) {
       await updateDoc(reqRef, {
         status: 'accepted',
         respondedAt: serverTimestamp(),
       });
+      // Write both sides of the friendship so getFriendsList can find them
+      const { fromUserId, toUserId } = reqData;
+      await Promise.all([
+        setDoc(doc(db, 'users', fromUserId, 'userFriends', toUserId), { since: serverTimestamp() }),
+        setDoc(doc(db, 'users', toUserId, 'userFriends', fromUserId), { since: serverTimestamp() }),
+      ]);
     } else {
       await updateDoc(reqRef, {
         status: 'declined',
@@ -104,28 +116,56 @@ export async function respondToFriendRequest(
 
 export async function getFriendsList(userId: string): Promise<UserProfile[]> {
   if (isFirebaseConfigured() && db) {
-    const friendsSnap = await getDocs(collection(db, 'users', userId, 'userFriends'));
-    const friendProfiles: UserProfile[] = [];
-    const now = Date.now();
-    for (const fDoc of friendsSnap.docs) {
-      const pSnap = await getDocs(
-        query(collection(db, 'users'), where('id', '==', fDoc.id))
-      );
-      if (!pSnap.empty) {
-        const data = pSnap.docs[0].data() as UserProfile;
-        const lastSeenMs = (data.lastSeen as any)?.toMillis
-          ? (data.lastSeen as any).toMillis()
-          : (data.lastSeen ? new Date(data.lastSeen).getTime() : 0);
-        const isFresh = now - lastSeenMs <= 45000;
-        const effectiveStatus = (data.status !== 'offline' && isFresh) ? data.status : 'offline';
-        friendProfiles.push({ ...data, status: effectiveStatus });
+    // Primary: read the userFriends subcollection (fast path)
+    const friendsSnap = await getDocs(collection(db!, 'users', userId, 'userFriends'));
+    const knownFriendIds = new Set(friendsSnap.docs.map((d) => d.id));
+
+    // Migration fallback: find accepted requests whose userFriends docs were never written
+    // (affects friendships accepted before the backfill fix was deployed)
+    const [sentSnap, receivedSnap] = await Promise.all([
+      getDocs(query(collection(db!, 'friendRequests'), where('fromUserId', '==', userId), where('status', '==', 'accepted'))),
+      getDocs(query(collection(db!, 'friendRequests'), where('toUserId',   '==', userId), where('status', '==', 'accepted'))),
+    ]);
+
+    const backfills: Promise<unknown>[] = [];
+    for (const reqDoc of [...sentSnap.docs, ...receivedSnap.docs]) {
+      const data = reqDoc.data();
+      const friendId = data.fromUserId === userId ? data.toUserId : data.fromUserId;
+      if (!knownFriendIds.has(friendId)) {
+        knownFriendIds.add(friendId);
+        // Lazy-backfill both sides so subsequent loads skip this branch
+        backfills.push(
+          setDoc(doc(db!, 'users', userId,    'userFriends', friendId), { since: serverTimestamp() }),
+          setDoc(doc(db!, 'users', friendId,  'userFriends', userId),   { since: serverTimestamp() }),
+        );
       }
     }
-    return friendProfiles;
+    if (backfills.length > 0) Promise.all(backfills).catch(console.error);
+
+    if (knownFriendIds.size === 0) return [];
+
+    // Fetch all friend profiles in parallel by document ID
+    const now = Date.now();
+    const profileSnaps = await Promise.all(
+      [...knownFriendIds].map((fid) => getDoc(doc(db!, 'users', fid)))
+    );
+
+    return profileSnaps
+      .filter((snap) => snap.exists())
+      .map((snap) => {
+        const data = snap.data() as UserProfile;
+        const lastSeenMs = (data.lastSeen as any)?.toMillis
+          ? (data.lastSeen as any).toMillis()
+          : (data.lastSeen ? new Date(data.lastSeen as string).getTime() : 0);
+        const isFresh = now - lastSeenMs <= 45000;
+        const effectiveStatus = (data.status !== 'offline' && isFresh) ? data.status : 'offline';
+        return { ...data, status: effectiveStatus };
+      });
   }
 
   return mockBackend.getFriends(userId);
 }
+
 
 export async function removeFriend(userId: string, friendId: string): Promise<void> {
   if (isFirebaseConfigured() && db) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, Smartphone } from 'lucide-react';
+import { Star, Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, Smartphone } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { usePwa } from '@/context/PwaContext';
@@ -30,7 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     <nav className="navbar">
       {/* Brand */}
       <div className="nav-brand" onClick={() => onSelectTab('play')}>
-        <Crown size={24} />
+        <Star size={24} />
         <span>Schada.org</span>
       </div>
 
