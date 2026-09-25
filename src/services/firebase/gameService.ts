@@ -491,6 +491,31 @@ export async function timeoutGameAction(
   }
 }
 
+export async function abandonGame(gameId: string): Promise<void> {
+  let game: GameRoom | null = null;
+  if (isFirebaseConfigured() && db) {
+    const snap = await getDoc(doc(db, 'games', gameId));
+    if (snap.exists()) {
+      game = snap.data() as GameRoom;
+    }
+  } else {
+    game = mockStore.get(gameId);
+  }
+
+  if (!game) return;
+
+  const updatePayload: Partial<GameRoom> = {
+    status: 'abandoned',
+    lastTurnStartTimeMs: null,
+  };
+
+  if (isFirebaseConfigured() && db) {
+    await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));
+  } else {
+    mockStore.set({ ...game, ...updatePayload });
+  }
+}
+
 export async function getOpenRooms(): Promise<GameRoom[]> {
   if (isFirebaseConfigured() && db) {
     const q = query(

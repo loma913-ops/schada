@@ -7,12 +7,13 @@ import {
   makeGameMove,
   resignGameAction,
   timeoutGameAction,
+  abandonGame,
   getLocalSessionToken,
   type GameRoom,
 } from '@/services/firebase/gameService';
 import { Arena, type ArenaPlayer } from './Arena';
 import type { Move, PieceColor } from '@/core/schada/types';
-import { Copy, Check, Share2, ArrowLeft, Loader2, UserCheck, Eye } from 'lucide-react';
+import { Copy, Check, Share2, ArrowLeft, Loader2, UserCheck, Eye, Cpu } from 'lucide-react';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { mockBackend } from '@/services/firebase/mockProvider';
 
@@ -190,95 +191,41 @@ export const GameRoomView: React.FC = () => {
     );
   }
 
-  // Waiting Room state
-  if (game.status === 'waiting') {
+  // Abandoned state
+  if (game.status === 'abandoned') {
     return (
-      <div style={{ maxWidth: '540px', margin: '3rem auto', padding: '1.5rem' }}>
-        <div
-          style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '16px',
-            padding: '2rem',
-            textAlign: 'center',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
-          }}
-        >
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              background: 'rgba(56, 189, 248, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.25rem',
-            }}
-          >
-            <Share2 size={28} color="var(--accent-blue)" />
-          </div>
-
-          <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.4rem' }}>Waiting for Opponent</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            Send this link to a friend to start the match immediately!
-          </p>
-
-          <div
-            style={{
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              padding: '0.75rem 1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.5rem',
-              marginBottom: '1.25rem',
-            }}
-          >
-            <span
-              style={{
-                fontFamily: 'monospace',
-                fontSize: '0.9rem',
-                color: 'var(--text-primary)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {shareableUrl}
-            </span>
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="btn btn-secondary"
-              style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}
-            >
-              {copied ? <Check size={16} color="var(--accent-green)" /> : <Copy size={16} />}
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            <Loader2 size={16} className="spin" />
-            <span>Waiting for player to connect...</span>
-          </div>
-
-          <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/')}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}
-            >
-              <ArrowLeft size={16} /> Cancel & Return to Lobby
-            </button>
-          </div>
-        </div>
+      <div style={{ maxWidth: '480px', margin: '4rem auto', padding: '2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+        <h3 style={{ margin: '0 0 1rem', color: 'var(--accent-red)' }}>Game Abandoned</h3>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+          This match was abandoned by the host.
+        </p>
+        <button type="button" className="btn-primary" onClick={() => navigate('/')}>
+          Return to Lobby
+        </button>
       </div>
     );
   }
+
+  const handlePlayAgainstComputer = async () => {
+    if (gameId) {
+      await abandonGame(gameId);
+    }
+    navigate('/', {
+      state: {
+        openComputerModal: true,
+        timeControlMinutes: game?.timeControlMinutes,
+        incrementSeconds: game?.incrementSeconds,
+        userColor: userColor || 'random',
+      },
+    });
+  };
+
+  const handleCancelAndReturn = async () => {
+    if (gameId) {
+      await abandonGame(gameId);
+    }
+    navigate('/');
+  };
 
   // Compute live synchronized clocks
   const now = Date.now();
@@ -294,11 +241,11 @@ export const GameRoomView: React.FC = () => {
 
   const bluePlayer: ArenaPlayer = game.bluePlayer
     ? { id: game.bluePlayer.id, username: game.bluePlayer.username, elo: game.bluePlayer.elo }
-    : { id: 'blue', username: 'Player Blue', elo: 1200 };
+    : { id: 'blue', username: 'Waiting for player...', elo: 1200 };
 
   const greenPlayer: ArenaPlayer = game.greenPlayer
     ? { id: game.greenPlayer.id, username: game.greenPlayer.username, elo: game.greenPlayer.elo }
-    : { id: 'green', username: 'Player Green', elo: 1200 };
+    : { id: 'green', username: 'Waiting for player...', elo: 1200 };
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
@@ -356,21 +303,172 @@ export const GameRoomView: React.FC = () => {
         isRanked={game.isRanked}
         userColor={userColor}
         isSpectator={isSpectator}
+        isWaiting={game.status === 'waiting'}
         syncedBlueTimeMs={currentBlueTime}
         syncedGreenTimeMs={currentGreenTime}
         onMakeMove={async (move: Move) => {
-          if (!userColor) return;
+          if (!userColor || game.status === 'waiting') return;
           await makeGameMove(gameId!, move, userColor);
         }}
         onResign={async () => {
-          if (!userColor) return;
+          if (!userColor || game.status === 'waiting') return;
           await resignGameAction(gameId!, userColor);
         }}
         onTimeout={async (timedOutColor) => {
+          if (game.status === 'waiting') return;
           await timeoutGameAction(gameId!, timedOutColor);
         }}
-        onExit={() => navigate('/')}
+        onExit={async () => {
+          if (game.status === 'waiting' && gameId) {
+            await abandonGame(gameId);
+          }
+          navigate('/');
+        }}
       />
+
+      {/* Waiting for Opponent Overlay */}
+      {game.status === 'waiting' && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.72)',
+            backdropFilter: 'blur(5px)',
+            WebkitBackdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '1rem',
+          }}
+        >
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '460px',
+              width: '100%',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '1.75rem',
+              textAlign: 'center',
+              boxShadow: 'var(--shadow-lg)',
+            }}
+          >
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.6rem',
+                marginBottom: '1rem',
+                padding: '0.4rem 0.9rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: '999px',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <Loader2 size={16} className="spin" color="var(--accent-gold)" />
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Awaiting connection
+              </span>
+            </div>
+
+            <h2
+              style={{
+                fontSize: '1.35rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                margin: '0 0 0.5rem',
+              }}
+            >
+              Waiting for other player to join.
+            </h2>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+              Share this invite link with another player, or play against the computer now.
+            </p>
+
+            {/* Room Link & Copy */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.5rem',
+                padding: '0.5rem 0.75rem',
+                backgroundColor: 'var(--bg-secondary)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-subtle)',
+                marginBottom: '1.5rem',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.85rem',
+                  color: 'var(--accent-gold)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {shareableUrl}
+              </span>
+              <button
+                type="button"
+                className="action-btn"
+                style={{ padding: '0.35rem 0.7rem', flexShrink: 0 }}
+                onClick={handleCopyLink}
+              >
+                {copied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
+                <span>{copied ? 'Copied' : 'Copy Link'}</span>
+              </button>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handlePlayAgainstComputer}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  width: '100%',
+                  padding: '0.8rem 1.25rem',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                }}
+              >
+                <Cpu size={18} />
+                <span>Play Against Computer</span>
+              </button>
+
+              <button
+                type="button"
+                className="action-btn"
+                onClick={handleCancelAndReturn}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  width: '100%',
+                  padding: '0.65rem 1rem',
+                  fontSize: '0.9rem',
+                }}
+              >
+                <ArrowLeft size={16} />
+                <span>Cancel & Return to Lobby</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Guest Name Confirmation Modal */}
       {guestPromptOpen && (

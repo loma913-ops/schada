@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, Users, Play } from 'lucide-react';
+import { X, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createGame } from '@/services/firebase/gameService';
 import { useNavigate } from 'react-router-dom';
@@ -20,9 +20,6 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
   const [isRanked, setIsRanked] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
 
-  // Once created, display share box
-  const [createdGameId, setCreatedGameId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -46,7 +43,8 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
         creator,
       });
 
-      setCreatedGameId(result.gameId);
+      onClose();
+      navigate(`/game/${result.gameId}`);
     } catch (err: unknown) {
       console.error('Failed to create room:', err);
       const message = err instanceof Error ? err.message : String(err);
@@ -56,101 +54,18 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
     }
   };
 
-  const shareableUrl = createdGameId
-    ? `${window.location.origin}/game/${createdGameId}`
-    : '';
-
-  const handleCopyLink = () => {
-    if (!shareableUrl) return;
-    navigator.clipboard.writeText(shareableUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleEnterRoom = () => {
-    if (!createdGameId) return;
-    onClose();
-    navigate(`/game/${createdGameId}`);
-  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">
-            {createdGameId ? 'Room Created' : 'Create Multiplayer Room'}
-          </h2>
+          <h2 className="modal-title">Create Multiplayer Room</h2>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
-        {createdGameId ? (
-          <div>
-            <div
-              style={{
-                padding: '0.9rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-subtle)',
-                marginBottom: '1.25rem',
-              }}
-            >
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
-                Share this link with a friend to play:
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                  padding: '0.4rem 0.6rem',
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border-subtle)',
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '0.85rem',
-                    color: 'var(--accent-gold)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {shareableUrl}
-                </span>
-                <button
-                  type="button"
-                  className="action-btn"
-                  style={{ padding: '0.3rem 0.65rem', flexShrink: 0 }}
-                  onClick={handleCopyLink}
-                >
-                  {copied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
-
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
-                {isPrivate ? '🔒 Private invite room' : '🌐 Open public room in lobby'}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={handleEnterRoom}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}
-            >
-              <Play size={16} />
-              <span>Enter Game Room</span>
-            </button>
-          </div>
-        ) : (
-          <div>
+        <div>
             {/* Room Visibility */}
             <div className="form-group">
               <label className="form-label">Room Access</label>
@@ -330,7 +245,6 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
               <span>{loading ? 'Creating Room...' : 'Create & Generate Link'}</span>
             </button>
           </div>
-        )}
       </div>
     </div>
   );

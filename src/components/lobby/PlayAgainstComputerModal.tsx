@@ -11,17 +11,37 @@ interface PlayAgainstComputerModalProps {
     difficultyLevel: number;
     userColor: PieceColor;
   }) => void;
+  initialTimeControlMinutes?: number;
+  initialIncrementSeconds?: number;
+  initialColorPref?: 'random' | 'blue' | 'green';
 }
 
 export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> = ({
   isOpen,
   onClose,
   onStartGame,
+  initialTimeControlMinutes,
+  initialIncrementSeconds,
+  initialColorPref,
 }) => {
-  const [minutes, setMinutes] = useState(5);
-  const [increment, setIncrement] = useState(0);
+  const [minutes, setMinutes] = useState(initialTimeControlMinutes ?? 5);
+  const [increment, setIncrement] = useState(initialIncrementSeconds ?? 0);
   const [strength, setStrength] = useState<number>(1);
-  const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
+  const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>(initialColorPref ?? 'random');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialTimeControlMinutes !== undefined) {
+        setMinutes(initialTimeControlMinutes);
+      }
+      if (initialIncrementSeconds !== undefined) {
+        setIncrement(initialIncrementSeconds);
+      }
+      if (initialColorPref !== undefined) {
+        setColorPref(initialColorPref);
+      }
+    }
+  }, [isOpen, initialTimeControlMinutes, initialIncrementSeconds, initialColorPref]);
 
   if (!isOpen) return null;
 

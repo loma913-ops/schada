@@ -4,6 +4,7 @@ import {
   joinGame,
   makeGameMove,
   resignGameAction,
+  abandonGame,
   getOpenRooms,
   getLocalSessionToken,
 } from '../gameService';
@@ -143,5 +144,23 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + gameId);
     const res = await joinGame(gameId, { id: 'p3', username: 'Viewer', elo: 1200 });
     expect(res.role).toBe('spectator');
+  });
+
+  it('marks game as abandoned and removes from open rooms', async () => {
+    const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+    });
+
+    let openRooms = await getOpenRooms();
+    expect(openRooms.some((r) => r.id === gameId)).toBe(true);
+
+    await abandonGame(gameId);
+
+    openRooms = await getOpenRooms();
+    expect(openRooms.some((r) => r.id === gameId)).toBe(false);
   });
 });

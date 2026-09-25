@@ -19,6 +19,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -35,10 +36,15 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
     }
   };
 
-  const handleStart = () => {
-    const chosenColor = colorPref === 'random' ? undefined : colorPref;
-    onCreateGame(minutes, minutes === 0 ? 0 : increment, isRanked, chosenColor);
-    onClose();
+  const handleStart = async () => {
+    setLoading(true);
+    try {
+      const chosenColor = colorPref === 'random' ? undefined : colorPref;
+      await onCreateGame(minutes, minutes === 0 ? 0 : increment, isRanked, chosenColor);
+      onClose();
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -220,9 +226,14 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
           )}
         </div>
 
-        <button className="btn-primary" onClick={handleStart} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+        <button
+          className="btn-primary"
+          onClick={handleStart}
+          disabled={loading}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+        >
           <Play size={16} />
-          <span>Launch Match</span>
+          <span>{loading ? 'Launching Room...' : 'Launch Match'}</span>
         </button>
       </div>
     </div>

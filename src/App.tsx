@@ -22,6 +22,7 @@ import { CustomGameModal } from './components/lobby/CustomGameModal';
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { mockBackend, type UserProfile } from './services/firebase/mockProvider';
+import { createGame } from './services/firebase/gameService';
 import type { BoardState, PieceColor } from './core/schada/types';
 
 interface ActiveMatch {
@@ -50,7 +51,31 @@ const MainApp: React.FC = () => {
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [customGameOpen, setCustomGameOpen] = useState(false);
   const [computerModalOpen, setComputerModalOpen] = useState(false);
+  const [computerModalSettings, setComputerModalSettings] = useState<{
+    timeControlMinutes?: number;
+    incrementSeconds?: number;
+    userColor?: 'random' | 'blue' | 'green';
+  }>({});
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
+
+  // Check if routed with request to open Computer Modal
+  React.useEffect(() => {
+    if (location.state && (location.state as any).openComputerModal) {
+      const state = location.state as {
+        openComputerModal?: boolean;
+        timeControlMinutes?: number;
+        incrementSeconds?: number;
+        userColor?: 'random' | 'blue' | 'green';
+      };
+      setComputerModalSettings({
+        timeControlMinutes: state.timeControlMinutes,
+        incrementSeconds: state.incrementSeconds,
+        userColor: state.userColor,
+      });
+      setComputerModalOpen(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   // Start a Quick Pair game (Player vs Player)
   const handleStartQuickPair = (minutes: number, increment: number, isRanked: boolean) => {
@@ -152,32 +177,26 @@ const MainApp: React.FC = () => {
     });
   };
 
-  // Custom Match Creation (Player vs Player)
-  const handleCreateCustom = (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => {
-    const opponentPlayer: ArenaPlayer = {
-      id: 'player_2',
-      username: 'Player 2',
-      elo: user ? user.eloRating : 1200,
-    };
-
-    const currentUserPlayer: ArenaPlayer = user
+  // Custom Match Creation (Player vs Player) - Routes to Multiplayer Room
+  const handleCreateCustom = async (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => {
+    const creator = user
       ? { id: user.id, username: user.username, elo: user.eloRating }
-      : { id: 'player_1', username: 'Player 1', elo: 1200 };
+      : {
+          id: 'guest_' + Math.random().toString(36).substring(2, 7),
+          username: localStorage.getItem('schada_guest_name') || 'Guest Host',
+          elo: 1200,
+        };
 
-    const userColor: PieceColor = colorPref || (Math.random() < 0.5 ? 'blue' : 'green');
-    const bluePlayer = userColor === 'blue' ? currentUserPlayer : opponentPlayer;
-    const greenPlayer = userColor === 'blue' ? opponentPlayer : currentUserPlayer;
-
-    setActiveMatch({
-      bluePlayer,
-      greenPlayer,
+    const result = await createGame({
       timeControlMinutes: minutes,
       incrementSeconds: minutes === 0 ? 0 : increment,
       isRanked: isRanked && Boolean(user),
-      userColor,
-      isComputer: false,
-      initialState: createInitialGameState(),
+      colorPref: colorPref || 'random',
+      isPrivate: false,
+      creator,
     });
+
+    navigate(`/game/${result.gameId}`);
   };
 
   // Game completion handler (updates Elo and records if ranked)
@@ -316,6 +335,9 @@ const MainApp: React.FC = () => {
         isOpen={computerModalOpen}
         onClose={() => setComputerModalOpen(false)}
         onStartGame={handleStartComputerMatch}
+        initialTimeControlMinutes={computerModalSettings.timeControlMinutes}
+        initialIncrementSeconds={computerModalSettings.incrementSeconds}
+        initialColorPref={computerModalSettings.userColor}
       />
       <CreateRoomModal
         isOpen={createRoomOpen}

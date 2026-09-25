@@ -27,6 +27,7 @@ interface ArenaProps {
   isComputer?: boolean;
   botLevel?: number;
   isSpectator?: boolean;
+  isWaiting?: boolean;
   syncedGameState?: BoardState;
   syncedBlueTimeMs?: number;
   syncedGreenTimeMs?: number;
@@ -48,6 +49,7 @@ export const Arena: React.FC<ArenaProps> = ({
   isComputer = false,
   botLevel = 1,
   isSpectator = false,
+  isWaiting = false,
   syncedGameState,
   syncedBlueTimeMs,
   syncedGreenTimeMs,
@@ -102,7 +104,7 @@ export const Arena: React.FC<ArenaProps> = ({
 
   // Clock countdown timer
   useEffect(() => {
-    if (gameState.isGameOver || timeControlMinutes <= 0) return;
+    if (isWaiting || gameState.isGameOver || timeControlMinutes <= 0) return;
 
     lastTickRef.current = Date.now();
 
