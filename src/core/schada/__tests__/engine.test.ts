@@ -206,7 +206,7 @@ describe('Schada Game Engine', () => {
   it('ensures pieces must complete their full designated paths and cannot stop early', () => {
     const board = createEmptyBoard();
 
-    // 1. Piece on a5 has bent path: 2 right, 2 down -> c3.
+    // 1. Piece on a5 has bent path: 2 right, 1 down -> c4.
     // Must NOT be able to stop early on b5 ([1, 0]) or c5 ([2, 0]).
     board['a5'] = {
       id: 'p_a5',
@@ -217,11 +217,11 @@ describe('Schada Game Engine', () => {
     };
     const a5Moves = getLegalMovesForSquare(board, 'a5');
     const a5Destinations = a5Moves.map((m) => m.to);
-    expect(a5Destinations).toContain('c3'); // Full completed path
+    expect(a5Destinations).toContain('c4'); // Full completed path
     expect(a5Destinations).not.toContain('b5'); // Cannot stop early on intermediate step
     expect(a5Destinations).not.toContain('c5'); // Cannot stop early at the corner bend
 
-    // 2. Piece on h4 has bent path: 2 left, 2 up -> f6.
+    // 2. Piece on h4 has bent path: 2 left, 1 up -> f5.
     // Must NOT be able to stop early on g4 ([-1, 0]) or f4 ([-2, 0]).
     board['h4'] = {
       id: 'p_h4',
@@ -232,7 +232,7 @@ describe('Schada Game Engine', () => {
     };
     const h4Moves = getLegalMovesForSquare(board, 'h4');
     const h4Destinations = h4Moves.map((m) => m.to);
-    expect(h4Destinations).toContain('f6'); // Full completed path
+    expect(h4Destinations).toContain('f5'); // Full completed path
     expect(h4Destinations).not.toContain('g4'); // Cannot stop early on intermediate step
     expect(h4Destinations).not.toContain('f4'); // Cannot stop early at the corner bend
 
