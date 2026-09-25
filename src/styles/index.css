@@ -219,6 +219,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .player-avatar {
@@ -230,6 +231,7 @@ body {
   justify-content: center;
   font-weight: 700;
   font-size: 0.85rem;
+  flex-shrink: 0;
 }
 
 .player-avatar.blue {
@@ -245,6 +247,9 @@ body {
 .player-meta {
   display: flex;
   flex-direction: column;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .player-name {
@@ -254,12 +259,52 @@ body {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-name span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  min-height: 1.2rem;
 }
 
 .player-elo {
   font-size: 0.8rem;
   font-family: var(--font-mono);
   color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.player-thinking {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-gold);
+  font-style: italic;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  animation: pulseThinking 1.4s ease-in-out infinite;
+}
+
+@keyframes pulseThinking {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 
 /* Digital Clock */
@@ -923,14 +968,33 @@ body {
 
 .mobile-arena-actions {
   display: none;
-  width: min(94vw, min(calc(100dvh - 210px), 520px));
+  width: calc(min(94vw, min(calc(100dvh - 210px), 520px)) + 8px);
+  max-width: 100%;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.25rem;
+  box-sizing: border-box;
 }
 
 @media (max-width: 900px) {
+  .player-bar {
+    width: calc(min(94vw, min(calc(100dvh - 210px), 520px)) + 8px);
+    max-width: 100%;
+    padding: 0.4rem 0.65rem;
+    box-sizing: border-box;
+  }
+
+  .player-info {
+    gap: 0.5rem;
+  }
+
+  .digital-clock {
+    font-size: 1.15rem;
+    padding: 0.25rem 0.5rem;
+    min-width: 75px;
+  }
+
   .mobile-arena-actions {
     display: flex;
   }

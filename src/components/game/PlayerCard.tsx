@@ -38,16 +38,18 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           {username.charAt(0).toUpperCase()}
         </div>
         <div className="player-meta">
-          <span className="player-name">
-            {username}
+          <div className="player-name">
+            <span>{username}</span>
             {isUser && <span style={{ fontSize: '0.75rem', opacity: 0.7 }}> (You)</span>}
+          </div>
+          <div className="player-sub">
+            <span className="player-elo">{elo}</span>
             {isThinking && (
-              <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold, #f59e0b)', marginLeft: '0.35rem', fontStyle: 'italic' }}>
-                Thinking...
+              <span className="player-thinking">
+                • Thinking...
               </span>
             )}
-          </span>
-          <span className="player-elo">{elo}</span>
+          </div>
         </div>
 
         {/* Captured enemy pieces rack: 2 rows (top = pawns, bottom = high pieces) */}
