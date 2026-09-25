@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Cpu, Users, Settings2, Share2 } from 'lucide-react';
 import { OnlinePlayersCount } from './OnlinePlayersCount';
 
@@ -11,7 +11,7 @@ export interface TimeControlOption {
 }
 
 interface QuickPairingGridProps {
-  onSelectTimeControl: (minutes: number, increment: number, isRanked: boolean) => void;
+  onSelectTimeControl: (minutes: number, increment: number, isRanked: boolean) => Promise<void> | void;
   onStartPassAndPlay: () => void;
   onOpenCustomModal: () => void;
   onOpenComputerModal: () => void;
@@ -39,6 +39,18 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
   onOpenComputerModal,
   onOpenCreateRoomModal,
 }) => {
+  const [pairingDisplay, setPairingDisplay] = useState<string | null>(null);
+
+  const handleCardClick = async (opt: TimeControlOption) => {
+    if (pairingDisplay) return;
+    setPairingDisplay(opt.display);
+    try {
+      await onSelectTimeControl(opt.minutes, opt.increment, true);
+    } finally {
+      setPairingDisplay(null);
+    }
+  };
+
   return (
     <div className="quick-pairing-container">
       {/* Real-time Players Online Indicator */}
@@ -49,11 +61,15 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
         {TIME_CONTROL_PRESETS.map((opt) => (
           <div
             key={opt.display}
-            className="pairing-card"
-            onClick={() => onSelectTimeControl(opt.minutes, opt.increment, true)}
+            className={`pairing-card ${pairingDisplay === opt.display ? 'active' : ''}`}
+            onClick={() => handleCardClick(opt)}
+            style={{
+              opacity: pairingDisplay && pairingDisplay !== opt.display ? 0.6 : 1,
+              pointerEvents: pairingDisplay ? 'none' : 'auto',
+            }}
           >
             <div className="time">{opt.display}</div>
-            <div className="label">{opt.name}</div>
+            <div className="label">{pairingDisplay === opt.display ? 'Joining...' : opt.name}</div>
           </div>
         ))}
 

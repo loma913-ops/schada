@@ -22,7 +22,7 @@ import { CustomGameModal } from './components/lobby/CustomGameModal';
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { mockBackend, type UserProfile } from './services/firebase/mockProvider';
-import { createGame } from './services/firebase/gameService';
+import { createGame, getOpenRooms, joinGame, getLocalSessionToken } from './services/firebase/gameService';
 import type { BoardState, PieceColor } from './core/schada/types';
 
 interface ActiveMatch {
@@ -77,34 +77,59 @@ const MainApp: React.FC = () => {
     }
   }, [location.state, navigate, location.pathname]);
 
-  // Start a Quick Pair game (Player vs Player)
-  const handleStartQuickPair = (minutes: number, increment: number, isRanked: boolean) => {
-    const currentUserPlayer: ArenaPlayer = user
+  // Start a Quick Pair game (Player vs Player) - checks lobby for open game or creates new open room
+  const handleStartQuickPair = async (minutes: number, increment: number, isRanked: boolean) => {
+    let guestId = localStorage.getItem('schada_guest_id');
+    if (!guestId) {
+      guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
+      localStorage.setItem('schada_guest_id', guestId);
+    }
+
+    const currentUser = user
       ? { id: user.id, username: user.username, elo: user.eloRating }
-      : { id: 'player_1', username: 'Player 1', elo: 1200 };
+      : {
+          id: guestId,
+          username: localStorage.getItem('schada_guest_name') || 'Guest Player',
+          elo: 1200,
+        };
 
-    const opponentPlayer: ArenaPlayer = {
-      id: 'player_2',
-      username: 'Player 2',
-      elo: user ? user.eloRating : 1200,
-    };
+    try {
+      // 1. Check if there is an existing waiting room in the lobby matching this time control
+      const openRooms = await getOpenRooms();
+      const existingMatch = openRooms.find((r) => {
+        if (r.status !== 'waiting') return false;
+        if (r.timeControlMinutes !== minutes || (r.incrementSeconds || 0) !== increment) return false;
+        const token = getLocalSessionToken(r.id);
+        const isHost =
+          (r.bluePlayer && (r.bluePlayer.id === currentUser.id || r.bluePlayer.sessionToken === token)) ||
+          (r.greenPlayer && (r.greenPlayer.id === currentUser.id || r.greenPlayer.sessionToken === token));
+        return !isHost;
+      });
 
-    // Randomly select starting colors for each player (50/50 chance for Blue or Green)
-    const isUserBlue = Math.random() < 0.5;
-    const userColor: PieceColor = isUserBlue ? 'blue' : 'green';
-    const bluePlayer = isUserBlue ? currentUserPlayer : opponentPlayer;
-    const greenPlayer = isUserBlue ? opponentPlayer : currentUserPlayer;
+      if (existingMatch) {
+        const joinRes = await joinGame(existingMatch.id, currentUser);
+        if (joinRes.success) {
+          navigate(`/game/${existingMatch.id}`);
+          return;
+        }
+      }
 
-    setActiveMatch({
-      bluePlayer,
-      greenPlayer,
-      timeControlMinutes: minutes,
-      incrementSeconds: increment,
-      isRanked: isRanked && Boolean(user),
-      userColor,
-      isComputer: false,
-      initialState: createInitialGameState(),
-    });
+      // 2. Otherwise create a public room in the lobby and wait for opponent
+      const result = await createGame({
+        timeControlMinutes: minutes,
+        incrementSeconds: increment,
+        isRanked: isRanked && Boolean(user),
+        colorPref: 'random',
+        isPrivate: false,
+        creator: currentUser,
+      });
+
+      navigate(`/game/${result.gameId}`);
+    } catch (err) {
+      console.error('Failed to quick pair / create room:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      alert(`Failed to start match: ${message}`);
+    }
   };
 
   // Start a Pass and Play / Solo Sandbox game
@@ -179,10 +204,16 @@ const MainApp: React.FC = () => {
 
   // Custom Match Creation (Player vs Player) - Routes to Multiplayer Room
   const handleCreateCustom = async (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => {
+    let guestId = localStorage.getItem('schada_guest_id');
+    if (!guestId) {
+      guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
+      localStorage.setItem('schada_guest_id', guestId);
+    }
+
     const creator = user
       ? { id: user.id, username: user.username, elo: user.eloRating }
       : {
-          id: 'guest_' + Math.random().toString(36).substring(2, 7),
+          id: guestId,
           username: localStorage.getItem('schada_guest_name') || 'Guest Host',
           elo: 1200,
         };

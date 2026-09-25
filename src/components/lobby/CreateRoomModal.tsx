@@ -16,7 +16,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
   const [timeControl, setTimeControl] = useState<number>(5);
   const [increment, setIncrement] = useState<number>(0);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
-  const [isPrivate, setIsPrivate] = useState<boolean>(true);
+  const [isPrivate, setIsPrivate] = useState<boolean>(false);
   const [isRanked, setIsRanked] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
 

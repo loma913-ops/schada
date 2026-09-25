@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Play, Copy, Check } from 'lucide-react';
+import { X, Play } from 'lucide-react';
 import type { PieceColor } from '@/core/schada/types';
 
 interface CustomGameModalProps {
@@ -17,24 +17,9 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
   const [increment, setIncrement] = useState(0);
   const [isRanked, setIsRanked] = useState(true);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
-
-  const handleGenerate = () => {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setGeneratedCode(code);
-  };
-
-  const handleCopyLink = () => {
-    if (generatedCode) {
-      navigator.clipboard.writeText(`${window.location.origin}/?room=${generatedCode}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   const handleStart = async () => {
     setLoading(true);
@@ -184,56 +169,24 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
           </div>
         </div>
 
-        {/* Room Code / Invite Link Generator */}
-        <div style={{ marginBottom: '1.25rem' }}>
-          {!generatedCode ? (
-            <button
-              type="button"
-              className="action-btn"
-              style={{ width: '100%', padding: '0.5rem' }}
-              onClick={handleGenerate}
-            >
-              Generate Shareable Room Code
-            </button>
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0.5rem 0.8rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
-              <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Room Code: </span>
-                <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-gold)' }}>
-                  {generatedCode}
-                </strong>
-              </div>
-              <button
-                type="button"
-                className="action-btn"
-                style={{ padding: '0.25rem 0.6rem' }}
-                onClick={handleCopyLink}
-              >
-                {copied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
-                <span>{copied ? 'Copied' : 'Copy Link'}</span>
-              </button>
-            </div>
-          )}
-        </div>
-
         <button
           className="btn-primary"
           onClick={handleStart}
           disabled={loading}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.4rem',
+            width: '100%',
+            marginTop: '1.25rem',
+            padding: '0.8rem 1.25rem',
+            fontSize: '1rem',
+            fontWeight: 600,
+          }}
         >
           <Play size={16} />
-          <span>{loading ? 'Launching Room...' : 'Launch Match'}</span>
+          <span>{loading ? 'Creating Match...' : 'Create Match & Add to Lobby'}</span>
         </button>
       </div>
     </div>
