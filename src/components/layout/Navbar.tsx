@@ -29,7 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Brand */}
       <div className="nav-brand" onClick={() => onSelectTab('play')}>
         <Crown size={24} />
-        <span>SCHADA</span>
+        <span>Schada.org</span>
       </div>
 
       {/* Navigation Tabs */}

@@ -166,7 +166,7 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const handleResign = () => {
     if (gameState.isGameOver) return;
-    const resigningColor = userColor || gameState.currentTurn;
+    const resigningColor = isComputer && userColor ? userColor : gameState.currentTurn;
     const nextState = resignGame(gameState, resigningColor);
     setGameState(nextState);
     if (onGameComplete) onGameComplete(nextState);
@@ -207,7 +207,7 @@ export const Arena: React.FC<ArenaProps> = ({
         <SchadaBoard
           board={gameState.board}
           currentTurn={gameState.currentTurn}
-          playerColor={userColor}
+          playerColor={isComputer ? userColor : undefined}
           orientation={orientation}
           lastMove={lastMove}
           onMakeMove={handleMakeMove}

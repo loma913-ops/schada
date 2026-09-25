@@ -41,27 +41,26 @@ const MainApp: React.FC = () => {
   const [customGameOpen, setCustomGameOpen] = useState(false);
   const [computerModalOpen, setComputerModalOpen] = useState(false);
 
-  // Start a Quick Pair game
+  // Start a Quick Pair game (Player vs Player)
   const handleStartQuickPair = (minutes: number, increment: number, isRanked: boolean) => {
-    const defaultOpponent: ArenaPlayer = {
-      id: 'bot_tactician',
-      username: 'Boogerd1936 (Bot)',
-      elo: 1420,
-    };
-
     const currentUserPlayer: ArenaPlayer = user
       ? { id: user.id, username: user.username, elo: user.eloRating }
-      : { id: 'guest', username: 'GuestPlayer', elo: 1200 };
+      : { id: 'player_1', username: 'Player 1', elo: 1200 };
+
+    const opponentPlayer: ArenaPlayer = {
+      id: 'player_2',
+      username: 'Player 2',
+      elo: user ? user.eloRating : 1200,
+    };
 
     setActiveMatch({
       bluePlayer: currentUserPlayer,
-      greenPlayer: defaultOpponent,
+      greenPlayer: opponentPlayer,
       timeControlMinutes: minutes,
       incrementSeconds: increment,
       isRanked: isRanked && Boolean(user),
       userColor: 'blue',
-      isComputer: true,
-      botLevel: 1,
+      isComputer: false,
       initialState: createInitialGameState(),
     });
   };
@@ -136,21 +135,21 @@ const MainApp: React.FC = () => {
     });
   };
 
-  // Custom Match Creation
+  // Custom Match Creation (Player vs Player)
   const handleCreateCustom = (minutes: number, isRanked: boolean, colorPref?: PieceColor) => {
-    const defaultOpponent: ArenaPlayer = {
-      id: 'opponent',
-      username: 'SchadaGrandmaster (Bot)',
-      elo: 1650,
+    const opponentPlayer: ArenaPlayer = {
+      id: 'player_2',
+      username: 'Player 2',
+      elo: user ? user.eloRating : 1200,
     };
 
     const currentUserPlayer: ArenaPlayer = user
       ? { id: user.id, username: user.username, elo: user.eloRating }
-      : { id: 'guest', username: 'GuestPlayer', elo: 1200 };
+      : { id: 'player_1', username: 'Player 1', elo: 1200 };
 
     const userColor = colorPref || 'blue';
-    const bluePlayer = userColor === 'blue' ? currentUserPlayer : defaultOpponent;
-    const greenPlayer = userColor === 'blue' ? defaultOpponent : currentUserPlayer;
+    const bluePlayer = userColor === 'blue' ? currentUserPlayer : opponentPlayer;
+    const greenPlayer = userColor === 'blue' ? opponentPlayer : currentUserPlayer;
 
     setActiveMatch({
       bluePlayer,
@@ -159,8 +158,7 @@ const MainApp: React.FC = () => {
       incrementSeconds: 0,
       isRanked: isRanked && Boolean(user),
       userColor,
-      isComputer: true,
-      botLevel: 1,
+      isComputer: false,
       initialState: createInitialGameState(),
     });
   };
