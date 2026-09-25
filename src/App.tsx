@@ -22,7 +22,13 @@ import { CustomGameModal } from './components/lobby/CustomGameModal';
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { mockBackend, type UserProfile } from './services/firebase/mockProvider';
-import { createGame, getOpenRooms, joinGame, getLocalSessionToken } from './services/firebase/gameService';
+import {
+  createGame,
+  getOpenRooms,
+  joinGame,
+  getLocalSessionToken,
+  startAbandonedGamesCleanupWatcher,
+} from './services/firebase/gameService';
 import type { BoardState, PieceColor } from './core/schada/types';
 
 interface ActiveMatch {
@@ -57,6 +63,12 @@ const MainApp: React.FC = () => {
     userColor?: 'random' | 'blue' | 'green';
   }>({});
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
+
+  // Periodic background cleanup of games abandoned for >= 10 minutes
+  React.useEffect(() => {
+    const stopCleanup = startAbandonedGamesCleanupWatcher();
+    return () => stopCleanup();
+  }, []);
 
   // Check if routed with request to open Computer Modal
   React.useEffect(() => {

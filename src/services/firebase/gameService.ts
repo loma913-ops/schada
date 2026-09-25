@@ -3,6 +3,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   query,
   where,
@@ -36,7 +37,10 @@ export interface GameRoom {
   lastTurnStartTimeMs: number | null;
   winner?: PieceColor | 'draw' | null;
   winReason?: string | null;
+  abandonedAt?: number;
 }
+
+export const ABANDONED_GAME_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 
 const SESSION_STORAGE_PREFIX = 'schada_player_token_';
 const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
@@ -86,6 +90,12 @@ class MockGameStore {
           if (subs) {
             subs.forEach((cb) => cb(game));
           }
+        } else if (type === 'GAME_DELETED' && gameId) {
+          const subs = this.listeners.get(gameId);
+          if (subs) {
+            subs.forEach((cb) => cb(null));
+            this.listeners.delete(gameId);
+          }
         }
         this.globalListeners.forEach((cb) => cb());
       };
@@ -117,7 +127,16 @@ class MockGameStore {
   }
 
   public get(id: string): GameRoom | null {
-    return this.getAll()[id] || null;
+    const game = this.getAll()[id] || null;
+    if (
+      game &&
+      game.status === 'abandoned' &&
+      Date.now() - (game.abandonedAt || game.createdAt) >= ABANDONED_GAME_EXPIRY_MS
+    ) {
+      this.delete(id);
+      return null;
+    }
+    return game;
   }
 
   public set(game: GameRoom): void {
@@ -139,6 +158,29 @@ class MockGameStore {
     // Broadcast to other tabs
     if (this.channel) {
       this.channel.postMessage({ type: 'GAME_UPDATED', gameId: game.id, game });
+    }
+  }
+
+  public delete(id: string): void {
+    const games = this.getAll();
+    delete games[id];
+    delete this.memoryStore[id];
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(MOCK_GAMES_STORAGE_KEY, JSON.stringify(games));
+    }
+
+    // Notify local callbacks
+    const subs = this.listeners.get(id);
+    if (subs) {
+      subs.forEach((cb) => cb(null));
+      this.listeners.delete(id);
+    }
+    this.globalListeners.forEach((cb) => cb());
+
+    // Broadcast to other tabs
+    if (this.channel) {
+      this.channel.postMessage({ type: 'GAME_DELETED', gameId: id });
     }
   }
 
@@ -347,11 +389,27 @@ export function subscribeToGame(
     const docRef = doc(db, 'games', gameId);
     return onSnapshot(
       docRef,
-      (snap) => {
+      async (snap) => {
         if (!snap.exists()) {
           onUpdate(null);
         } else {
-          onUpdate(snap.data() as GameRoom);
+          const game = snap.data() as GameRoom;
+          if (
+            game.status === 'abandoned' &&
+            Date.now() - (game.abandonedAt || game.createdAt) >= ABANDONED_GAME_EXPIRY_MS
+          ) {
+            try {
+              await deleteDoc(docRef);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem(SESSION_STORAGE_PREFIX + gameId);
+              }
+            } catch (err) {
+              console.warn('Error deleting expired abandoned game in subscription:', err);
+            }
+            onUpdate(null);
+            return;
+          }
+          onUpdate(game);
         }
       },
       (err) => {
@@ -504,8 +562,10 @@ export async function abandonGame(gameId: string): Promise<void> {
 
   if (!game) return;
 
+  const now = Date.now();
   const updatePayload: Partial<GameRoom> = {
     status: 'abandoned',
+    abandonedAt: now,
     lastTurnStartTimeMs: null,
   };
 
@@ -514,9 +574,96 @@ export async function abandonGame(gameId: string): Promise<void> {
   } else {
     mockStore.set({ ...game, ...updatePayload });
   }
+
+  if (typeof window !== 'undefined') {
+    setTimeout(() => {
+      cleanupAbandonedGames().catch(() => {});
+    }, ABANDONED_GAME_EXPIRY_MS + 100);
+  }
+}
+
+export async function deleteGame(gameId: string): Promise<void> {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(SESSION_STORAGE_PREFIX + gameId);
+  }
+
+  if (isFirebaseConfigured() && db) {
+    await deleteDoc(doc(db, 'games', gameId));
+  } else {
+    mockStore.delete(gameId);
+  }
+}
+
+/**
+ * Removes and cleans up games that have been abandoned for 10 minutes (or specified duration).
+ * Deletes documents from Firestore / MockStore and clears associated local player tokens.
+ */
+export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EXPIRY_MS): Promise<string[]> {
+  const now = Date.now();
+  const removedIds: string[] = [];
+
+  if (isFirebaseConfigured() && db) {
+    try {
+      const q = query(
+        collection(db, 'games'),
+        where('status', '==', 'abandoned')
+      );
+      const snap = await getDocs(q);
+      for (const docSnap of snap.docs) {
+        const game = docSnap.data() as GameRoom;
+        const abandonedTime = game.abandonedAt || game.createdAt;
+        if (abandonedTime && now - abandonedTime >= maxAgeMs) {
+          await deleteDoc(doc(db, 'games', docSnap.id));
+          removedIds.push(docSnap.id);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem(SESSION_STORAGE_PREFIX + docSnap.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to cleanup abandoned games from Firestore:', err);
+    }
+  } else {
+    const all = mockStore.getAll();
+    for (const [id, game] of Object.entries(all)) {
+      if (game.status === 'abandoned') {
+        const abandonedTime = game.abandonedAt || game.createdAt;
+        if (abandonedTime && now - abandonedTime >= maxAgeMs) {
+          mockStore.delete(id);
+          removedIds.push(id);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem(SESSION_STORAGE_PREFIX + id);
+          }
+        }
+      }
+    }
+  }
+
+  return removedIds;
+}
+
+/**
+ * Starts a recurring background watcher that cleans up games abandoned for 10 minutes.
+ */
+export function startAbandonedGamesCleanupWatcher(intervalMs: number = 60000): () => void {
+  cleanupAbandonedGames().catch(() => {});
+
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const intervalId = setInterval(() => {
+    cleanupAbandonedGames().catch(() => {});
+  }, intervalMs);
+
+  return () => {
+    clearInterval(intervalId);
+  };
 }
 
 export async function getOpenRooms(): Promise<GameRoom[]> {
+  cleanupAbandonedGames().catch(() => {});
+
   if (isFirebaseConfigured() && db) {
     const q = query(
       collection(db, 'games'),
@@ -532,6 +679,8 @@ export async function getOpenRooms(): Promise<GameRoom[]> {
 }
 
 export function subscribeToOpenRooms(callback: (rooms: GameRoom[]) => void): () => void {
+  cleanupAbandonedGames().catch(() => {});
+
   if (isFirebaseConfigured() && db) {
     const q = query(
       collection(db, 'games'),

@@ -7,6 +7,10 @@ import {
   abandonGame,
   getOpenRooms,
   getLocalSessionToken,
+  deleteGame,
+  cleanupAbandonedGames,
+  subscribeToGame,
+  ABANDONED_GAME_EXPIRY_MS,
 } from '../gameService';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
 
@@ -162,5 +166,154 @@ describe('GameService Multiplayer Sync', () => {
 
     openRooms = await getOpenRooms();
     expect(openRooms.some((r) => r.id === gameId)).toBe(false);
+  });
+
+  it('sets abandonedAt timestamp when game is abandoned', async () => {
+    const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+    });
+
+    const before = Date.now();
+    await abandonGame(gameId);
+    const after = Date.now();
+
+    let fetchedGame: any = null;
+    const unsub = subscribeToGame(gameId, (g) => {
+      fetchedGame = g;
+    });
+    unsub();
+
+    expect(fetchedGame).not.toBeNull();
+    expect(fetchedGame.status).toBe('abandoned');
+    expect(fetchedGame.abandonedAt).toBeGreaterThanOrEqual(before);
+    expect(fetchedGame.abandonedAt).toBeLessThanOrEqual(after);
+  });
+
+  it('retains abandoned game if under 10 minutes old', async () => {
+    const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+    });
+
+    await abandonGame(gameId);
+
+    // Run cleanup with standard 10 minutes (600,000 ms) threshold
+    const removed = await cleanupAbandonedGames(ABANDONED_GAME_EXPIRY_MS);
+    expect(removed).not.toContain(gameId);
+
+    let fetchedGame: any = null;
+    const unsub = subscribeToGame(gameId, (g) => {
+      fetchedGame = g;
+    });
+    unsub();
+
+    expect(fetchedGame).not.toBeNull();
+    expect(fetchedGame.status).toBe('abandoned');
+  });
+
+  it('removes and cleans up games that have been abandoned for 10 minutes or more', async () => {
+    const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
+    const { gameId, sessionToken } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+    });
+
+    expect(getLocalSessionToken(gameId)).toBe(sessionToken);
+
+    await abandonGame(gameId);
+
+    // Simulate 10 minutes (600,000 ms) having passed since abandonment by running cleanup with maxAgeMs = 0
+    const removed = await cleanupAbandonedGames(0);
+    expect(removed).toContain(gameId);
+
+    // Game should now be completely deleted from store
+    let fetchedGame: any = 'initial';
+    const unsub = subscribeToGame(gameId, (g) => {
+      fetchedGame = g;
+    });
+    unsub();
+
+    expect(fetchedGame).toBeNull();
+
+    // Local player session token should also be cleaned up
+    expect(getLocalSessionToken(gameId)).toBeNull();
+  });
+
+  it('does not remove active or completed games during cleanup', async () => {
+    const creator = { id: 'p1', username: 'ActiveHost', elo: 1300 };
+    const { gameId: activeGameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+    });
+
+    const removed = await cleanupAbandonedGames(0);
+    expect(removed).not.toContain(activeGameId);
+
+    let activeGame: any = null;
+    const unsub = subscribeToGame(activeGameId, (g) => {
+      activeGame = g;
+    });
+    unsub();
+
+    expect(activeGame).not.toBeNull();
+    expect(activeGame.status).toBe('waiting');
+  });
+
+  it('cleans up expired abandoned game on direct subscription', async () => {
+    const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+    });
+
+    await abandonGame(gameId);
+
+    // Manually manipulate the stored mock game abandonedAt to be 11 minutes ago
+    const raw = localStorage.getItem('schada_mock_games');
+    const parsed = JSON.parse(raw || '{}');
+    parsed[gameId].abandonedAt = Date.now() - 11 * 60 * 1000;
+    localStorage.setItem('schada_mock_games', JSON.stringify(parsed));
+
+    let fetchedGame: any = 'placeholder';
+    const unsub = subscribeToGame(gameId, (g) => {
+      fetchedGame = g;
+    });
+    unsub();
+
+    expect(fetchedGame).toBeNull();
+  });
+
+  it('allows manual game deletion via deleteGame', async () => {
+    const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+    });
+
+    await deleteGame(gameId);
+
+    let fetchedGame: any = 'placeholder';
+    const unsub = subscribeToGame(gameId, (g) => {
+      fetchedGame = g;
+    });
+    unsub();
+
+    expect(fetchedGame).toBeNull();
+    expect(getLocalSessionToken(gameId)).toBeNull();
   });
 });

@@ -9,6 +9,8 @@ import {
   timeoutGameAction,
   abandonGame,
   getLocalSessionToken,
+  cleanupAbandonedGames,
+  ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '@/services/firebase/gameService';
 import { Arena, type ArenaPlayer } from './Arena';
@@ -63,6 +65,21 @@ export const GameRoomView: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // Auto-cleanup timer if viewing an abandoned game when the 10 minutes elapse
+  useEffect(() => {
+    if (!game || game.status !== 'abandoned') return;
+
+    const abandonedTime = game.abandonedAt || game.createdAt;
+    const elapsed = Date.now() - abandonedTime;
+    const remainingMs = Math.max(0, ABANDONED_GAME_EXPIRY_MS - elapsed);
+
+    const timer = setTimeout(async () => {
+      await cleanupAbandonedGames();
+    }, remainingMs);
+
+    return () => clearTimeout(timer);
+  }, [game?.status, game?.abandonedAt, game?.createdAt]);
 
   // 2. Determine player identity and join
   useEffect(() => {
@@ -200,10 +217,13 @@ export const GameRoomView: React.FC = () => {
     return (
       <div style={{ maxWidth: '480px', margin: '4rem auto', padding: '2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
         <h3 style={{ margin: '0 0 1rem', color: 'var(--accent-red)' }}>Game Abandoned</h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
           This match was abandoned by the host.
         </p>
-        <button type="button" className="btn-primary" onClick={() => navigate('/')}>
+        <p style={{ color: 'var(--text-muted, #71717a)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+          Abandoned games are automatically removed after 10 minutes.
+        </p>
+        <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>
           Return to Lobby
         </button>
       </div>
