@@ -496,14 +496,14 @@ export async function getOpenRooms(): Promise<GameRoom[]> {
     const q = query(
       collection(db, 'games'),
       where('isPrivate', '==', false),
-      where('status', '==', 'waiting')
+      where('status', 'in', ['waiting', 'in_progress'])
     );
     const snap = await getDocs(q);
     return snap.docs.map((docSnap) => docSnap.data() as GameRoom);
   }
 
   const all = mockStore.getAll();
-  return Object.values(all).filter((g) => !g.isPrivate && g.status === 'waiting');
+  return Object.values(all).filter((g) => !g.isPrivate && (g.status === 'waiting' || g.status === 'in_progress'));
 }
 
 export function subscribeToOpenRooms(callback: (rooms: GameRoom[]) => void): () => void {
@@ -511,7 +511,7 @@ export function subscribeToOpenRooms(callback: (rooms: GameRoom[]) => void): () 
     const q = query(
       collection(db, 'games'),
       where('isPrivate', '==', false),
-      where('status', '==', 'waiting')
+      where('status', 'in', ['waiting', 'in_progress'])
     );
     return onSnapshot(
       q,
@@ -528,7 +528,7 @@ export function subscribeToOpenRooms(callback: (rooms: GameRoom[]) => void): () 
 
   const update = () => {
     const all = mockStore.getAll();
-    callback(Object.values(all).filter((g) => !g.isPrivate && g.status === 'waiting'));
+    callback(Object.values(all).filter((g) => !g.isPrivate && (g.status === 'waiting' || g.status === 'in_progress')));
   };
 
   update();

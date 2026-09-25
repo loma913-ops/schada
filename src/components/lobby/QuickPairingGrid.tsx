@@ -1,6 +1,5 @@
 import React from 'react';
 import { Cpu, Users, Settings2, Share2 } from 'lucide-react';
-import { OpenRoomsList } from './OpenRoomsList';
 import { OnlinePlayersCount } from './OnlinePlayersCount';
 
 export interface TimeControlOption {
@@ -109,9 +108,6 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
           <span>Pass & Play (Local 2-Player)</span>
         </button>
       </div>
-
-      {/* Open Rooms Section */}
-      <OpenRoomsList />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { BottomNav } from './components/layout/BottomNav';
 import { OfflineBanner } from './components/layout/OfflineBanner';
 import { InstallModal } from './components/pwa/InstallModal';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
+import { LobbyTable } from './components/lobby/LobbyTable';
 import { PlayAgainstComputerModal } from './components/lobby/PlayAgainstComputerModal';
 import { CreateRoomModal } from './components/lobby/CreateRoomModal';
 import { GameRoomView } from './components/game/GameRoomView';
@@ -255,14 +256,19 @@ const MainApp: React.FC = () => {
                     onExit={() => setActiveMatch(null)}
                   />
                 ) : (
-                  <div className="lobby-wrapper">
-                    <QuickPairingGrid
-                      onSelectTimeControl={handleStartQuickPair}
-                      onStartPassAndPlay={handleStartPassAndPlay}
-                      onOpenCustomModal={() => setCustomGameOpen(true)}
-                      onOpenComputerModal={() => setComputerModalOpen(true)}
-                      onOpenCreateRoomModal={() => setCreateRoomOpen(true)}
-                    />
+                  <div className="home-dashboard">
+                    <div className="home-grid-column">
+                      <QuickPairingGrid
+                        onSelectTimeControl={handleStartQuickPair}
+                        onStartPassAndPlay={handleStartPassAndPlay}
+                        onOpenCustomModal={() => setCustomGameOpen(true)}
+                        onOpenComputerModal={() => setComputerModalOpen(true)}
+                        onOpenCreateRoomModal={() => setCreateRoomOpen(true)}
+                      />
+                    </div>
+                    <div className="home-lobby-column">
+                      <LobbyTable onOpenCreateRoomModal={() => setCreateRoomOpen(true)} />
+                    </div>
                   </div>
                 )
               ) : currentTab === 'leaderboard' ? (
