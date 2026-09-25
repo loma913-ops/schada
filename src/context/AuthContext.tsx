@@ -32,43 +32,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, pass: string) => {
+  const login = React.useCallback(async (email: string, pass: string) => {
     const profile = await loginUser(email, pass);
     setUser(profile);
-  };
+  }, []);
 
-  const register = async (email: string, pass: string, username: string) => {
+  const register = React.useCallback(async (email: string, pass: string, username: string) => {
     const profile = await registerUser(email, pass, username);
     setUser(profile);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = React.useCallback(async () => {
     await logoutUser();
     setUser(null);
-  };
+  }, []);
 
-  const updateUsername = async (newUsername: string) => {
-    if (!user) throw new Error('Not logged in');
-    const updated = await changeUsername(user.id, newUsername);
-    setUser(updated);
-  };
+  const updateUsername = React.useCallback(async (newUsername: string) => {
+    setUser((currentUser) => {
+      if (!currentUser) throw new Error('Not logged in');
+      changeUsername(currentUser.id, newUsername).then((updated) => setUser(updated));
+      return currentUser;
+    });
+  }, []);
 
-  const refreshUser = () => {
+  const refreshUser = React.useCallback(() => {
     subscribeToAuthState((profile) => setUser(profile));
-  };
+  }, []);
+
+  const value = React.useMemo(
+    () => ({
+      user,
+      isLoading,
+      login,
+      register,
+      logout,
+      updateUsername,
+      refreshUser,
+    }),
+    [user, isLoading, login, register, logout, updateUsername, refreshUser]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        login,
-        register,
-        logout,
-        updateUsername,
-        refreshUser,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

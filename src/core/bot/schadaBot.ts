@@ -1,5 +1,5 @@
 import type { BoardMatrix, Move, PieceColor } from '../schada/types';
-import { getAllLegalMoves, executeMove, haveAllRemainingHighPiecesReachedGoal } from '../schada/engine';
+import { getAllLegalMoves, haveAllRemainingHighPiecesReachedGoal, isSquareAttacked } from '../schada/engine';
 import { squareToColRow } from '../schada/vectors';
 
 /**
@@ -67,34 +67,27 @@ export function scoreMove(
   }
 
   // 5. Lookahead / Threat Avoidance (1-ply defensive check)
-  // Simulate the move on a scratch board
-  const nextState = executeMove(
-    {
-      board,
-      currentTurn: botColor,
-      moveHistory: [],
-      capturedPieces: { blue: [], green: [] },
-      positionHistory: [],
-      isGameOver: false,
-      result: null,
-    },
-    move
-  );
+  // Simulate the move on a lightweight scratch board (avoiding heavy hash calculation & cloning)
+  const scratchBoard: BoardMatrix = { ...board };
+  scratchBoard[move.from] = null;
+  scratchBoard[move.to] = {
+    ...move.piece,
+    hasLeftBase: true,
+    hasReachedGoal: toRow === goalRank,
+  };
 
   // Did this move immediately win the game?
-  if (haveAllRemainingHighPiecesReachedGoal(nextState.board, botColor)) {
+  if (haveAllRemainingHighPiecesReachedGoal(scratchBoard, botColor)) {
     return 10000;
   }
 
-  // Check if destination square is immediately attacked by opponent
-  const opponentResponses = getAllLegalMoves(nextState.board, opponentColor);
-  const isDirectlyAttacked = opponentResponses.some((oppMove) => oppMove.to === move.to);
-
-  if (isDirectlyAttacked && toRow !== goalRank) {
-    // If piece is in goal rank, it is immune to capture!
-    // Otherwise penalize blundering the moving piece
-    const movingPieceValue = PIECE_VALUES[move.piece.type] || 15;
-    score -= movingPieceValue * 1.5;
+  // Check if destination square is immediately attacked by opponent (only if outside immune goal rank)
+  if (toRow !== goalRank) {
+    const isDirectlyAttacked = isSquareAttacked(scratchBoard, move.to, opponentColor);
+    if (isDirectlyAttacked) {
+      const movingPieceValue = PIECE_VALUES[move.piece.type] || 15;
+      score -= movingPieceValue * 1.5;
+    }
   }
 
   // 6. Friendly leap bonuses for Field Officer (only outside the goal line)

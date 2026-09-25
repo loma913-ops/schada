@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 interface DigitalClockProps {
   remainingMs: number;
@@ -6,11 +6,11 @@ interface DigitalClockProps {
   isLowTime?: boolean;
 }
 
-export const DigitalClock: React.FC<DigitalClockProps> = ({
+export const DigitalClock: React.FC<DigitalClockProps> = memo(function DigitalClock({
   remainingMs,
   isActive,
   isLowTime,
-}) => {
+}) {
   // If unlimited time
   if (remainingMs <= 0 && !isActive) {
     return <div className="digital-clock">∞</div>;
@@ -40,4 +40,4 @@ export const DigitalClock: React.FC<DigitalClockProps> = ({
       {formattedTime}
     </div>
   );
-};
+});

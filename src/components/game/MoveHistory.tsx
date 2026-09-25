@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo, memo } from 'react';
 import type { Move } from '@/core/schada/types';
 import { ChevronFirst, ChevronLeft, ChevronRight, ChevronLast } from 'lucide-react';
 
@@ -8,22 +8,25 @@ interface MoveHistoryProps {
   onNavigateMove?: (index: number) => void;
 }
 
-export const MoveHistory: React.FC<MoveHistoryProps> = ({
+export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory({
   history,
   currentMoveIndex = history.length - 1,
   onNavigateMove,
-}) => {
+}) {
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Group moves into pairs (White/Blue, Black/Green)
-  const movePairs: { num: number; blue?: Move; green?: Move }[] = [];
-  for (let i = 0; i < history.length; i += 2) {
-    movePairs.push({
-      num: Math.floor(i / 2) + 1,
-      blue: history[i],
-      green: history[i + 1],
-    });
-  }
+  // Group moves into pairs (Blue, Green) — only recompute when history grows
+  const movePairs: { num: number; blue?: Move; green?: Move }[] = useMemo(() => {
+    const pairs: { num: number; blue?: Move; green?: Move }[] = [];
+    for (let i = 0; i < history.length; i += 2) {
+      pairs.push({
+        num: Math.floor(i / 2) + 1,
+        blue: history[i],
+        green: history[i + 1],
+      });
+    }
+    return pairs;
+  }, [history]);
 
   // Auto-scroll to bottom on new moves
   useEffect(() => {
@@ -115,4 +118,4 @@ export const MoveHistory: React.FC<MoveHistoryProps> = ({
       )}
     </div>
   );
-};
+});

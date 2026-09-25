@@ -8,18 +8,6 @@
  * 4. Preloaded HTML5 Audio element fallback so audio never drops under any browser state.
  */
 
-import { MOVE_SOUND_B64, CAPTURE_SOUND_B64 } from './soundAssets';
-
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binaryString = window.atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
 class SoundService {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
@@ -38,10 +26,10 @@ class SoundService {
     }
 
     if (typeof window !== 'undefined') {
-      // Pre-instantiate audio elements for zero-latency fallback
+      // Pre-instantiate audio elements from cached static assets
       try {
-        this.moveAudioElement = new Audio('data:audio/wav;base64,' + MOVE_SOUND_B64);
-        this.captureAudioElement = new Audio('data:audio/wav;base64,' + CAPTURE_SOUND_B64);
+        this.moveAudioElement = new Audio('/sounds/move.mp3');
+        this.captureAudioElement = new Audio('/sounds/capture.mp3');
         this.moveAudioElement.preload = 'auto';
         this.captureAudioElement.preload = 'auto';
       } catch {
@@ -85,10 +73,15 @@ class SoundService {
     this.isDecoding = true;
 
     try {
-      const moveArr = base64ToArrayBuffer(MOVE_SOUND_B64);
-      const capArr = base64ToArrayBuffer(CAPTURE_SOUND_B64);
+      const [moveRes, capRes] = await Promise.all([
+        fetch('/sounds/move.mp3'),
+        fetch('/sounds/capture.mp3'),
+      ]);
+      const [moveArr, capArr] = await Promise.all([
+        moveRes.arrayBuffer(),
+        capRes.arrayBuffer(),
+      ]);
 
-      // decodeAudioData consumes the ArrayBuffer, so we decode each fresh
       const [mBuf, cBuf] = await Promise.all([
         ctx.decodeAudioData(moveArr),
         ctx.decodeAudioData(capArr),

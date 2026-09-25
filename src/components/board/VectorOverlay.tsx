@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import type { Square } from '@/core/schada/types';
 import { BOARD_VISUALS } from '@/core/schada/board_visual_data';
 
@@ -8,7 +8,7 @@ interface VectorOverlayProps {
   orientation?: 'blue' | 'green';
 }
 
-export const VectorOverlay: React.FC<VectorOverlayProps> = ({
+export const VectorOverlay: React.FC<VectorOverlayProps> = memo(({
   square,
   isSelected,
   orientation = 'blue',
@@ -60,4 +60,7 @@ export const VectorOverlay: React.FC<VectorOverlayProps> = ({
       </g>
     </svg>
   );
-};
+});
+
+VectorOverlay.displayName = 'VectorOverlay';
+

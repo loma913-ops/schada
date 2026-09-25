@@ -125,6 +125,7 @@
   pointer-events: none;
   z-index: 5;
   animation: pulseDot 1.5s infinite ease-in-out;
+  will-change: transform, opacity;
 }
 
 .move-capture-ring {
@@ -139,6 +140,7 @@
   pointer-events: none;
   z-index: 5;
   animation: ringPulse 1.2s infinite alternate ease-in-out;
+  will-change: transform, opacity;
 }
 
 @keyframes pulseDot {

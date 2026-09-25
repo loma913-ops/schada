@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import type { Piece, PieceColor } from '@/core/schada/types';
 import { DigitalClock } from './DigitalClock';
 import { PieceIcon } from '../board/PieceIcon';
@@ -15,7 +15,7 @@ interface PlayerCardProps {
   isThinking?: boolean;
 }
 
-export const PlayerCard: React.FC<PlayerCardProps> = ({
+export const PlayerCard: React.FC<PlayerCardProps> = memo(function PlayerCard({
   username,
   elo,
   color,
@@ -25,7 +25,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   materialAdvantage,
   isUser,
   isThinking,
-}) => {
+}) {
   const pawns = capturedPieces.filter((p) => p.type === 'pawn');
   const fieldOfficers = capturedPieces.filter((p) => p.type === 'field_officer');
   const officers = capturedPieces.filter((p) => p.type === 'officer');
@@ -159,4 +159,4 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
       <DigitalClock remainingMs={remainingMs} isActive={isTurn} />
     </div>
   );
-};
+});

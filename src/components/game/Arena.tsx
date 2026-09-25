@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { BoardState, Move, Piece, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import { selectBotMove, getBotThinkingDelayMs } from '@/core/bot/schadaBot';
@@ -9,6 +9,14 @@ import { PlayerCard } from './PlayerCard';
 import { MoveHistory } from './MoveHistory';
 import { GameControls } from './GameControls';
 import { GameOverModal } from './GameOverModal';
+
+/** Pure helper — defined at module scope so it is never re-created on render. */
+function getMaterialValue(pieces: Piece[]): number {
+  return pieces.reduce(
+    (sum, p) => sum + (p.type === 'field_officer' ? 3 : p.type === 'officer' ? 2 : 1),
+    0
+  );
+}
 
 export interface ArenaPlayer {
   id: string;
@@ -102,6 +110,17 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const lastTickRef = useRef<number>(Date.now());
 
+  const handleTimeout = useCallback((timedOutColor: PieceColor) => {
+    if (customTimeout) {
+      customTimeout(timedOutColor);
+    }
+    setGameState((prev) => {
+      const ended = timeoutGame(prev, timedOutColor);
+      if (onGameComplete) onGameComplete(ended);
+      return ended;
+    });
+  }, [customTimeout, onGameComplete]);
+
   // Clock countdown timer
   useEffect(() => {
     if (isWaiting || gameState.isGameOver || timeControlMinutes <= 0) return;
@@ -133,20 +152,15 @@ export const Arena: React.FC<ArenaProps> = ({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [gameState.currentTurn, gameState.isGameOver, timeControlMinutes]);
+  }, [
+    isWaiting,
+    gameState.currentTurn,
+    gameState.isGameOver,
+    timeControlMinutes,
+    handleTimeout,
+  ]);
 
-  const handleTimeout = (timedOutColor: PieceColor) => {
-    if (customTimeout) {
-      customTimeout(timedOutColor);
-    }
-    setGameState((prev) => {
-      const ended = timeoutGame(prev, timedOutColor);
-      if (onGameComplete) onGameComplete(ended);
-      return ended;
-    });
-  };
-
-  const handleMakeMove = (move: Move) => {
+  const handleMakeMove = useCallback((move: Move) => {
     const currentState = gameStateRef.current;
     if (currentState.isGameOver) return;
 
@@ -193,7 +207,7 @@ export const Arena: React.FC<ArenaProps> = ({
     if (nextState.isGameOver && onGameComplete) {
       onGameComplete(nextState);
     }
-  };
+  }, [customMakeMove, incrementSeconds, timeControlMinutes, onGameComplete]);
 
   // Bot Turn Automation
   useEffect(() => {
@@ -219,7 +233,7 @@ export const Arena: React.FC<ArenaProps> = ({
       clearTimeout(timer);
       setIsBotThinking(false);
     };
-  }, [gameState.currentTurn, gameState.isGameOver, isComputer, computerColor, botLevel]);
+  }, [gameState.currentTurn, gameState.isGameOver, isComputer, computerColor, botLevel, handleMakeMove]);
 
   const handleResign = () => {
     if (gameState.isGameOver) return;
@@ -251,16 +265,14 @@ export const Arena: React.FC<ArenaProps> = ({
   const topCaptured = gameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue'];
   const bottomCaptured = gameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue'];
 
-  const getMaterialValue = (pieces: Piece[]) =>
-    pieces.reduce(
-      (sum, p) => sum + (p.type === 'field_officer' ? 3 : p.type === 'officer' ? 2 : 1),
-      0
-    );
-
-  const topMaterialScore = getMaterialValue(topCaptured);
-  const bottomMaterialScore = getMaterialValue(bottomCaptured);
-  const topAdvantage = topMaterialScore - bottomMaterialScore;
-  const bottomAdvantage = bottomMaterialScore - topMaterialScore;
+  const materialScores = useMemo(() => {
+    const topScore = getMaterialValue(topCaptured);
+    const bottomScore = getMaterialValue(bottomCaptured);
+    return {
+      topAdvantage: topScore - bottomScore,
+      bottomAdvantage: bottomScore - topScore,
+    };
+  }, [topCaptured, bottomCaptured]);
 
   return (
     <div className="arena-layout">
@@ -274,7 +286,7 @@ export const Arena: React.FC<ArenaProps> = ({
           isTurn={gameState.currentTurn === topColor && !gameState.isGameOver}
           remainingMs={topTime}
           capturedPieces={topCaptured}
-          materialAdvantage={topAdvantage > 0 ? topAdvantage : undefined}
+          materialAdvantage={materialScores.topAdvantage > 0 ? materialScores.topAdvantage : undefined}
           isUser={userColor === topColor}
           isThinking={isBotThinking && gameState.currentTurn === topColor}
         />
@@ -303,7 +315,7 @@ export const Arena: React.FC<ArenaProps> = ({
           isTurn={gameState.currentTurn === bottomColor && !gameState.isGameOver}
           remainingMs={bottomTime}
           capturedPieces={bottomCaptured}
-          materialAdvantage={bottomAdvantage > 0 ? bottomAdvantage : undefined}
+          materialAdvantage={materialScores.bottomAdvantage > 0 ? materialScores.bottomAdvantage : undefined}
           isUser={userColor === bottomColor}
           isThinking={isBotThinking && gameState.currentTurn === bottomColor}
         />

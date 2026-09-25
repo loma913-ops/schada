@@ -5,6 +5,7 @@ import {
   getLegalMovesForSquare,
   executeMove,
   createEmptyBoard,
+  isSquareAttacked,
 } from '../engine';
 import { calculateScoreBreakdown, evaluateGameResult } from '../scoring';
 import { SCHADA_VECTORS, squareToColRow, colRowToSquare } from '../vectors';
@@ -381,5 +382,50 @@ describe('Schada Game Engine', () => {
     expect(foMoves.some((m) => m.to === 'h2')).toBe(false);
     expect(foMoves.some((m) => m.to === 'g2')).toBe(false);
   });
+
+  describe('isSquareAttacked', () => {
+    it('accurately detects when a square is attacked by an enemy piece', () => {
+      const board = createEmptyBoard();
+      // Blue piece on a1 targeting a3 via a2 (vector [0, 2])
+      board['a1'] = {
+        id: 'blue_fo',
+        type: 'field_officer',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+
+      // Path is open, a3 should be attacked by blue
+      expect(isSquareAttacked(board, 'a3', 'blue')).toBe(true);
+      // a4 is not a destination for a1
+      expect(isSquareAttacked(board, 'a4', 'blue')).toBe(false);
+      // Green is not attacking a3
+      expect(isSquareAttacked(board, 'a3', 'green')).toBe(false);
+    });
+
+    it('returns false when intermediate squares are blocked for pieces that cannot leap', () => {
+      const board = createEmptyBoard();
+      // Blue officer on a1 (vector [0, 2])
+      board['a1'] = {
+        id: 'blue_officer',
+        type: 'officer',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+      // Blocker on a2
+      board['a2'] = {
+        id: 'blocker',
+        type: 'pawn',
+        color: 'green',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+
+      // Officer cannot jump enemy blocker
+      expect(isSquareAttacked(board, 'a3', 'blue')).toBe(false);
+    });
+  });
 });
+
 

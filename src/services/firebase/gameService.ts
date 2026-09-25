@@ -662,8 +662,6 @@ export function startAbandonedGamesCleanupWatcher(intervalMs: number = 60000): (
 }
 
 export async function getOpenRooms(): Promise<GameRoom[]> {
-  cleanupAbandonedGames().catch(() => {});
-
   if (isFirebaseConfigured() && db) {
     const q = query(
       collection(db, 'games'),
@@ -679,8 +677,6 @@ export async function getOpenRooms(): Promise<GameRoom[]> {
 }
 
 export function subscribeToOpenRooms(callback: (rooms: GameRoom[]) => void): () => void {
-  cleanupAbandonedGames().catch(() => {});
-
   if (isFirebaseConfigured() && db) {
     const q = query(
       collection(db, 'games'),

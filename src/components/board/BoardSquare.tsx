@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import type { Square, Piece, Move } from '@/core/schada/types';
 import { squareToColRow } from '@/core/schada/vectors';
 import { VectorOverlay } from './VectorOverlay';
@@ -10,11 +10,11 @@ interface BoardSquareProps {
   isSelected: boolean;
   isLastMove: boolean;
   legalMoveTarget: Move | undefined;
-  onClick: () => void;
+  onClick: (square: Square) => void;
   orientation?: 'blue' | 'green';
 }
 
-export const BoardSquare: React.FC<BoardSquareProps> = ({
+export const BoardSquare: React.FC<BoardSquareProps> = memo(({
   square,
   piece,
   isSelected,
@@ -40,7 +40,7 @@ export const BoardSquare: React.FC<BoardSquareProps> = ({
       className={`board-square ${isLight ? 'light' : 'dark'} ${isSelected ? 'selected' : ''} ${
         isLastMove ? 'last-move' : ''
       }`}
-      onClick={onClick}
+      onClick={() => onClick(square)}
       data-square={square}
     >
       {/* Background vector indicators */}
@@ -72,4 +72,7 @@ export const BoardSquare: React.FC<BoardSquareProps> = ({
       )}
     </div>
   );
-};
+});
+
+BoardSquare.displayName = 'BoardSquare';
+

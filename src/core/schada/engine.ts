@@ -223,6 +223,66 @@ export function getAllLegalMoves(board: BoardMatrix, color: PieceColor): Move[] 
 }
 
 /**
+ * Checks if targetSquare is attacked by any piece of attackerColor.
+ * Highly optimized for engine/bot lookaheads: exits immediately on first valid attack line,
+ * avoiding object allocations and notation formatting.
+ */
+export function isSquareAttacked(
+  board: BoardMatrix,
+  targetSquare: Square,
+  attackerColor: PieceColor
+): boolean {
+  const [targetCol, targetRow] = squareToColRow(targetSquare);
+  const baseRank = attackerColor === 'blue' ? 0 : 7;
+  const goalRank = attackerColor === 'blue' ? 7 : 0;
+
+  for (let c = 0; c < 8; c++) {
+    for (let r = 0; r < 8; r++) {
+      const sq = colRowToSquare(c, r)!;
+      const piece = board[sq];
+      if (!piece || piece.color !== attackerColor) continue;
+
+      const vectors = SCHADA_VECTORS[sq];
+      if (!vectors) continue;
+
+      const isHighPiece = piece.type === 'field_officer' || piece.type === 'officer';
+
+      // High piece movement constraints
+      if (isHighPiece && piece.hasLeftBase && targetRow === baseRank) continue;
+      if (isHighPiece && piece.hasReachedGoal && targetRow !== goalRank) continue;
+
+      for (const vector of vectors) {
+        const destCol = c + vector.target[0];
+        const destRow = r + vector.target[1];
+
+        if (destCol === targetCol && destRow === targetRow) {
+          // Validate intermediate path
+          let blocked = false;
+          for (const [stepDc, stepDr] of vector.path) {
+            const stepCol = c + stepDc;
+            const stepRow = r + stepDr;
+            const stepSq = colRowToSquare(stepCol, stepRow)!;
+            const occupant = board[stepSq];
+            if (occupant) {
+              if (piece.type === 'field_officer' && occupant.color === attackerColor) {
+                continue; // Field officer friendly leap allowed
+              }
+              blocked = true;
+              break;
+            }
+          }
+          if (!blocked) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Checks if all remaining high pieces of a player have reached their goal line.
  */
 export function haveAllRemainingHighPiecesReachedGoal(board: BoardMatrix, color: PieceColor): boolean {

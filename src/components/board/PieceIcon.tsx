@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { memo } from 'react';
 import type { Piece } from '@/core/schada/types';
 
 interface PieceIconProps {
   piece: Piece;
 }
 
-export const PieceIcon: React.FC<PieceIconProps> = ({ piece }) => {
+export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
   const isBlue = piece.color === 'blue';
   const primaryColor = isBlue ? '#2563eb' : '#16a34a';
   const secondaryColor = isBlue ? '#1d4ed8' : '#15803d';
@@ -14,11 +14,6 @@ export const PieceIcon: React.FC<PieceIconProps> = ({ piece }) => {
   if (piece.type === 'field_officer') {
     return (
       <svg viewBox="0 0 100 100" className="piece-icon" width="100%" height="100%">
-        <defs>
-          <filter id={`shadow-${piece.id}`} x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="4" stdDeviation="3" floodOpacity="0.4" />
-          </filter>
-        </defs>
         {/* Outer Ring */}
         <circle
           cx="50"
@@ -27,7 +22,6 @@ export const PieceIcon: React.FC<PieceIconProps> = ({ piece }) => {
           fill={primaryColor}
           stroke={secondaryColor}
           strokeWidth="4"
-          filter={`url(#shadow-${piece.id})`}
         />
         {/* Inner Ring */}
         <circle cx="50" cy="50" r="32" fill="none" stroke={highlightColor} strokeWidth="3.5" />
@@ -46,11 +40,6 @@ export const PieceIcon: React.FC<PieceIconProps> = ({ piece }) => {
   if (piece.type === 'officer') {
     return (
       <svg viewBox="0 0 100 100" className="piece-icon" width="100%" height="100%">
-        <defs>
-          <filter id={`shadow-${piece.id}`} x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="4" stdDeviation="3" floodOpacity="0.4" />
-          </filter>
-        </defs>
         {/* Outer Circle */}
         <circle
           cx="50"
@@ -59,7 +48,6 @@ export const PieceIcon: React.FC<PieceIconProps> = ({ piece }) => {
           fill={primaryColor}
           stroke={secondaryColor}
           strokeWidth="4"
-          filter={`url(#shadow-${piece.id})`}
         />
         {/* Central Crest / Diamond */}
         <path
@@ -76,11 +64,6 @@ export const PieceIcon: React.FC<PieceIconProps> = ({ piece }) => {
   // Pawn
   return (
     <svg viewBox="0 0 100 100" className="piece-icon" width="100%" height="100%">
-      <defs>
-        <filter id={`shadow-${piece.id}`} x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodOpacity="0.35" />
-        </filter>
-      </defs>
       {/* Compact Circular Shield */}
       <circle
         cx="50"
@@ -89,11 +72,13 @@ export const PieceIcon: React.FC<PieceIconProps> = ({ piece }) => {
         fill={primaryColor}
         stroke={secondaryColor}
         strokeWidth="3.5"
-        filter={`url(#shadow-${piece.id})`}
       />
       {/* Central Ring */}
       <circle cx="50" cy="50" r="20" fill="none" stroke="#ffffff" strokeWidth="3" opacity="0.9" />
       <circle cx="50" cy="50" r="7" fill="#ffffff" />
     </svg>
   );
-};
+});
+
+PieceIcon.displayName = 'PieceIcon';
+

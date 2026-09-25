@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -9,16 +9,20 @@ import { OfflineBanner } from './components/layout/OfflineBanner';
 import { InstallModal } from './components/pwa/InstallModal';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
 import { LobbyTable } from './components/lobby/LobbyTable';
-import { PlayAgainstComputerModal } from './components/lobby/PlayAgainstComputerModal';
-import { CreateRoomModal } from './components/lobby/CreateRoomModal';
-import { GameRoomView } from './components/game/GameRoomView';
-import { Arena, type ArenaPlayer } from './components/game/Arena';
-import { LeaderboardTable } from './components/leaderboard/LeaderboardTable';
-import { RulesGuide } from './components/learn/RulesGuide';
-import { AuthModal } from './components/auth/AuthModal';
-import { ProfileModal } from './components/auth/ProfileModal';
-import { FriendsDrawer } from './components/friends/FriendsDrawer';
-import { CustomGameModal } from './components/lobby/CustomGameModal';
+import type { ArenaPlayer } from './components/game/Arena';
+
+// Lazy-loaded routes and modal components for minimal initial bundle size
+const GameRoomView = lazy(() => import('./components/game/GameRoomView').then((m) => ({ default: m.GameRoomView })));
+const Arena = lazy(() => import('./components/game/Arena').then((m) => ({ default: m.Arena })));
+const LeaderboardTable = lazy(() => import('./components/leaderboard/LeaderboardTable').then((m) => ({ default: m.LeaderboardTable })));
+const RulesGuide = lazy(() => import('./components/learn/RulesGuide').then((m) => ({ default: m.RulesGuide })));
+const PlayAgainstComputerModal = lazy(() => import('./components/lobby/PlayAgainstComputerModal').then((m) => ({ default: m.PlayAgainstComputerModal })));
+const CreateRoomModal = lazy(() => import('./components/lobby/CreateRoomModal').then((m) => ({ default: m.CreateRoomModal })));
+const AuthModal = lazy(() => import('./components/auth/AuthModal').then((m) => ({ default: m.AuthModal })));
+const ProfileModal = lazy(() => import('./components/auth/ProfileModal').then((m) => ({ default: m.ProfileModal })));
+const FriendsDrawer = lazy(() => import('./components/friends/FriendsDrawer').then((m) => ({ default: m.FriendsDrawer })));
+const CustomGameModal = lazy(() => import('./components/lobby/CustomGameModal').then((m) => ({ default: m.CustomGameModal })));
+
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { mockBackend, type UserProfile } from './services/firebase/mockProvider';
@@ -296,52 +300,60 @@ const MainApp: React.FC = () => {
       />
 
       {/* Main Views with Routing */}
-      <Routes>
-        <Route path="/game/:gameId" element={<GameRoomView />} />
-        <Route
-          path="*"
-          element={
-            <main className="main-app-content">
-              {currentTab === 'play' ? (
-                activeMatch ? (
-                  <Arena
-                    initialState={activeMatch.initialState}
-                    bluePlayer={activeMatch.bluePlayer}
-                    greenPlayer={activeMatch.greenPlayer}
-                    timeControlMinutes={activeMatch.timeControlMinutes}
-                    incrementSeconds={activeMatch.incrementSeconds || 0}
-                    isRanked={activeMatch.isRanked}
-                    userColor={activeMatch.userColor}
-                    isComputer={activeMatch.isComputer}
-                    botLevel={activeMatch.botLevel}
-                    onGameComplete={handleGameComplete}
-                    onExit={() => setActiveMatch(null)}
-                  />
+      <Suspense
+        fallback={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: 'var(--text-muted)' }}>
+            Loading...
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/game/:gameId" element={<GameRoomView />} />
+          <Route
+            path="*"
+            element={
+              <main className="main-app-content">
+                {currentTab === 'play' ? (
+                  activeMatch ? (
+                    <Arena
+                      initialState={activeMatch.initialState}
+                      bluePlayer={activeMatch.bluePlayer}
+                      greenPlayer={activeMatch.greenPlayer}
+                      timeControlMinutes={activeMatch.timeControlMinutes}
+                      incrementSeconds={activeMatch.incrementSeconds || 0}
+                      isRanked={activeMatch.isRanked}
+                      userColor={activeMatch.userColor}
+                      isComputer={activeMatch.isComputer}
+                      botLevel={activeMatch.botLevel}
+                      onGameComplete={handleGameComplete}
+                      onExit={() => setActiveMatch(null)}
+                    />
+                  ) : (
+                    <div className="home-dashboard">
+                      <div className="home-grid-column">
+                        <QuickPairingGrid
+                          onSelectTimeControl={handleStartQuickPair}
+                          onStartPassAndPlay={handleStartPassAndPlay}
+                          onOpenCustomModal={() => setCustomGameOpen(true)}
+                          onOpenComputerModal={() => setComputerModalOpen(true)}
+                          onOpenCreateRoomModal={() => setCreateRoomOpen(true)}
+                        />
+                      </div>
+                      <div className="home-lobby-column">
+                        <LobbyTable onOpenCreateRoomModal={() => setCreateRoomOpen(true)} />
+                      </div>
+                    </div>
+                  )
+                ) : currentTab === 'leaderboard' ? (
+                  <LeaderboardTable />
                 ) : (
-                  <div className="home-dashboard">
-                    <div className="home-grid-column">
-                      <QuickPairingGrid
-                        onSelectTimeControl={handleStartQuickPair}
-                        onStartPassAndPlay={handleStartPassAndPlay}
-                        onOpenCustomModal={() => setCustomGameOpen(true)}
-                        onOpenComputerModal={() => setComputerModalOpen(true)}
-                        onOpenCreateRoomModal={() => setCreateRoomOpen(true)}
-                      />
-                    </div>
-                    <div className="home-lobby-column">
-                      <LobbyTable onOpenCreateRoomModal={() => setCreateRoomOpen(true)} />
-                    </div>
-                  </div>
-                )
-              ) : currentTab === 'leaderboard' ? (
-                <LeaderboardTable />
-              ) : (
-                <RulesGuide />
-              )}
-            </main>
-          }
-        />
-      </Routes>
+                  <RulesGuide />
+                )}
+              </main>
+            }
+          />
+        </Routes>
+      </Suspense>
 
       {/* Mobile Bottom Navigation (Hidden during active matches) */}
       {!isMatchActive && (
@@ -361,31 +373,41 @@ const MainApp: React.FC = () => {
       {/* PWA Install Guide Modal */}
       <InstallModal />
 
-      {/* Modals & Drawers */}
-      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
-      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
-      <FriendsDrawer
-        isOpen={friendsOpen}
-        onClose={() => setFriendsOpen(false)}
-        onChallengeFriend={handleChallengeFriend}
-      />
-      <CustomGameModal
-        isOpen={customGameOpen}
-        onClose={() => setCustomGameOpen(false)}
-        onCreateGame={handleCreateCustom}
-      />
-      <PlayAgainstComputerModal
-        isOpen={computerModalOpen}
-        onClose={() => setComputerModalOpen(false)}
-        onStartGame={handleStartComputerMatch}
-        initialTimeControlMinutes={computerModalSettings.timeControlMinutes}
-        initialIncrementSeconds={computerModalSettings.incrementSeconds}
-        initialColorPref={computerModalSettings.userColor}
-      />
-      <CreateRoomModal
-        isOpen={createRoomOpen}
-        onClose={() => setCreateRoomOpen(false)}
-      />
+      {/* Modals & Drawers - Loaded on-demand only when opened */}
+      <Suspense fallback={null}>
+        {authOpen && <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />}
+        {profileOpen && <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />}
+        {friendsOpen && (
+          <FriendsDrawer
+            isOpen={friendsOpen}
+            onClose={() => setFriendsOpen(false)}
+            onChallengeFriend={handleChallengeFriend}
+          />
+        )}
+        {customGameOpen && (
+          <CustomGameModal
+            isOpen={customGameOpen}
+            onClose={() => setCustomGameOpen(false)}
+            onCreateGame={handleCreateCustom}
+          />
+        )}
+        {computerModalOpen && (
+          <PlayAgainstComputerModal
+            isOpen={computerModalOpen}
+            onClose={() => setComputerModalOpen(false)}
+            onStartGame={handleStartComputerMatch}
+            initialTimeControlMinutes={computerModalSettings.timeControlMinutes}
+            initialIncrementSeconds={computerModalSettings.incrementSeconds}
+            initialColorPref={computerModalSettings.userColor}
+          />
+        )}
+        {createRoomOpen && (
+          <CreateRoomModal
+            isOpen={createRoomOpen}
+            onClose={() => setCreateRoomOpen(false)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

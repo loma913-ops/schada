@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import type { BoardMatrix, Move, PieceColor, Square } from '@/core/schada/types';
 import { colRowToSquare } from '@/core/schada/vectors';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
@@ -15,7 +15,7 @@ interface SchadaBoardProps {
   disabled?: boolean;
 }
 
-export const SchadaBoard: React.FC<SchadaBoardProps> = ({
+export const SchadaBoard: React.FC<SchadaBoardProps> = memo(({
   board,
   currentTurn,
   playerColor,
@@ -27,58 +27,73 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = ({
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
 
   // Compute legal moves for currently selected square
-  const legalMovesForSelected: Move[] = selectedSquare
-    ? getLegalMovesForSquare(board, selectedSquare)
-    : [];
+  const legalMovesForSelected: Move[] = useMemo(() => {
+    return selectedSquare ? getLegalMovesForSquare(board, selectedSquare) : [];
+  }, [board, selectedSquare]);
 
-  const handleSquareClick = (square: Square) => {
-    if (disabled) return;
-
-    // If playerColor is set, only allow moving on your turn
-    if (playerColor && playerColor !== currentTurn) {
-      return;
+  // Index legal moves by destination square for O(1) lookups across all 64 tiles
+  const legalMoveMap = useMemo(() => {
+    const map = new Map<Square, Move>();
+    for (const m of legalMovesForSelected) {
+      map.set(m.to, m);
     }
+    return map;
+  }, [legalMovesForSelected]);
 
-    const clickedPiece = board[square];
+  const handleSquareClick = useCallback(
+    (square: Square) => {
+      if (disabled) return;
 
-    // If clicking on an active legal move destination
-    const matchingMove = legalMovesForSelected.find((m) => m.to === square);
-    if (matchingMove) {
-      if (matchingMove.captured) {
-        haptics.capturePiece();
-      } else {
-        haptics.movePiece();
+      // If playerColor is set, only allow moving on your turn
+      if (playerColor && playerColor !== currentTurn) {
+        return;
       }
-      onMakeMove(matchingMove);
+
+      const clickedPiece = board[square];
+
+      // If clicking on an active legal move destination
+      const matchingMove = legalMoveMap.get(square);
+      if (matchingMove) {
+        if (matchingMove.captured) {
+          haptics.capturePiece();
+        } else {
+          haptics.movePiece();
+        }
+        onMakeMove(matchingMove);
+        setSelectedSquare(null);
+        return;
+      }
+
+      // If clicking a friendly piece on the current turn
+      if (clickedPiece && clickedPiece.color === currentTurn) {
+        if (selectedSquare === square) {
+          setSelectedSquare(null); // toggle off
+        } else {
+          haptics.selectPiece();
+          setSelectedSquare(square);
+        }
+        return;
+      }
+
+      // Deselect otherwise
       setSelectedSquare(null);
-      return;
-    }
+    },
+    [disabled, playerColor, currentTurn, board, legalMoveMap, selectedSquare, onMakeMove]
+  );
 
-    // If clicking a friendly piece on the current turn
-    if (clickedPiece && clickedPiece.color === currentTurn) {
-      if (selectedSquare === square) {
-        setSelectedSquare(null); // toggle off
-      } else {
-        haptics.selectPiece();
-        setSelectedSquare(square);
+  // Generate 64 squares in display order (cached by orientation)
+  const squares: Square[] = useMemo(() => {
+    const result: Square[] = [];
+    const rows = orientation === 'blue' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+    const cols = orientation === 'blue' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+
+    for (const r of rows) {
+      for (const c of cols) {
+        result.push(colRowToSquare(c, r)!);
       }
-      return;
     }
-
-    // Deselect otherwise
-    setSelectedSquare(null);
-  };
-
-  // Generate 64 squares in display order
-  const squares: Square[] = [];
-  const rows = orientation === 'blue' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
-  const cols = orientation === 'blue' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
-
-  for (const r of rows) {
-    for (const c of cols) {
-      squares.push(colRowToSquare(c, r)!);
-    }
-  }
+    return result;
+  }, [orientation]);
 
   return (
     <div className="schada-board-wrapper">
@@ -87,7 +102,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = ({
           const piece = board[sq];
           const isSelected = selectedSquare === sq;
           const isLastMove = lastMove?.from === sq || lastMove?.to === sq;
-          const legalMoveTarget = legalMovesForSelected.find((m) => m.to === sq);
+          const legalMoveTarget = legalMoveMap.get(sq);
 
           return (
             <BoardSquare
@@ -97,7 +112,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = ({
               isSelected={isSelected}
               isLastMove={isLastMove}
               legalMoveTarget={legalMoveTarget}
-              onClick={() => handleSquareClick(sq)}
+              onClick={handleSquareClick}
               orientation={orientation}
             />
           );
@@ -105,4 +120,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = ({
       </div>
     </div>
   );
-};
+});
+
+SchadaBoard.displayName = 'SchadaBoard';
+
