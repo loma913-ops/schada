@@ -60,6 +60,10 @@ export const GameRoomView: React.FC = () => {
     return () => unsubscribe();
   }, [gameId]);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // 2. Determine player identity and join
   useEffect(() => {
     if (!gameId || !game || hasJoined) return;
@@ -210,6 +214,7 @@ export const GameRoomView: React.FC = () => {
     if (gameId) {
       await abandonGame(gameId);
     }
+    window.scrollTo(0, 0);
     navigate('/', {
       state: {
         openComputerModal: true,
@@ -224,6 +229,7 @@ export const GameRoomView: React.FC = () => {
     if (gameId) {
       await abandonGame(gameId);
     }
+    window.scrollTo(0, 0);
     navigate('/');
   };
 
@@ -248,18 +254,20 @@ export const GameRoomView: React.FC = () => {
     : { id: 'green', username: 'Waiting for player...', elo: 1200 };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+    <div className="game-room-container">
       {/* Spectator or Player banner */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '1rem',
-          padding: '0.5rem 1rem',
+          marginBottom: '0.75rem',
+          padding: '0.5rem 0.75rem',
           background: isSpectator ? 'rgba(234, 179, 8, 0.1)' : 'rgba(56, 189, 248, 0.08)',
           border: `1px solid ${isSpectator ? 'rgba(234, 179, 8, 0.3)' : 'rgba(56, 189, 248, 0.2)'}`,
           borderRadius: '8px',
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
@@ -328,47 +336,9 @@ export const GameRoomView: React.FC = () => {
 
       {/* Waiting for Opponent Overlay */}
       {game.status === 'waiting' && (
-        <div
-          className="modal-overlay"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.72)',
-            backdropFilter: 'blur(5px)',
-            WebkitBackdropFilter: 'blur(5px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            padding: '1rem',
-          }}
-        >
-          <div
-            className="modal-content"
-            style={{
-              maxWidth: '460px',
-              width: '100%',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1.75rem',
-              textAlign: 'center',
-              boxShadow: 'var(--shadow-lg)',
-            }}
-          >
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.6rem',
-                marginBottom: '1rem',
-                padding: '0.4rem 0.9rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '999px',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
+        <div className="waiting-modal-overlay">
+          <div className="waiting-modal-card">
+            <div className="waiting-status-badge">
               <Loader2 size={16} className="spin" color="var(--accent-gold)" />
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                 Awaiting connection
@@ -386,49 +356,28 @@ export const GameRoomView: React.FC = () => {
               Waiting for other player to join.
             </h2>
 
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
               Share this invite link with another player, or play against the computer now.
             </p>
 
             {/* Room Link & Copy */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.5rem',
-                padding: '0.5rem 0.75rem',
-                backgroundColor: 'var(--bg-secondary)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-subtle)',
-                marginBottom: '1.5rem',
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '0.85rem',
-                  color: 'var(--accent-gold)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
+            <div className="waiting-room-link-box">
+              <span className="waiting-room-link-text">
                 {shareableUrl}
               </span>
               <button
                 type="button"
                 className="action-btn"
-                style={{ padding: '0.35rem 0.7rem', flexShrink: 0 }}
+                style={{ padding: '0.35rem 0.65rem', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                 onClick={handleCopyLink}
               >
                 {copied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
-                <span>{copied ? 'Copied' : 'Copy Link'}</span>
+                <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
               <button
                 type="button"
                 className="btn-primary"

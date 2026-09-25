@@ -7,6 +7,12 @@
   padding: 0;
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
@@ -14,6 +20,8 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -44,6 +52,9 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Navbar */
@@ -624,6 +635,21 @@ body {
   z-index: 95;
 }
 
+/* Main Content Container */
+.main-app-content {
+  flex: 1;
+  padding: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .main-app-content {
+    padding: 0.5rem;
+  }
+}
+
 /* Home Dashboard Layout: Side-by-side on desktop, stacked on mobile */
 .home-dashboard {
   display: grid;
@@ -639,9 +665,9 @@ body {
 @media (max-width: 960px) {
   .home-dashboard {
     grid-template-columns: 1fr;
-    gap: 1.5rem;
-    margin: 1rem auto 1.5rem;
-    padding: 0 0.5rem;
+    gap: 1.25rem;
+    margin: 0.5rem auto 1.5rem;
+    padding: 0;
   }
 }
 
@@ -739,6 +765,24 @@ body {
   margin-left: 1.25rem;
   justify-content: flex-end;
   align-items: center;
+}
+
+@media (max-width: 600px) {
+  .lobby-card-header {
+    padding: 0.6rem 0.65rem;
+  }
+  .lobby-game-row {
+    padding: 0.6rem 0.65rem;
+  }
+  .lobby-col.col-gear {
+    margin-left: 0.5rem;
+  }
+  .lobby-col.col-time {
+    flex: 0 0 8ch;
+    width: 8ch;
+    min-width: 8ch;
+    max-width: 8ch;
+  }
 }
 
 .lobby-gear-btn {
@@ -1548,7 +1592,7 @@ body {
 
 .mobile-arena-actions {
   display: none;
-  width: calc(min(94vw, min(calc(100dvh - 210px), 520px)) + 8px);
+  width: min(calc(100vw - 24px), min(calc(100dvh - 210px), 520px));
   max-width: 100%;
   justify-content: space-between;
   align-items: center;
@@ -1559,7 +1603,7 @@ body {
 
 @media (max-width: 900px) {
   .player-bar {
-    width: calc(min(94vw, min(calc(100dvh - 210px), 520px)) + 8px);
+    width: min(calc(100vw - 24px), min(calc(100dvh - 210px), 520px));
     max-width: 100%;
     padding: 0.4rem 0.65rem;
     box-sizing: border-box;
@@ -1787,5 +1831,105 @@ body {
   color: var(--text-secondary);
   line-height: 1.4;
 }
+
+/* ---------------------------------------------------- */
+/* Game Room & Waiting Overlay (Centered Layout)         */
+/* ---------------------------------------------------- */
+
+.game-room-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .game-room-container {
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* Dedicated Waiting Overlay that is always strictly centered */
+.waiting-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 100;
+  padding: 1rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.waiting-modal-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg) !important;
+  padding: 1.75rem 1.25rem !important;
+  text-align: center;
+  box-shadow: var(--shadow-xl);
+  max-width: 440px !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  margin: auto !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  animation: modalFadeIn 0.2s ease;
+}
+
+@media (max-width: 480px) {
+  .waiting-modal-card {
+    padding: 1.35rem 1rem !important;
+    border-radius: var(--radius-md) !important;
+  }
+}
+
+.waiting-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: 0.4rem 0.9rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+}
+
+.waiting-room-link-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.waiting-room-link-text {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent-gold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 0%;
+  min-width: 0;
+  text-align: left;
+}
+
 
 

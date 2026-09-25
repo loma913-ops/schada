@@ -289,7 +289,7 @@ const MainApp: React.FC = () => {
         <Route
           path="*"
           element={
-            <main style={{ flex: 1, padding: '1rem' }}>
+            <main className="main-app-content">
               {currentTab === 'play' ? (
                 activeMatch ? (
                   <Arena

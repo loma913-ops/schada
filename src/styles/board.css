@@ -30,8 +30,9 @@
 
   .schada-board-grid {
     /* Fits mobile screens vertically and horizontally without scrolling */
-    width: min(94vw, min(calc(100dvh - 210px), 520px));
-    height: min(94vw, min(calc(100dvh - 210px), 520px));
+    width: min(calc(100vw - 24px), min(calc(100dvh - 210px), 520px));
+    height: min(calc(100vw - 24px), min(calc(100dvh - 210px), 520px));
+    max-width: 100%;
   }
 }
 
