@@ -103,6 +103,9 @@ export async function registerUser(
       });
     });
 
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('schada_auth_cached_uid', uid);
+    }
     syncPresenceHeartbeat();
     return userProfile;
   }
@@ -136,6 +139,9 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
       console.warn('Could not update status to online:', e);
     }
 
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('schada_auth_cached_uid', uid);
+    }
     syncPresenceHeartbeat();
     const data = userDoc.data() as UserProfile;
     return { ...data, status };
@@ -161,6 +167,9 @@ export async function logoutUser(): Promise<void> {
       }
     }
     await signOut(auth);
+  }
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('schada_auth_cached_uid');
   }
   mockBackend.logout();
   syncPresenceHeartbeat();
@@ -229,6 +238,9 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
   if (isFirebaseConfigured() && auth && db) {
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('schada_auth_cached_uid', firebaseUser.uid);
+        }
         try {
           const userDocRef = doc(db!, 'users', firebaseUser.uid);
           const active = isCurrentClientActive();
@@ -245,6 +257,10 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
           }
         } catch (e) {
           console.error('Error fetching user profile:', e);
+        }
+      } else {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('schada_auth_cached_uid');
         }
       }
       callback(null);

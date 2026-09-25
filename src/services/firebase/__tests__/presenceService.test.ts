@@ -36,6 +36,7 @@ import {
   checkIsUserActiveAcrossTabs,
   resetPresenceStateForTesting,
   ACTIVE_SESSIONS_STORAGE_KEY,
+  AUTH_CACHED_UID_KEY,
   IDLE_TIMEOUT_MS,
   type SessionHeartbeat,
 } from '../presenceService';
@@ -264,5 +265,42 @@ describe('User Online & Active Presence Service', () => {
     // Revert context back to online
     setActivityContext('online');
     expect(mockBackend.getCurrentUser()?.status).toBe('online');
+  });
+
+  it('cleans up pre-existing guest sessions on this device when user signs in', () => {
+    // Simulate user previously had a guest session in localStorage
+    const guestSessions: Record<string, SessionHeartbeat> = {
+      session_guest_old: {
+        lastSeen: Date.now(),
+        isRegistered: false,
+        userId: null,
+        isActive: true,
+      },
+    };
+    localStorage.setItem(ACTIVE_SESSIONS_STORAGE_KEY, JSON.stringify(guestSessions));
+
+    // Register/login user
+    mockBackend.register('newuser@test.com', 'pass', 'NewUser');
+    recordUserActivity();
+    syncPresenceHeartbeat();
+
+    // Verify stats: guest session was purged, exactly 1 player and 0 guests
+    let emittedStats: any = null;
+    const unsub = subscribeToLobbyStats((stats) => {
+      emittedStats = stats;
+    });
+
+    expect(emittedStats.playersOnline).toBe(1);
+    expect(emittedStats.guestsOnline).toBe(0);
+
+    unsub();
+  });
+
+  it('respects cached auth UID to prevent misidentifying client as a guest', () => {
+    localStorage.setItem(AUTH_CACHED_UID_KEY, 'user_cached_123');
+    localStorage.setItem('schada_mock_current_user_id', 'user_cached_123');
+    const reg = isCurrentClientRegistered();
+    expect(reg.isRegistered).toBe(true);
+    expect(reg.userId).toBe('user_cached_123');
   });
 });

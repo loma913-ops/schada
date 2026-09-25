@@ -60,6 +60,12 @@ service cloud.firestore {
       allow delete: if resource.data.status == 'abandoned';
     }
 
+    // Real-time guest presence sessions
+    match /guest_sessions/{sessionId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Matchmaking queue tickets
     match /matchmaking_queue/{ticketId} {
       allow read: if isAuthenticated();

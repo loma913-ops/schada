@@ -1,4 +1,4 @@
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { mockBackend } from './mockProvider';
 
@@ -19,6 +19,7 @@ export interface SessionHeartbeat {
 export const SESSION_STORAGE_ID_KEY = 'schada_client_session_id';
 export const ACTIVE_SESSIONS_STORAGE_KEY = 'schada_active_sessions_v2';
 export const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
+export const AUTH_CACHED_UID_KEY = 'schada_auth_cached_uid';
 
 // Timing constants for presence & activity detection
 export const IDLE_TIMEOUT_MS = 120_000;       // 2 minutes of no user interactions = idle/inactive
@@ -53,8 +54,14 @@ export function getClientSessionId(): string {
  * Checks whether the current client is authenticated as a registered user.
  */
 export function isCurrentClientRegistered(): { isRegistered: boolean; userId: string | null } {
-  if (isFirebaseConfigured() && auth?.currentUser) {
-    return { isRegistered: true, userId: auth.currentUser.uid };
+  if (isFirebaseConfigured()) {
+    if (auth?.currentUser) {
+      return { isRegistered: true, userId: auth.currentUser.uid };
+    }
+    const cachedUid = typeof localStorage !== 'undefined' ? localStorage.getItem(AUTH_CACHED_UID_KEY) : null;
+    if (cachedUid) {
+      return { isRegistered: true, userId: cachedUid };
+    }
   }
   const uid = typeof localStorage !== 'undefined' ? localStorage.getItem('schada_mock_current_user_id') : null;
   if (uid) {
@@ -143,6 +150,9 @@ export function resetPresenceStateForTesting(): void {
   lastThrottleRecord = 0;
   hiddenSince = null;
   currentActivityContext = 'online';
+  firestoreRegisteredCount = null;
+  firestoreGuestsCount = null;
+  firestoreGamesCount = null;
 }
 
 export function recordUserActivity(): void {
@@ -187,7 +197,16 @@ export function syncPresenceHeartbeat(): void {
       context: currentActivityContext,
     };
 
-    // Clean up stale sessions (> 15 seconds old)
+    // If client is registered, clean up any guest sessions recorded on this device
+    if (isRegistered && userId) {
+      for (const [sId, data] of Object.entries(map)) {
+        if (!data.isRegistered) {
+          delete map[sId];
+        }
+      }
+    }
+
+    // Clean up stale sessions (> SESSION_TTL_MS old)
     for (const [sId, data] of Object.entries(map)) {
       if (now - data.lastSeen > SESSION_TTL_MS) {
         delete map[sId];
@@ -198,6 +217,28 @@ export function syncPresenceHeartbeat(): void {
     }
   } catch {
     // Ignore storage errors
+  }
+
+  // Live Firebase guest presence synchronization
+  if (isFirebaseConfigured() && db) {
+    try {
+      const guestDocRef = doc(db, 'guest_sessions', sessionId);
+      if (!isRegistered) {
+        if (active) {
+          setDoc(guestDocRef, {
+            lastSeen: serverTimestamp(),
+            updatedAt: now,
+          }).catch(() => {});
+        } else {
+          deleteDoc(guestDocRef).catch(() => {});
+        }
+      } else {
+        // If client is registered, ensure it is not tracked in guest_sessions
+        deleteDoc(guestDocRef).catch(() => {});
+      }
+    } catch {
+      // Ignore
+    }
   }
 
   // Update registered user's status based on cross-tab activity
@@ -243,6 +284,15 @@ export function cleanupCurrentTabSession(): void {
     }
   } catch {
     // Ignore
+  }
+
+  // Clean up guest session in Firestore if client was a guest
+  if (isFirebaseConfigured() && db && !isRegistered) {
+    try {
+      deleteDoc(doc(db, 'guest_sessions', sessionId)).catch(() => {});
+    } catch {
+      // Ignore
+    }
   }
 }
 
@@ -369,6 +419,7 @@ export function getLocalActiveGamesCount(): number {
 }
 
 let firestoreRegisteredCount: number | null = null;
+let firestoreGuestsCount: number | null = null;
 let firestoreGamesCount: number | null = null;
 
 function getCurrentLobbyStats(): LobbyStats {
@@ -381,6 +432,13 @@ function getCurrentLobbyStats(): LobbyStats {
     playersOnline = registeredUsersCount;
   }
 
+  let guestsOnline = 0;
+  if (isFirebaseConfigured() && firestoreGuestsCount !== null) {
+    guestsOnline = firestoreGuestsCount;
+  } else {
+    guestsOnline = guestSessionsCount;
+  }
+
   let activeGames = 0;
   if (isFirebaseConfigured() && firestoreGamesCount !== null) {
     activeGames = firestoreGamesCount;
@@ -390,7 +448,7 @@ function getCurrentLobbyStats(): LobbyStats {
 
   return {
     playersOnline,
-    guestsOnline: guestSessionsCount,
+    guestsOnline,
     activeGames,
   };
 }
@@ -444,6 +502,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
 
   // Firestore real-time listeners if live Firebase is configured
   let unsubscribeUsers: (() => void) | null = null;
+  let unsubscribeGuests: (() => void) | null = null;
   let unsubscribeGames: (() => void) | null = null;
 
   if (isFirebaseConfigured() && db) {
@@ -458,6 +517,32 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
         (err) => {
           console.warn('Firestore online users count listener fallback:', err);
           firestoreRegisteredCount = null;
+          notifyStatsSubscribers();
+        }
+      );
+
+      const qGuests = collection(db, 'guest_sessions');
+      unsubscribeGuests = onSnapshot(
+        qGuests,
+        (snapshot) => {
+          const now = Date.now();
+          let count = 0;
+          for (const docSnap of snapshot.docs) {
+            const data = docSnap.data();
+            const updatedAt = typeof data.updatedAt === 'number' ? data.updatedAt : 0;
+            if (now - updatedAt <= SESSION_TTL_MS) {
+              count += 1;
+            } else if (now - updatedAt > SESSION_TTL_MS * 3) {
+              // Clean up ancient stale guest docs
+              deleteDoc(docSnap.ref).catch(() => {});
+            }
+          }
+          firestoreGuestsCount = count;
+          notifyStatsSubscribers();
+        },
+        (err) => {
+          console.warn('Firestore guest sessions listener fallback:', err);
+          firestoreGuestsCount = null;
           notifyStatsSubscribers();
         }
       );
@@ -490,6 +575,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
       window.removeEventListener('schada_user_status_changed', handleCustomStatus);
     }
     if (unsubscribeUsers) unsubscribeUsers();
+    if (unsubscribeGuests) unsubscribeGuests();
     if (unsubscribeGames) unsubscribeGames();
     stopTracking();
   };

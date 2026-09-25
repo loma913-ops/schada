@@ -4,7 +4,7 @@ import { subscribeToLobbyStats, type LobbyStats } from '@/services/firebase/pres
 export const OnlinePlayersCount: React.FC = () => {
   const [stats, setStats] = useState<LobbyStats>({
     playersOnline: 0,
-    guestsOnline: 1,
+    guestsOnline: 0,
     activeGames: 0,
   });
 
