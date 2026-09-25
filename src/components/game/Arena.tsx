@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { BoardState, Move, PieceColor } from '@/core/schada/types';
+import type { BoardState, Move, Piece, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import { selectBotMove, getBotThinkingDelayMs } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
@@ -187,6 +187,20 @@ export const Arena: React.FC<ArenaProps> = ({
   const topTime = topColor === 'blue' ? blueTime : greenTime;
   const bottomTime = bottomColor === 'blue' ? blueTime : greenTime;
 
+  const topCaptured = gameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue'];
+  const bottomCaptured = gameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue'];
+
+  const getMaterialValue = (pieces: Piece[]) =>
+    pieces.reduce(
+      (sum, p) => sum + (p.type === 'field_officer' ? 3 : p.type === 'officer' ? 2 : 1),
+      0
+    );
+
+  const topMaterialScore = getMaterialValue(topCaptured);
+  const bottomMaterialScore = getMaterialValue(bottomCaptured);
+  const topAdvantage = topMaterialScore - bottomMaterialScore;
+  const bottomAdvantage = bottomMaterialScore - topMaterialScore;
+
   return (
     <div className="arena-layout">
       {/* Left/Center Column: Board Arena */}
@@ -198,7 +212,8 @@ export const Arena: React.FC<ArenaProps> = ({
           color={topColor}
           isTurn={gameState.currentTurn === topColor && !gameState.isGameOver}
           remainingMs={topTime}
-          capturedPieces={gameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue']}
+          capturedPieces={topCaptured}
+          materialAdvantage={topAdvantage > 0 ? topAdvantage : undefined}
           isUser={userColor === topColor}
           isThinking={isBotThinking && gameState.currentTurn === topColor}
         />
@@ -221,7 +236,8 @@ export const Arena: React.FC<ArenaProps> = ({
           color={bottomColor}
           isTurn={gameState.currentTurn === bottomColor && !gameState.isGameOver}
           remainingMs={bottomTime}
-          capturedPieces={gameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue']}
+          capturedPieces={bottomCaptured}
+          materialAdvantage={bottomAdvantage > 0 ? bottomAdvantage : undefined}
           isUser={userColor === bottomColor}
           isThinking={isBotThinking && gameState.currentTurn === bottomColor}
         />
