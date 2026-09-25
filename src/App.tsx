@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/layout/Navbar';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
 import { PlayAgainstComputerModal } from './components/lobby/PlayAgainstComputerModal';
+import { CreateRoomModal } from './components/lobby/CreateRoomModal';
+import { GameRoomView } from './components/game/GameRoomView';
 import { Arena, type ArenaPlayer } from './components/game/Arena';
 import { LeaderboardTable } from './components/leaderboard/LeaderboardTable';
 import { RulesGuide } from './components/learn/RulesGuide';
@@ -30,6 +33,8 @@ interface ActiveMatch {
 
 const MainApp: React.FC = () => {
   const { user, refreshUser } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [currentTab, setCurrentTab] = useState<'play' | 'leaderboard' | 'learn'>('play');
   const [activeMatch, setActiveMatch] = useState<ActiveMatch | null>(null);
@@ -40,6 +45,7 @@ const MainApp: React.FC = () => {
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [customGameOpen, setCustomGameOpen] = useState(false);
   const [computerModalOpen, setComputerModalOpen] = useState(false);
+  const [createRoomOpen, setCreateRoomOpen] = useState(false);
 
   // Start a Quick Pair game (Player vs Player)
   const handleStartQuickPair = (minutes: number, increment: number, isRanked: boolean) => {
@@ -205,6 +211,9 @@ const MainApp: React.FC = () => {
         currentTab={currentTab}
         onSelectTab={(tab) => {
           setCurrentTab(tab);
+          if (location.pathname !== '/') {
+            navigate('/');
+          }
           if (tab !== 'play') {
             setActiveMatch(null);
           }
@@ -215,39 +224,48 @@ const MainApp: React.FC = () => {
         pendingRequestsCount={user ? mockBackend.getPendingIncomingRequests(user.id).length : 0}
       />
 
-      {/* Main Views */}
-      <main style={{ flex: 1, padding: '1rem' }}>
-        {currentTab === 'play' ? (
-          activeMatch ? (
-            <Arena
-              initialState={activeMatch.initialState}
-              bluePlayer={activeMatch.bluePlayer}
-              greenPlayer={activeMatch.greenPlayer}
-              timeControlMinutes={activeMatch.timeControlMinutes}
-              incrementSeconds={activeMatch.incrementSeconds || 0}
-              isRanked={activeMatch.isRanked}
-              userColor={activeMatch.userColor}
-              isComputer={activeMatch.isComputer}
-              botLevel={activeMatch.botLevel}
-              onGameComplete={handleGameComplete}
-              onExit={() => setActiveMatch(null)}
-            />
-          ) : (
-            <div style={{ maxWidth: '640px', margin: '2rem auto' }}>
-              <QuickPairingGrid
-                onSelectTimeControl={handleStartQuickPair}
-                onStartPassAndPlay={handleStartPassAndPlay}
-                onOpenCustomModal={() => setCustomGameOpen(true)}
-                onOpenComputerModal={() => setComputerModalOpen(true)}
-              />
-            </div>
-          )
-        ) : currentTab === 'leaderboard' ? (
-          <LeaderboardTable />
-        ) : (
-          <RulesGuide />
-        )}
-      </main>
+      {/* Main Views with Routing */}
+      <Routes>
+        <Route path="/game/:gameId" element={<GameRoomView />} />
+        <Route
+          path="*"
+          element={
+            <main style={{ flex: 1, padding: '1rem' }}>
+              {currentTab === 'play' ? (
+                activeMatch ? (
+                  <Arena
+                    initialState={activeMatch.initialState}
+                    bluePlayer={activeMatch.bluePlayer}
+                    greenPlayer={activeMatch.greenPlayer}
+                    timeControlMinutes={activeMatch.timeControlMinutes}
+                    incrementSeconds={activeMatch.incrementSeconds || 0}
+                    isRanked={activeMatch.isRanked}
+                    userColor={activeMatch.userColor}
+                    isComputer={activeMatch.isComputer}
+                    botLevel={activeMatch.botLevel}
+                    onGameComplete={handleGameComplete}
+                    onExit={() => setActiveMatch(null)}
+                  />
+                ) : (
+                  <div style={{ maxWidth: '640px', margin: '2rem auto' }}>
+                    <QuickPairingGrid
+                      onSelectTimeControl={handleStartQuickPair}
+                      onStartPassAndPlay={handleStartPassAndPlay}
+                      onOpenCustomModal={() => setCustomGameOpen(true)}
+                      onOpenComputerModal={() => setComputerModalOpen(true)}
+                      onOpenCreateRoomModal={() => setCreateRoomOpen(true)}
+                    />
+                  </div>
+                )
+              ) : currentTab === 'leaderboard' ? (
+                <LeaderboardTable />
+              ) : (
+                <RulesGuide />
+              )}
+            </main>
+          }
+        />
+      </Routes>
 
       {/* Modals & Drawers */}
       <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
@@ -267,6 +285,10 @@ const MainApp: React.FC = () => {
         onClose={() => setComputerModalOpen(false)}
         onStartGame={handleStartComputerMatch}
       />
+      <CreateRoomModal
+        isOpen={createRoomOpen}
+        onClose={() => setCreateRoomOpen(false)}
+      />
     </div>
   );
 };
@@ -275,7 +297,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <MainApp />
+        <BrowserRouter>
+          <MainApp />
+        </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
   );

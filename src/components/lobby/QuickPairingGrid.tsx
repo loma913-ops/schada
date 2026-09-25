@@ -1,5 +1,6 @@
 import React from 'react';
-import { Cpu, Users, Settings2 } from 'lucide-react';
+import { Cpu, Users, Settings2, Share2 } from 'lucide-react';
+import { OpenRoomsList } from './OpenRoomsList';
 
 export interface TimeControlOption {
   display: string;
@@ -14,6 +15,7 @@ interface QuickPairingGridProps {
   onStartPassAndPlay: () => void;
   onOpenCustomModal: () => void;
   onOpenComputerModal: () => void;
+  onOpenCreateRoomModal: () => void;
 }
 
 export const TIME_CONTROL_PRESETS: TimeControlOption[] = [
@@ -35,6 +37,7 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
   onStartPassAndPlay,
   onOpenCustomModal,
   onOpenComputerModal,
+  onOpenCreateRoomModal,
 }) => {
   return (
     <div className="quick-pairing-container">
@@ -60,8 +63,25 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
         </div>
       </div>
 
-      {/* Prominent Play Against Computer Button */}
-      <div style={{ marginTop: '1rem', width: '100%' }}>
+      {/* Prominent Action Buttons: Play with a Friend & Play Computer */}
+      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+        <button
+          type="button"
+          className="lichess-cta-btn"
+          onClick={onOpenCreateRoomModal}
+          style={{
+            width: '100%',
+            padding: '0.85rem 1.25rem',
+            fontSize: '1.05rem',
+            fontWeight: 600,
+            background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(34, 197, 94, 0.15))',
+            borderColor: 'rgba(56, 189, 248, 0.4)',
+          }}
+        >
+          <Share2 size={22} className="lichess-cta-icon" color="var(--accent-blue)" />
+          <span>Play with a Friend (Create Room / Invite Link)</span>
+        </button>
+
         <button
           type="button"
           className="lichess-cta-btn"
@@ -84,6 +104,9 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
           <span>Pass & Play (Local 2-Player Sandbox)</span>
         </button>
       </div>
+
+      {/* Open Rooms Section */}
+      <OpenRoomsList />
     </div>
   );
 };

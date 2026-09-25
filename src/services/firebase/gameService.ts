@@ -1,0 +1,496 @@
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  onSnapshot,
+} from 'firebase/firestore';
+import { db, isFirebaseConfigured } from './config';
+import type { BoardState, Move, PieceColor } from '@/core/schada/types';
+import { createInitialGameState, executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
+import type { ArenaPlayer } from '@/components/game/Arena';
+
+export interface GamePlayer extends ArenaPlayer {
+  sessionToken: string;
+}
+
+export interface GameRoom {
+  id: string;
+  isPrivate: boolean;
+  status: 'waiting' | 'in_progress' | 'completed' | 'abandoned';
+  createdAt: number;
+  timeControlMinutes: number;
+  incrementSeconds: number;
+  isRanked: boolean;
+  creatorColorPref: PieceColor | 'random';
+  bluePlayer: GamePlayer | null;
+  greenPlayer: GamePlayer | null;
+  boardState: BoardState;
+  currentTurn: PieceColor;
+  blueTimeMs: number;
+  greenTimeMs: number;
+  lastTurnStartTimeMs: number | null;
+  winner?: PieceColor | 'draw' | null;
+  winReason?: string | null;
+}
+
+const SESSION_STORAGE_PREFIX = 'schada_player_token_';
+const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
+
+// Helper to remove any undefined values for Firestore serialization
+function sanitize<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+export function getLocalSessionToken(gameId: string): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(SESSION_STORAGE_PREFIX + gameId);
+}
+
+export function setLocalSessionToken(gameId: string, token: string): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(SESSION_STORAGE_PREFIX + gameId, token);
+}
+
+function generateGameId(): string {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+function generateToken(): string {
+  return 'tok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+}
+
+// ----------------- Mock Local Channel for Offline / Development -----------------
+class MockGameStore {
+  private channel: BroadcastChannel | null = null;
+  private listeners: Map<string, Set<(game: GameRoom | null) => void>> = new Map();
+  private memoryStore: Record<string, GameRoom> = {};
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      this.channel = new BroadcastChannel('schada_game_sync_channel');
+      this.channel.onmessage = (event) => {
+        const { type, gameId, game } = event.data || {};
+        if (type === 'GAME_UPDATED' && gameId) {
+          const subs = this.listeners.get(gameId);
+          if (subs) {
+            subs.forEach((cb) => cb(game));
+          }
+        }
+      };
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key === MOCK_GAMES_STORAGE_KEY) {
+          const games = this.getAll();
+          this.listeners.forEach((subs, gameId) => {
+            const game = games[gameId] || null;
+            subs.forEach((cb) => cb(game));
+          });
+        }
+      });
+    }
+  }
+
+  public getAll(): Record<string, GameRoom> {
+    if (typeof localStorage === 'undefined') {
+      return this.memoryStore;
+    }
+    try {
+      return JSON.parse(localStorage.getItem(MOCK_GAMES_STORAGE_KEY) || '{}');
+    } catch {
+      return this.memoryStore;
+    }
+  }
+
+  public get(id: string): GameRoom | null {
+    return this.getAll()[id] || null;
+  }
+
+  public set(game: GameRoom): void {
+    const games = this.getAll();
+    games[game.id] = game;
+    this.memoryStore[game.id] = game;
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(MOCK_GAMES_STORAGE_KEY, JSON.stringify(games));
+    }
+
+    // Notify local callbacks
+    const subs = this.listeners.get(game.id);
+    if (subs) {
+      subs.forEach((cb) => cb(game));
+    }
+
+    // Broadcast to other tabs
+    if (this.channel) {
+      this.channel.postMessage({ type: 'GAME_UPDATED', gameId: game.id, game });
+    }
+  }
+
+  public clear(): void {
+    this.memoryStore = {};
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(MOCK_GAMES_STORAGE_KEY);
+    }
+  }
+
+  public subscribe(gameId: string, callback: (game: GameRoom | null) => void): () => void {
+    if (!this.listeners.has(gameId)) {
+      this.listeners.set(gameId, new Set());
+    }
+    this.listeners.get(gameId)!.add(callback);
+    callback(this.get(gameId));
+
+    return () => {
+      const subs = this.listeners.get(gameId);
+      if (subs) {
+        subs.delete(callback);
+        if (subs.size === 0) {
+          this.listeners.delete(gameId);
+        }
+      }
+    };
+  }
+}
+
+const mockStore = new MockGameStore();
+
+// ----------------- Exported Service API -----------------
+
+export interface CreateGameParams {
+  timeControlMinutes: number;
+  incrementSeconds?: number;
+  isRanked?: boolean;
+  colorPref?: PieceColor | 'random';
+  isPrivate?: boolean;
+  creator: {
+    id: string;
+    username: string;
+    elo: number;
+  };
+}
+
+export async function createGame(params: CreateGameParams): Promise<{ gameId: string; sessionToken: string; color: PieceColor }> {
+  const gameId = generateGameId();
+  const sessionToken = generateToken();
+  const initialTimeMs = params.timeControlMinutes > 0 ? params.timeControlMinutes * 60 * 1000 : 0;
+
+  // Determine initial color assignment
+  const colorPref = params.colorPref || 'random';
+  let creatorColor: PieceColor;
+  if (colorPref === 'random') {
+    creatorColor = Math.random() < 0.5 ? 'blue' : 'green';
+  } else {
+    creatorColor = colorPref;
+  }
+
+  const creatorPlayer: GamePlayer = {
+    id: params.creator.id,
+    username: params.creator.username,
+    elo: params.creator.elo,
+    sessionToken,
+  };
+
+  const initialBoard = createInitialGameState();
+
+  const newGame: GameRoom = {
+    id: gameId,
+    isPrivate: Boolean(params.isPrivate),
+    status: 'waiting',
+    createdAt: Date.now(),
+    timeControlMinutes: params.timeControlMinutes,
+    incrementSeconds: params.incrementSeconds || 0,
+    isRanked: Boolean(params.isRanked),
+    creatorColorPref: colorPref,
+    bluePlayer: creatorColor === 'blue' ? creatorPlayer : null,
+    greenPlayer: creatorColor === 'green' ? creatorPlayer : null,
+    boardState: initialBoard,
+    currentTurn: 'blue',
+    blueTimeMs: initialTimeMs,
+    greenTimeMs: initialTimeMs,
+    lastTurnStartTimeMs: null,
+  };
+
+  setLocalSessionToken(gameId, sessionToken);
+
+  if (isFirebaseConfigured() && db) {
+    const docRef = doc(db, 'games', gameId);
+    await setDoc(docRef, sanitize(newGame));
+  } else {
+    mockStore.set(newGame);
+  }
+
+  return { gameId, sessionToken, color: creatorColor };
+}
+
+export interface JoinGameResult {
+  success: boolean;
+  role: 'player' | 'spectator';
+  color?: PieceColor;
+  sessionToken?: string;
+  error?: string;
+}
+
+export async function joinGame(
+  gameId: string,
+  user: { id: string; username: string; elo: number }
+): Promise<JoinGameResult> {
+  const existingToken = getLocalSessionToken(gameId);
+
+  // Retrieve current game state
+  let game: GameRoom | null = null;
+  if (isFirebaseConfigured() && db) {
+    const snap = await getDoc(doc(db, 'games', gameId));
+    if (snap.exists()) {
+      game = snap.data() as GameRoom;
+    }
+  } else {
+    game = mockStore.get(gameId);
+  }
+
+  if (!game) {
+    return { success: false, role: 'spectator', error: 'Game not found.' };
+  }
+
+  // Check if existing token matches already assigned player
+  if (existingToken) {
+    if (game.bluePlayer && game.bluePlayer.sessionToken === existingToken) {
+      return { success: true, role: 'player', color: 'blue', sessionToken: existingToken };
+    }
+    if (game.greenPlayer && game.greenPlayer.sessionToken === existingToken) {
+      return { success: true, role: 'player', color: 'green', sessionToken: existingToken };
+    }
+  }
+
+  // Check if user ID matches one of the seated players (e.g. re-login on another browser)
+  if (game.bluePlayer && game.bluePlayer.id === user.id) {
+    const token = game.bluePlayer.sessionToken || generateToken();
+    setLocalSessionToken(gameId, token);
+    return { success: true, role: 'player', color: 'blue', sessionToken: token };
+  }
+  if (game.greenPlayer && game.greenPlayer.id === user.id) {
+    const token = game.greenPlayer.sessionToken || generateToken();
+    setLocalSessionToken(gameId, token);
+    return { success: true, role: 'player', color: 'green', sessionToken: token };
+  }
+
+  // If game is waiting for an opponent, take the empty seat!
+  if (game.status === 'waiting') {
+    const newToken = generateToken();
+    setLocalSessionToken(gameId, newToken);
+
+    const joiningPlayer: GamePlayer = {
+      id: user.id,
+      username: user.username,
+      elo: user.elo,
+      sessionToken: newToken,
+    };
+
+    let assignedColor: PieceColor;
+    if (!game.bluePlayer) {
+      assignedColor = 'blue';
+      game.bluePlayer = joiningPlayer;
+    } else {
+      assignedColor = 'green';
+      game.greenPlayer = joiningPlayer;
+    }
+
+    game.status = 'in_progress';
+    game.lastTurnStartTimeMs = Date.now();
+
+    if (isFirebaseConfigured() && db) {
+      await updateDoc(doc(db, 'games', gameId), sanitize({
+        bluePlayer: game.bluePlayer,
+        greenPlayer: game.greenPlayer,
+        status: game.status,
+        lastTurnStartTimeMs: game.lastTurnStartTimeMs,
+      }));
+    } else {
+      mockStore.set(game);
+    }
+
+    return { success: true, role: 'player', color: assignedColor, sessionToken: newToken };
+  }
+
+  // Otherwise, game is full or in progress with two players -> join as Spectator
+  return { success: true, role: 'spectator' };
+}
+
+export function subscribeToGame(
+  gameId: string,
+  onUpdate: (game: GameRoom | null) => void,
+  onError?: (err: Error) => void
+): () => void {
+  if (isFirebaseConfigured() && db) {
+    const docRef = doc(db, 'games', gameId);
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (!snap.exists()) {
+          onUpdate(null);
+        } else {
+          onUpdate(snap.data() as GameRoom);
+        }
+      },
+      (err) => {
+        if (onError) onError(err);
+      }
+    );
+  }
+
+  return mockStore.subscribe(gameId, onUpdate);
+}
+
+export async function makeGameMove(
+  gameId: string,
+  move: Move,
+  playerColor: PieceColor
+): Promise<void> {
+  let game: GameRoom | null = null;
+  if (isFirebaseConfigured() && db) {
+    const snap = await getDoc(doc(db, 'games', gameId));
+    if (snap.exists()) {
+      game = snap.data() as GameRoom;
+    }
+  } else {
+    game = mockStore.get(gameId);
+  }
+
+  if (!game || game.status !== 'in_progress') {
+    throw new Error('Game is not in progress.');
+  }
+
+  if (game.currentTurn !== playerColor) {
+    throw new Error('It is not your turn.');
+  }
+
+  // Calculate clock consumption
+  const now = Date.now();
+  let nextBlueTime = game.blueTimeMs;
+  let nextGreenTime = game.greenTimeMs;
+
+  if (game.timeControlMinutes > 0 && game.lastTurnStartTimeMs) {
+    const elapsed = Math.max(0, now - game.lastTurnStartTimeMs);
+    const incrementMs = game.incrementSeconds * 1000;
+
+    if (playerColor === 'blue') {
+      nextBlueTime = Math.max(0, game.blueTimeMs - elapsed + incrementMs);
+    } else {
+      nextGreenTime = Math.max(0, game.greenTimeMs - elapsed + incrementMs);
+    }
+  }
+
+  // Execute move via engine
+  const nextBoardState = executeMove(game.boardState, move);
+  const nextTurn: PieceColor = playerColor === 'blue' ? 'green' : 'blue';
+
+  const updatePayload: Partial<GameRoom> = {
+    boardState: nextBoardState,
+    currentTurn: nextTurn,
+    blueTimeMs: nextBlueTime,
+    greenTimeMs: nextGreenTime,
+    lastTurnStartTimeMs: nextBoardState.isGameOver ? null : now,
+  };
+
+  if (nextBoardState.isGameOver) {
+    updatePayload.status = 'completed';
+    updatePayload.winner = nextBoardState.result?.winner;
+    updatePayload.winReason = nextBoardState.result?.winReason;
+  }
+
+  if (isFirebaseConfigured() && db) {
+    await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));
+  } else {
+    mockStore.set({ ...game, ...updatePayload });
+  }
+}
+
+export async function resignGameAction(
+  gameId: string,
+  resigningColor: PieceColor
+): Promise<void> {
+  let game: GameRoom | null = null;
+  if (isFirebaseConfigured() && db) {
+    const snap = await getDoc(doc(db, 'games', gameId));
+    if (snap.exists()) {
+      game = snap.data() as GameRoom;
+    }
+  } else {
+    game = mockStore.get(gameId);
+  }
+
+  if (!game || game.status !== 'in_progress') return;
+
+  const nextBoardState = resignGame(game.boardState, resigningColor);
+  const updatePayload: Partial<GameRoom> = {
+    boardState: nextBoardState,
+    status: 'completed',
+    winner: nextBoardState.result?.winner,
+    winReason: nextBoardState.result?.winReason,
+    lastTurnStartTimeMs: null,
+  };
+
+  if (isFirebaseConfigured() && db) {
+    await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));
+  } else {
+    mockStore.set({ ...game, ...updatePayload });
+  }
+}
+
+export async function timeoutGameAction(
+  gameId: string,
+  timedOutColor: PieceColor
+): Promise<void> {
+  let game: GameRoom | null = null;
+  if (isFirebaseConfigured() && db) {
+    const snap = await getDoc(doc(db, 'games', gameId));
+    if (snap.exists()) {
+      game = snap.data() as GameRoom;
+    }
+  } else {
+    game = mockStore.get(gameId);
+  }
+
+  if (!game || game.status !== 'in_progress') return;
+
+  const nextBoardState = timeoutGame(game.boardState, timedOutColor);
+  const updatePayload: Partial<GameRoom> = {
+    boardState: nextBoardState,
+    status: 'completed',
+    winner: nextBoardState.result?.winner,
+    winReason: nextBoardState.result?.winReason,
+    lastTurnStartTimeMs: null,
+  };
+
+  if (isFirebaseConfigured() && db) {
+    await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));
+  } else {
+    mockStore.set({ ...game, ...updatePayload });
+  }
+}
+
+export async function getOpenRooms(): Promise<GameRoom[]> {
+  if (isFirebaseConfigured() && db) {
+    const q = query(
+      collection(db, 'games'),
+      where('isPrivate', '==', false),
+      where('status', '==', 'waiting')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((docSnap) => docSnap.data() as GameRoom);
+  }
+
+  const all = mockStore.getAll();
+  return Object.values(all).filter((g) => !g.isPrivate && g.status === 'waiting');
+}

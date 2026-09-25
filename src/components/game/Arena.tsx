@@ -25,6 +25,13 @@ interface ArenaProps {
   userColor?: PieceColor; // undefined for pass & play / spectator
   isComputer?: boolean;
   botLevel?: number;
+  isSpectator?: boolean;
+  syncedGameState?: BoardState;
+  syncedBlueTimeMs?: number;
+  syncedGreenTimeMs?: number;
+  onMakeMove?: (move: Move) => Promise<void> | void;
+  onResign?: () => void;
+  onTimeout?: (timedOutColor: PieceColor) => void;
   onGameComplete?: (finalState: BoardState) => void;
   onExit: () => void;
 }
@@ -39,22 +46,55 @@ export const Arena: React.FC<ArenaProps> = ({
   userColor,
   isComputer = false,
   botLevel = 1,
+  isSpectator = false,
+  syncedGameState,
+  syncedBlueTimeMs,
+  syncedGreenTimeMs,
+  onMakeMove: customMakeMove,
+  onResign: customResign,
+  onTimeout: customTimeout,
   onGameComplete,
   onExit,
 }) => {
-  const [gameState, setGameState] = useState<BoardState>(initialState);
+  const [gameState, setGameState] = useState<BoardState>(syncedGameState || initialState);
   const [orientation, setOrientation] = useState<'blue' | 'green'>(userColor || 'blue');
   const [isBotThinking, setIsBotThinking] = useState(false);
 
   const gameStateRef = useRef<BoardState>(gameState);
   gameStateRef.current = gameState;
 
+  const prevMoveCountRef = useRef<number>(gameState.moveHistory.length);
+
+  // Sync external state from Firestore/multiplayer if provided
+  useEffect(() => {
+    if (syncedGameState) {
+      if (syncedGameState.moveHistory.length > prevMoveCountRef.current) {
+        const latestMove = syncedGameState.moveHistory[syncedGameState.moveHistory.length - 1];
+        if (latestMove.captured) {
+          soundService.playCapture();
+        } else {
+          soundService.playMove();
+        }
+      }
+      prevMoveCountRef.current = syncedGameState.moveHistory.length;
+      setGameState(syncedGameState);
+    }
+  }, [syncedGameState]);
+
   const computerColor: PieceColor | undefined =
     isComputer && userColor ? (userColor === 'blue' ? 'green' : 'blue') : undefined;
 
   const initialMs = timeControlMinutes > 0 ? timeControlMinutes * 60 * 1000 : 0;
-  const [blueTime, setBlueTime] = useState<number>(initialMs);
-  const [greenTime, setGreenTime] = useState<number>(initialMs);
+  const [blueTime, setBlueTime] = useState<number>(syncedBlueTimeMs ?? initialMs);
+  const [greenTime, setGreenTime] = useState<number>(syncedGreenTimeMs ?? initialMs);
+
+  useEffect(() => {
+    if (syncedBlueTimeMs !== undefined) setBlueTime(syncedBlueTimeMs);
+  }, [syncedBlueTimeMs]);
+
+  useEffect(() => {
+    if (syncedGreenTimeMs !== undefined) setGreenTime(syncedGreenTimeMs);
+  }, [syncedGreenTimeMs]);
 
   const lastTickRef = useRef<number>(Date.now());
 
@@ -92,6 +132,9 @@ export const Arena: React.FC<ArenaProps> = ({
   }, [gameState.currentTurn, gameState.isGameOver, timeControlMinutes]);
 
   const handleTimeout = (timedOutColor: PieceColor) => {
+    if (customTimeout) {
+      customTimeout(timedOutColor);
+    }
     setGameState((prev) => {
       const ended = timeoutGame(prev, timedOutColor);
       if (onGameComplete) onGameComplete(ended);
@@ -102,6 +145,16 @@ export const Arena: React.FC<ArenaProps> = ({
   const handleMakeMove = (move: Move) => {
     const currentState = gameStateRef.current;
     if (currentState.isGameOver) return;
+
+    if (customMakeMove) {
+      if (move.captured) {
+        soundService.playCapture();
+      } else {
+        soundService.playMove();
+      }
+      customMakeMove(move);
+      return;
+    }
 
     // Play appropriate sound effect
     if (move.captured) {
@@ -166,6 +219,10 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const handleResign = () => {
     if (gameState.isGameOver) return;
+    if (customResign) {
+      customResign();
+      return;
+    }
     const resigningColor = isComputer && userColor ? userColor : gameState.currentTurn;
     const nextState = resignGame(gameState, resigningColor);
     setGameState(nextState);
@@ -222,11 +279,16 @@ export const Arena: React.FC<ArenaProps> = ({
         <SchadaBoard
           board={gameState.board}
           currentTurn={gameState.currentTurn}
-          playerColor={isComputer ? userColor : undefined}
+          playerColor={userColor}
           orientation={orientation}
           lastMove={lastMove}
           onMakeMove={handleMakeMove}
-          disabled={gameState.isGameOver || (isComputer && gameState.currentTurn === computerColor)}
+          disabled={
+            gameState.isGameOver ||
+            isSpectator ||
+            (isComputer && gameState.currentTurn === computerColor) ||
+            (Boolean(userColor) && gameState.currentTurn !== userColor)
+          }
         />
 
         {/* Bottom Player Card */}
@@ -250,7 +312,7 @@ export const Arena: React.FC<ArenaProps> = ({
           <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             {timeControlMinutes > 0 ? `${timeControlMinutes}+${incrementSeconds}` : 'Unlimited'} •{' '}
             <span style={{ color: isRanked ? 'var(--accent-gold)' : 'var(--text-secondary)' }}>
-              {isComputer ? `Level ${botLevel} Bot` : isRanked ? 'Ranked' : 'Casual'}
+              {isSpectator ? 'Spectating' : isComputer ? `Level ${botLevel} Bot` : isRanked ? 'Ranked' : 'Casual'}
             </span>
           </div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -265,7 +327,7 @@ export const Arena: React.FC<ArenaProps> = ({
         <GameControls
           onResign={handleResign}
           onFlipBoard={handleFlipBoard}
-          disabled={gameState.isGameOver}
+          disabled={gameState.isGameOver || isSpectator}
         />
       </div>
 
