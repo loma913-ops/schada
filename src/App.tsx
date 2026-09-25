@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { PwaProvider } from './context/PwaContext';
 import { Navbar } from './components/layout/Navbar';
 import { BottomNav } from './components/layout/BottomNav';
+import { Footer } from './components/layout/Footer';
 import { OfflineBanner } from './components/layout/OfflineBanner';
 import { InstallModal } from './components/pwa/InstallModal';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
@@ -17,6 +18,8 @@ const Arena = lazy(() => import('./components/game/Arena').then((m) => ({ defaul
 const LeaderboardTable = lazy(() => import('./components/leaderboard/LeaderboardTable').then((m) => ({ default: m.LeaderboardTable })));
 const RulesGuide = lazy(() => import('./components/learn/RulesGuide').then((m) => ({ default: m.RulesGuide })));
 const HistoryGuide = lazy(() => import('./components/history/HistoryGuide').then((m) => ({ default: m.HistoryGuide })));
+const TermsOfService = lazy(() => import('./components/legal/TermsOfService').then((m) => ({ default: m.TermsOfService })));
+const PrivacyPolicy = lazy(() => import('./components/legal/PrivacyPolicy').then((m) => ({ default: m.PrivacyPolicy })));
 const PlayAgainstComputerModal = lazy(() => import('./components/lobby/PlayAgainstComputerModal').then((m) => ({ default: m.PlayAgainstComputerModal })));
 const CreateRoomModal = lazy(() => import('./components/lobby/CreateRoomModal').then((m) => ({ default: m.CreateRoomModal })));
 const AuthModal = lazy(() => import('./components/auth/AuthModal').then((m) => ({ default: m.AuthModal })));
@@ -310,6 +313,9 @@ const MainApp: React.FC = () => {
       >
         <Routes>
           <Route path="/game/:gameId" element={<GameRoomView />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route
             path="*"
             element={
@@ -357,6 +363,21 @@ const MainApp: React.FC = () => {
           />
         </Routes>
       </Suspense>
+
+      {/* Site Footer (Hidden during active matches) */}
+      {!isMatchActive && (
+        <Footer
+          onSelectTab={(tab) => {
+            setCurrentTab(tab);
+            if (location.pathname !== '/') {
+              navigate('/');
+            }
+            if (tab !== 'play') {
+              setActiveMatch(null);
+            }
+          }}
+        />
+      )}
 
       {/* Mobile Bottom Navigation (Hidden during active matches) */}
       {!isMatchActive && (
