@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Cpu } from 'lucide-react';
+import { X, Play } from 'lucide-react';
 import type { PieceColor } from '@/core/schada/types';
 
 interface PlayAgainstComputerModalProps {
@@ -18,26 +18,25 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
   onClose,
   onStartGame,
 }) => {
-  const [timeMode, setTimeMode] = useState<'realtime' | 'unlimited'>('unlimited');
   const [minutes, setMinutes] = useState(5);
-  const [increment, setIncrement] = useState(3);
+  const [increment, setIncrement] = useState(0);
   const [strength, setStrength] = useState<number>(1);
-  const [sidePref, setSidePref] = useState<'blue' | 'random' | 'green'>('random');
+  const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
 
   if (!isOpen) return null;
 
   const handlePlay = () => {
     // Resolve random side
     const resolvedColor: PieceColor =
-      sidePref === 'random'
+      colorPref === 'random'
         ? Math.random() < 0.5
           ? 'blue'
           : 'green'
-        : sidePref;
+        : colorPref;
 
     onStartGame({
-      timeControlMinutes: timeMode === 'unlimited' ? 0 : minutes,
-      incrementSeconds: timeMode === 'unlimited' ? 0 : increment,
+      timeControlMinutes: minutes,
+      incrementSeconds: minutes === 0 ? 0 : increment,
       difficultyLevel: strength,
       userColor: resolvedColor,
     });
@@ -46,86 +45,77 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-content lichess-modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '440px', padding: '1.5rem', borderRadius: '8px' }}
-      >
-        {/* Modal Close Button */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-0.5rem' }}>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Close modal">
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">Play Against Computer</h2>
+          <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
-        {/* Top Tabs: Real time vs Unlimited */}
-        <div className="lichess-tabs-nav">
-          <button
-            type="button"
-            className={`lichess-tab-btn ${timeMode === 'realtime' ? 'active' : ''}`}
-            onClick={() => setTimeMode('realtime')}
-          >
-            Real time
-          </button>
-          <button
-            type="button"
-            className={`lichess-tab-btn ${timeMode === 'unlimited' ? 'active' : ''}`}
-            onClick={() => setTimeMode('unlimited')}
-          >
-            Unlimited
-          </button>
+        {/* Time Control Selector */}
+        <div className="form-group">
+          <label className="form-label">Time Control (Minutes per player)</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
+            {[1, 3, 5, 10, 0].map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`action-btn ${minutes === m ? 'active' : ''}`}
+                style={{
+                  backgroundColor: minutes === m ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                  color: minutes === m ? '#1a1a1a' : 'var(--text-primary)',
+                  fontWeight: 700,
+                  padding: '0.5rem',
+                }}
+                onClick={() => setMinutes(m)}
+              >
+                {m === 0 ? 'Unlimited' : `${m} min`}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Time Settings Content */}
-        <div style={{ minHeight: '68px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          {timeMode === 'unlimited' ? (
-            <p className="lichess-unlimited-text">Take all the time you need</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Minutes per side:</span>
-                  <span style={{ fontWeight: 700 }}>{minutes} min</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="60"
-                  step="1"
-                  value={minutes}
-                  onChange={(e) => setMinutes(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: 'var(--accent-green, #629924)' }}
-                />
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Increment in seconds:</span>
-                  <span style={{ fontWeight: 700 }}>+{increment}s</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="30"
-                  step="1"
-                  value={increment}
-                  onChange={(e) => setIncrement(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: 'var(--accent-green, #629924)' }}
-                />
-              </div>
+        {/* Increment per move */}
+        {minutes > 0 && (
+          <div className="form-group">
+            <label className="form-label">Increment per move</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
+              {[0, 1, 2, 3, 5].map((sec) => (
+                <button
+                  key={sec}
+                  type="button"
+                  className={`action-btn ${increment === sec ? 'active' : ''}`}
+                  style={{
+                    backgroundColor: increment === sec ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: increment === sec ? '#1a1a1a' : 'var(--text-primary)',
+                    fontWeight: 700,
+                    padding: '0.5rem',
+                  }}
+                  onClick={() => setIncrement(sec)}
+                >
+                  {sec === 0 ? 'None' : `+${sec}s`}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Strength Section */}
-        <div style={{ marginTop: '1.25rem' }}>
-          <div className="lichess-field-label">Strength</div>
-          <div className="lichess-segmented-strength">
+        {/* Bot Strength / Difficulty Level */}
+        <div className="form-group">
+          <label className="form-label">Difficulty Level</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '0.4rem' }}>
             {[1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
               <button
                 key={lvl}
                 type="button"
-                className={`lichess-strength-btn ${strength === lvl ? 'active' : ''}`}
+                className={`action-btn ${strength === lvl ? 'active' : ''}`}
+                style={{
+                  backgroundColor: strength === lvl ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                  color: strength === lvl ? '#1a1a1a' : 'var(--text-primary)',
+                  fontWeight: 700,
+                  padding: '0.5rem 0',
+                }}
                 onClick={() => setStrength(lvl)}
               >
                 {lvl}
@@ -134,68 +124,60 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
           </div>
         </div>
 
-        {/* Side Section */}
-        <div style={{ marginTop: '1.25rem' }}>
-          <div className="lichess-field-label">Side</div>
-          <div className="lichess-segmented-side">
-            {/* Blue Side */}
+        {/* Preferred Army Color */}
+        <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+          <label className="form-label">Preferred Army Color</label>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
               type="button"
-              className={`lichess-side-btn ${sidePref === 'blue' ? 'active' : ''}`}
-              onClick={() => setSidePref('blue')}
+              className={`action-btn ${colorPref === 'random' ? 'active' : ''}`}
+              style={{
+                flex: 1,
+                backgroundColor: colorPref === 'random' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                color: colorPref === 'random' ? '#1a1a1a' : 'var(--text-primary)',
+                fontWeight: 700,
+              }}
+              onClick={() => setColorPref('random')}
             >
-              <svg width="28" height="28" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="38" fill="#2563eb" stroke="#ffffff" strokeWidth="4" />
-                <circle cx="50" cy="50" r="14" fill="#ffffff" />
-              </svg>
-              <span>Blue</span>
+              Random
             </button>
-
-            {/* Random Side */}
             <button
               type="button"
-              className={`lichess-side-btn ${sidePref === 'random' ? 'active' : ''}`}
-              onClick={() => setSidePref('random')}
+              className={`action-btn ${colorPref === 'blue' ? 'active' : ''}`}
+              style={{
+                flex: 1,
+                backgroundColor: colorPref === 'blue' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                color: colorPref === 'blue' ? '#1a1a1a' : 'var(--piece-blue)',
+                fontWeight: 700,
+              }}
+              onClick={() => setColorPref('blue')}
             >
-              <svg width="28" height="28" viewBox="0 0 100 100">
-                <defs>
-                  <clipPath id="split-clip">
-                    <rect x="0" y="0" width="50" height="100" />
-                  </clipPath>
-                </defs>
-                <circle cx="50" cy="50" r="38" fill="#16a34a" stroke="#ffffff" strokeWidth="4" />
-                <circle cx="50" cy="50" r="38" fill="#2563eb" clipPath="url(#split-clip)" />
-                <circle cx="50" cy="50" r="14" fill="#ffffff" />
-              </svg>
-              <span>Random side</span>
+              Blue
             </button>
-
-            {/* Green Side */}
             <button
               type="button"
-              className={`lichess-side-btn ${sidePref === 'green' ? 'active' : ''}`}
-              onClick={() => setSidePref('green')}
+              className={`action-btn ${colorPref === 'green' ? 'active' : ''}`}
+              style={{
+                flex: 1,
+                backgroundColor: colorPref === 'green' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                color: colorPref === 'green' ? '#1a1a1a' : 'var(--piece-green)',
+                fontWeight: 700,
+              }}
+              onClick={() => setColorPref('green')}
             >
-              <svg width="28" height="28" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="38" fill="#16a34a" stroke="#ffffff" strokeWidth="4" />
-                <circle cx="50" cy="50" r="14" fill="#ffffff" />
-              </svg>
-              <span>Green</span>
+              Green
             </button>
           </div>
         </div>
 
-        {/* Submit Button */}
-        <div style={{ marginTop: '1.75rem' }}>
-          <button
-            type="button"
-            className="lichess-cta-btn"
-            onClick={handlePlay}
-          >
-            <Cpu size={22} className="lichess-cta-icon" />
-            <span>Play against computer</span>
-          </button>
-        </div>
+        <button
+          className="btn-primary"
+          onClick={handlePlay}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+        >
+          <Play size={16} />
+          <span>Launch Match</span>
+        </button>
       </div>
     </div>
   );
