@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { PwaProvider } from './context/PwaContext';
 import { Navbar } from './components/layout/Navbar';
+import { BottomNav } from './components/layout/BottomNav';
+import { OfflineBanner } from './components/layout/OfflineBanner';
+import { InstallModal } from './components/pwa/InstallModal';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
 import { PlayAgainstComputerModal } from './components/lobby/PlayAgainstComputerModal';
 import { CreateRoomModal } from './components/lobby/CreateRoomModal';
@@ -204,8 +208,12 @@ const MainApp: React.FC = () => {
     }
   };
 
+  const isMatchActive = Boolean(activeMatch) || location.pathname.startsWith('/game/');
+
   return (
-    <div className="app-container">
+    <div className={`app-container ${isMatchActive ? 'in-match' : ''}`}>
+      <OfflineBanner />
+
       {/* Top Navbar */}
       <Navbar
         currentTab={currentTab}
@@ -267,6 +275,24 @@ const MainApp: React.FC = () => {
         />
       </Routes>
 
+      {/* Mobile Bottom Navigation (Hidden during active matches) */}
+      {!isMatchActive && (
+        <BottomNav
+          currentTab={currentTab}
+          onSelectTab={(tab) => {
+            setCurrentTab(tab);
+            if (location.pathname !== '/') {
+              navigate('/');
+            }
+          }}
+          onOpenFriends={() => setFriendsOpen(true)}
+          pendingRequestsCount={user ? mockBackend.getPendingIncomingRequests(user.id).length : 0}
+        />
+      )}
+
+      {/* PWA Install Guide Modal */}
+      <InstallModal />
+
       {/* Modals & Drawers */}
       <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
@@ -297,10 +323,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <MainApp />
-        </BrowserRouter>
+        <PwaProvider>
+          <BrowserRouter>
+            <MainApp />
+          </BrowserRouter>
+        </PwaProvider>
       </AuthProvider>
     </ThemeProvider>
   );
 }
+

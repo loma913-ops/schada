@@ -3,6 +3,7 @@ import type { BoardMatrix, Move, PieceColor, Square } from '@/core/schada/types'
 import { colRowToSquare } from '@/core/schada/vectors';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
 import { BoardSquare } from './BoardSquare';
+import { haptics } from '@/services/device/haptics';
 
 interface SchadaBoardProps {
   board: BoardMatrix;
@@ -43,6 +44,11 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = ({
     // If clicking on an active legal move destination
     const matchingMove = legalMovesForSelected.find((m) => m.to === square);
     if (matchingMove) {
+      if (matchingMove.captured) {
+        haptics.capturePiece();
+      } else {
+        haptics.movePiece();
+      }
       onMakeMove(matchingMove);
       setSelectedSquare(null);
       return;
@@ -53,6 +59,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = ({
       if (selectedSquare === square) {
         setSelectedSquare(null); // toggle off
       } else {
+        haptics.selectPiece();
         setSelectedSquare(square);
       }
       return;

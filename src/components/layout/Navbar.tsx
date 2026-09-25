@@ -1,7 +1,8 @@
 import React from 'react';
-import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User } from 'lucide-react';
+import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, Smartphone } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { usePwa } from '@/context/PwaContext';
 
 interface NavbarProps {
   currentTab: 'play' | 'leaderboard' | 'learn';
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { isStandalone, setInstallModalOpen } = usePwa();
 
   return (
     <nav className="navbar">
@@ -32,8 +34,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         <span>Schada.org</span>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="nav-links">
+      {/* Navigation Tabs (Desktop only) */}
+      <div className="nav-links desktop-nav-links">
         <button
           className={`nav-tab ${currentTab === 'play' ? 'active' : ''}`}
           onClick={() => onSelectTab('play')}
@@ -59,9 +61,28 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right Cluster */}
       <div className="nav-actions">
-        {/* Friends Drawer Button */}
+        {/* PWA Install Trigger (hidden if already installed in standalone mode) */}
+        {!isStandalone && (
+          <button
+            className="action-btn install-btn"
+            style={{
+              padding: '0.45rem 0.75rem',
+              borderColor: 'var(--accent-gold)',
+              color: 'var(--accent-gold)',
+              backgroundColor: 'rgba(229, 183, 88, 0.08)',
+              fontWeight: 600,
+            }}
+            onClick={() => setInstallModalOpen(true)}
+            title="Install Schada App"
+          >
+            <Smartphone size={16} />
+            <span className="install-btn-text">Install App</span>
+          </button>
+        )}
+
+        {/* Friends Drawer Button (Desktop only, mobile has it in BottomNav) */}
         <button
-          className="action-btn"
+          className="action-btn desktop-friends-btn"
           style={{ position: 'relative', padding: '0.45rem 0.75rem' }}
           onClick={onOpenFriends}
           title="Friends & Challenges"
@@ -104,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* User Account / Profile */}
         {user ? (
           <button
-            className="action-btn"
+            className="action-btn nav-profile-btn"
             style={{
               padding: '0.4rem 0.8rem',
               display: 'flex',
@@ -116,8 +137,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="User Profile & Settings"
           >
             <User size={15} color="var(--accent-gold)" />
-            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{user.username}</span>
+            <span className="nav-username" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{user.username}</span>
             <span
+              className="nav-user-elo"
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.8rem',
@@ -142,10 +164,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onOpenAuth}
           >
             <LogIn size={15} />
-            <span>Sign In</span>
+            <span className="signin-text">Sign In</span>
           </button>
         )}
       </div>
     </nav>
   );
 };
+

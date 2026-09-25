@@ -3,6 +3,7 @@ import type { BoardState, Move, Piece, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import { selectBotMove, getBotThinkingDelayMs } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
+import { RotateCcw, Flag, ListOrdered, X, ArrowLeft } from 'lucide-react';
 import { SchadaBoard } from '../board/SchadaBoard';
 import { PlayerCard } from './PlayerCard';
 import { MoveHistory } from './MoveHistory';
@@ -59,6 +60,7 @@ export const Arena: React.FC<ArenaProps> = ({
   const [gameState, setGameState] = useState<BoardState>(syncedGameState || initialState);
   const [orientation, setOrientation] = useState<'blue' | 'green'>(userColor || 'blue');
   const [isBotThinking, setIsBotThinking] = useState(false);
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
 
   const gameStateRef = useRef<BoardState>(gameState);
   gameStateRef.current = gameState;
@@ -303,9 +305,54 @@ export const Arena: React.FC<ArenaProps> = ({
           isUser={userColor === bottomColor}
           isThinking={isBotThinking && gameState.currentTurn === bottomColor}
         />
+
+        {/* Mobile In-Game Action Bar */}
+        <div className="mobile-arena-actions">
+          <button
+            className="mobile-action-btn"
+            onClick={handleFlipBoard}
+            title="Flip Board"
+            aria-label="Flip Board"
+          >
+            <RotateCcw size={17} />
+            <span>Flip</span>
+          </button>
+
+          <button
+            className={`mobile-action-btn ${mobileHistoryOpen ? 'active' : ''}`}
+            onClick={() => setMobileHistoryOpen(true)}
+            title="Move Notation"
+            aria-label="Move Notation"
+          >
+            <ListOrdered size={17} />
+            <span>Moves ({gameState.moveHistory.length})</span>
+          </button>
+
+          {!isSpectator && !gameState.isGameOver && (
+            <button
+              className="mobile-action-btn danger"
+              onClick={handleResign}
+              title="Resign"
+              aria-label="Resign"
+            >
+              <Flag size={17} />
+              <span>Resign</span>
+            </button>
+          )}
+
+          <button
+            className="mobile-action-btn"
+            onClick={onExit}
+            title="Exit to Lobby"
+            aria-label="Exit"
+          >
+            <ArrowLeft size={17} />
+            <span>Exit</span>
+          </button>
+        </div>
       </div>
 
-      {/* Right Column: Game Controls, Move History, Status */}
+      {/* Right Column: Game Controls, Move History, Status (Desktop) */}
       <div className="arena-panel-col">
         {/* Match Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -330,6 +377,31 @@ export const Arena: React.FC<ArenaProps> = ({
           disabled={gameState.isGameOver || isSpectator}
         />
       </div>
+
+      {/* Mobile Move History Slide-up Sheet */}
+      {mobileHistoryOpen && (
+        <div className="mobile-sheet-backdrop" onClick={() => setMobileHistoryOpen(false)}>
+          <div className="mobile-sheet-content" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-sheet-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+                <ListOrdered size={18} color="var(--accent-gold)" />
+                <span>Move Notation ({gameState.moveHistory.length})</span>
+              </div>
+              <button
+                className="action-btn"
+                style={{ padding: '0.35rem' }}
+                onClick={() => setMobileHistoryOpen(false)}
+                aria-label="Close Move Notation"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="mobile-sheet-body">
+              <MoveHistory history={gameState.moveHistory} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Game Over Modal */}
       {gameState.isGameOver && gameState.result && (

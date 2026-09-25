@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import type { GameResult, PieceColor } from '@/core/schada/types';
 import confetti from 'canvas-confetti';
 import { soundService } from '@/services/audio/soundService';
+import { haptics } from '@/services/device/haptics';
 import { Trophy, Award, RefreshCw, Home } from 'lucide-react';
 
 interface GameOverModalProps {
@@ -23,6 +24,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   const isDraw = result.winner === 'draw';
 
   useEffect(() => {
+    haptics.gameOver();
     if (isWinner) {
       soundService.playVictory();
       confetti({
