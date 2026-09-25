@@ -134,8 +134,28 @@ export const Navbar: React.FC<NavbarProps> = ({
               borderColor: 'var(--border-strong)',
             }}
             onClick={onOpenProfile}
-            title="User Profile & Settings"
+            title={`User Profile & Settings (Status: ${user.status})`}
           >
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor:
+                  user.status === 'online'
+                    ? 'var(--accent-green)'
+                    : user.status === 'in-game'
+                    ? 'var(--accent-gold)'
+                    : 'var(--text-muted)',
+                boxShadow:
+                  user.status === 'online'
+                    ? '0 0 6px rgba(98, 153, 36, 0.6)'
+                    : 'none',
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+              title={`Status: ${user.status}`}
+            />
             <User size={15} color="var(--accent-gold)" />
             <span className="nav-username" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{user.username}</span>
             <span

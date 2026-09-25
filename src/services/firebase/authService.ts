@@ -13,6 +13,11 @@ import {
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { mockBackend, type UserProfile } from './mockProvider';
+import {
+  isCurrentClientActive,
+  syncPresenceHeartbeat,
+  cleanupCurrentTabSession,
+} from './presenceService';
 
 export function validateUsernameFormat(username: string): { valid: boolean; error?: string } {
   const trimmed = username.trim();
@@ -23,6 +28,28 @@ export function validateUsernameFormat(username: string): { valid: boolean; erro
     return { valid: false, error: 'Username can only contain letters, numbers, and underscores.' };
   }
   return { valid: true };
+}
+
+export async function setUserOnlineStatus(
+  status: 'online' | 'in-game' | 'offline'
+): Promise<void> {
+  if (isFirebaseConfigured() && auth?.currentUser && db) {
+    try {
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        status,
+        lastSeen: serverTimestamp(),
+      });
+    } catch (e) {
+      console.warn('Could not update Firestore user status:', e);
+    }
+  }
+
+  const currentUid = typeof localStorage !== 'undefined'
+    ? localStorage.getItem('schada_mock_current_user_id')
+    : null;
+  if (currentUid) {
+    mockBackend.setUserStatus(currentUid, status);
+  }
 }
 
 export async function registerUser(
@@ -76,11 +103,14 @@ export async function registerUser(
       });
     });
 
+    syncPresenceHeartbeat();
     return userProfile;
   }
 
   // Fallback to local mock provider
-  return mockBackend.register(email, pass, username);
+  const registered = mockBackend.register(email, pass, username);
+  syncPresenceHeartbeat();
+  return registered;
 }
 
 export async function loginUser(email: string, pass: string): Promise<UserProfile> {
@@ -94,23 +124,30 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
       throw new Error('User profile record not found in Firestore.');
     }
 
+    const active = isCurrentClientActive();
+    const status = active ? 'online' : 'offline';
+
     try {
       await updateDoc(userDocRef, {
-        status: 'online',
+        status,
         lastSeen: serverTimestamp(),
       });
     } catch (e) {
       console.warn('Could not update status to online:', e);
     }
 
+    syncPresenceHeartbeat();
     const data = userDoc.data() as UserProfile;
-    return { ...data, status: 'online' };
+    return { ...data, status };
   }
 
-  return mockBackend.login(email, pass);
+  const user = mockBackend.login(email, pass);
+  syncPresenceHeartbeat();
+  return user;
 }
 
 export async function logoutUser(): Promise<void> {
+  cleanupCurrentTabSession();
   if (isFirebaseConfigured() && auth && db) {
     const uid = auth.currentUser?.uid;
     if (uid) {
@@ -126,6 +163,7 @@ export async function logoutUser(): Promise<void> {
     await signOut(auth);
   }
   mockBackend.logout();
+  syncPresenceHeartbeat();
 }
 
 export async function changeUsername(
@@ -193,13 +231,16 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
       if (firebaseUser) {
         try {
           const userDocRef = doc(db!, 'users', firebaseUser.uid);
+          const active = isCurrentClientActive();
+          const status = active ? 'online' : 'offline';
           await updateDoc(userDocRef, {
-            status: 'online',
+            status,
             lastSeen: serverTimestamp(),
           });
+          syncPresenceHeartbeat();
           const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
-            callback(userDoc.data() as UserProfile);
+            callback({ ...(userDoc.data() as UserProfile), status });
             return;
           }
         } catch (e) {

@@ -76,7 +76,49 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             {user.username.charAt(0).toUpperCase()}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{user.username}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{user.username}</div>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  backgroundColor:
+                    user.status === 'online'
+                      ? 'rgba(98, 153, 36, 0.15)'
+                      : user.status === 'in-game'
+                      ? 'rgba(229, 183, 88, 0.15)'
+                      : 'rgba(117, 114, 109, 0.15)',
+                  color:
+                    user.status === 'online'
+                      ? 'var(--accent-green)'
+                      : user.status === 'in-game'
+                      ? 'var(--accent-gold)'
+                      : 'var(--text-muted)',
+                  border: `1px solid ${
+                    user.status === 'online'
+                      ? 'rgba(98, 153, 36, 0.3)'
+                      : user.status === 'in-game'
+                      ? 'rgba(229, 183, 88, 0.3)'
+                      : 'rgba(117, 114, 109, 0.3)'
+                  }`,
+                }}
+              >
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: 'currentColor',
+                  }}
+                />
+                {user.status === 'online' ? 'Online' : user.status === 'in-game' ? 'In Game' : 'Offline'}
+              </span>
+            </div>
             <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{user.email}</div>
           </div>
           <div style={{ textAlign: 'right' }}>

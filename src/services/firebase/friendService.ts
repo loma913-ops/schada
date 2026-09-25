@@ -106,12 +106,19 @@ export async function getFriendsList(userId: string): Promise<UserProfile[]> {
   if (isFirebaseConfigured() && db) {
     const friendsSnap = await getDocs(collection(db, 'users', userId, 'userFriends'));
     const friendProfiles: UserProfile[] = [];
+    const now = Date.now();
     for (const fDoc of friendsSnap.docs) {
       const pSnap = await getDocs(
         query(collection(db, 'users'), where('id', '==', fDoc.id))
       );
       if (!pSnap.empty) {
-        friendProfiles.push(pSnap.docs[0].data() as UserProfile);
+        const data = pSnap.docs[0].data() as UserProfile;
+        const lastSeenMs = (data.lastSeen as any)?.toMillis
+          ? (data.lastSeen as any).toMillis()
+          : (data.lastSeen ? new Date(data.lastSeen).getTime() : 0);
+        const isFresh = now - lastSeenMs <= 45000;
+        const effectiveStatus = (data.status !== 'offline' && isFresh) ? data.status : 'offline';
+        friendProfiles.push({ ...data, status: effectiveStatus });
       }
     }
     return friendProfiles;

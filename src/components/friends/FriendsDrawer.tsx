@@ -43,9 +43,21 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen && user) {
-      refreshData();
-    }
+    if (!isOpen || !user) return;
+    refreshData();
+
+    // Live presence polling & event synchronization
+    const interval = setInterval(refreshData, 3000);
+    const handleStatusOrStorage = () => refreshData();
+
+    window.addEventListener('storage', handleStatusOrStorage);
+    window.addEventListener('schada_user_status_changed', handleStatusOrStorage);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStatusOrStorage);
+      window.removeEventListener('schada_user_status_changed', handleStatusOrStorage);
+    };
   }, [isOpen, user]);
 
   if (!isOpen) return null;

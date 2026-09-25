@@ -18,6 +18,7 @@ import type { Move, PieceColor } from '@/core/schada/types';
 import { Copy, Check, Share2, ArrowLeft, Loader2, UserCheck, Eye, Cpu } from 'lucide-react';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { mockBackend } from '@/services/firebase/mockProvider';
+import { setActivityContext } from '@/services/firebase/presenceService';
 
 export const GameRoomView: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -159,6 +160,18 @@ export const GameRoomView: React.FC = () => {
 
   const userColor: PieceColor | undefined = isBlue ? 'blue' : isGreen ? 'green' : undefined;
   const isSpectator = !userColor;
+
+  // Set in-game presence context while player in an active match
+  useEffect(() => {
+    if (user && !isSpectator && game?.status === 'in_progress') {
+      setActivityContext('in-game');
+    } else {
+      setActivityContext('online');
+    }
+    return () => {
+      setActivityContext('online');
+    };
+  }, [user, isSpectator, game?.status]);
 
   // Handle game completion & ranked rating updates
   useEffect(() => {

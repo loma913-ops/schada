@@ -35,6 +35,7 @@ class MockBackend {
   }
 
   private seedDefaultUsers() {
+    if (typeof localStorage === 'undefined') return;
     const existing = localStorage.getItem(this.usersKey);
     if (!existing) {
       const defaultUsers: Record<string, UserProfile> = {
@@ -83,13 +84,13 @@ class MockBackend {
       };
       localStorage.setItem(this.usersKey, JSON.stringify(defaultUsers));
     } else {
-      // Sanitize existing cached users so offline accounts are not erroneously marked online
+      // Sanitize existing cached users so inactive/offline accounts are not erroneously marked online
       try {
         const users: Record<string, UserProfile> = JSON.parse(existing);
-        const currentUid = localStorage.getItem(this.currentUserIdKey);
         let changed = false;
         for (const [uid, u] of Object.entries(users)) {
-          if ((!currentUid || uid !== currentUid) && u.status === 'online') {
+          const active = this.isUserActive(uid);
+          if (!active && u.status !== 'offline') {
             u.status = 'offline';
             changed = true;
           }
@@ -104,18 +105,60 @@ class MockBackend {
   }
 
   private getUsers(): Record<string, UserProfile> {
+    if (typeof localStorage === 'undefined') return {};
     return JSON.parse(localStorage.getItem(this.usersKey) || '{}');
   }
 
   private saveUsers(users: Record<string, UserProfile>) {
+    if (typeof localStorage === 'undefined') return;
     localStorage.setItem(this.usersKey, JSON.stringify(users));
+  }
+
+  public isUserActive(userId: string): boolean {
+    try {
+      const raw = localStorage.getItem('schada_active_sessions_v2');
+      if (!raw) return false;
+      const map: Record<string, { lastSeen: number; isRegistered: boolean; userId: string | null; isActive: boolean }> = JSON.parse(raw);
+      const now = Date.now();
+      return Object.values(map).some(
+        (s) => s.userId === userId && s.isRegistered && s.isActive && (now - s.lastSeen <= 15000)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  public setUserStatus(userId: string, status: 'online' | 'in-game' | 'offline') {
+    const users = this.getUsers();
+    if (users[userId]) {
+      if (users[userId].status !== status) {
+        users[userId].status = status;
+        users[userId].lastSeen = new Date().toISOString();
+        this.saveUsers(users);
+        try {
+          window.dispatchEvent(new CustomEvent('schada_user_status_changed', { detail: { userId, status } }));
+        } catch {
+          // Ignore in non-browser environments
+        }
+      }
+    }
   }
 
   public getCurrentUser(): UserProfile | null {
     const uid = localStorage.getItem(this.currentUserIdKey);
     if (!uid) return null;
     const users = this.getUsers();
-    return users[uid] || null;
+    const user = users[uid];
+    if (!user) return null;
+    const active = this.isUserActive(uid);
+    // User status of online is ONLY when logged in and active
+    const effectiveStatus: 'online' | 'in-game' | 'offline' = active
+      ? (user.status === 'in-game' ? 'in-game' : 'online')
+      : 'offline';
+    return {
+      ...user,
+      status: effectiveStatus,
+    };
   }
 
   public register(email: string, _password: string, username: string): UserProfile {
@@ -141,6 +184,7 @@ class MockBackend {
       gamesLost: 0,
       gamesDrawn: 0,
       status: 'online',
+      lastSeen: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     };
 
@@ -158,6 +202,7 @@ class MockBackend {
     }
 
     user.status = 'online';
+    user.lastSeen = new Date().toISOString();
     users[user.id] = user;
     this.saveUsers(users);
 
@@ -171,20 +216,38 @@ class MockBackend {
       const users = this.getUsers();
       if (users[currentId]) {
         users[currentId].status = 'offline';
+        users[currentId].lastSeen = new Date().toISOString();
         this.saveUsers(users);
       }
     }
     localStorage.removeItem(this.currentUserIdKey);
+    try {
+      window.dispatchEvent(new CustomEvent('schada_user_status_changed', { detail: { status: 'offline' } }));
+    } catch {
+      // Ignore
+    }
   }
 
   public getOnlineRegisteredUsersCount(): number {
-    const currentUid = localStorage.getItem(this.currentUserIdKey);
-    if (!currentUid) {
-      return 0;
+    try {
+      const raw = localStorage.getItem('schada_active_sessions_v2');
+      if (!raw) {
+        const currentUid = localStorage.getItem(this.currentUserIdKey);
+        return currentUid && this.isUserActive(currentUid) ? 1 : 0;
+      }
+      const map = JSON.parse(raw);
+      const now = Date.now();
+      const activeRegisteredIds = new Set<string>();
+      for (const s of Object.values(map) as any[]) {
+        if (s.isRegistered && s.userId && s.isActive && (now - s.lastSeen <= 15000)) {
+          activeRegisteredIds.add(s.userId);
+        }
+      }
+      return activeRegisteredIds.size;
+    } catch {
+      const currentUid = localStorage.getItem(this.currentUserIdKey);
+      return currentUid && this.isUserActive(currentUid) ? 1 : 0;
     }
-    const users = this.getUsers();
-    const user = users[currentUid];
-    return user && (user.status === 'online' || user.status === 'in-game') ? 1 : 0;
   }
 
   public changeUsername(newUsername: string): UserProfile {
@@ -320,7 +383,17 @@ class MockBackend {
     );
     const friendIds = friendsData[userId] || [];
     const users = this.getUsers();
-    return friendIds.map((fid) => users[fid]).filter(Boolean);
+    return friendIds
+      .map((fid) => {
+        const u = users[fid];
+        if (!u) return null;
+        const active = this.isUserActive(u.id);
+        return {
+          ...u,
+          status: (active ? (u.status === 'in-game' ? 'in-game' : 'online') : 'offline') as 'online' | 'in-game' | 'offline',
+        };
+      })
+      .filter(Boolean) as UserProfile[];
   }
 
   public removeFriend(userId: string, friendId: string) {
