@@ -43,7 +43,7 @@ export const SCHADA_VECTORS: Record<Square, MoveVector[]> = {
   "e3": [{"target": [2, -2], "path": [[1, -1]]}, {"target": [1, 1], "path": []}, {"target": [-2, 2], "path": [[-1, 1]]}],
   "f3": [{"target": [0, -2], "path": [[0, -1]]}, {"target": [-1, 1], "path": []}, {"target": [2, 2], "path": [[1, 1]]}],
   "g3": [{"target": [-1, 0], "path": []}, {"target": [1, 0], "path": []}, {"target": [0, -2], "path": [[0, -1]]}],
-  "h3": [{"target": [-1, -1], "path": []}, {"target": [-1, 1], "path": []}, {"target": [-3, 3], "path": [[-1, 1], [-2, 2]]}],
+  "h3": [{"target": [-1, -1], "path": []}, {"target": [-3, 3], "path": [[-1, 1], [-2, 2]]}],
 
   "a4": [{"target": [0, -2], "path": [[0, -1]]}, {"target": [1, -1], "path": []}, {"target": [1, 1], "path": []}],
   "b4": [{"target": [-1, 1], "path": []}, {"target": [2, -2], "path": [[1, -1]]}, {"target": [2, 2], "path": [[1, 1]]}],
@@ -52,10 +52,10 @@ export const SCHADA_VECTORS: Record<Square, MoveVector[]> = {
   "e4": [{"target": [-1, 0], "path": []}, {"target": [0, 2], "path": [[0, 1]]}, {"target": [3, -3], "path": [[1, -1], [2, -2]]}],
   "f4": [{"target": [-1, 0], "path": []}, {"target": [1, 0], "path": []}, {"target": [1, 2], "path": [[0, 1], [0, 2]]}, {"target": [-1, -2], "path": [[0, -1], [0, -2]]}],
   "g4": [{"target": [0, -1], "path": []}, {"target": [-2, 2], "path": [[-1, 1]]}, {"target": [1, 1], "path": []}],
-  "h4": [{"target": [0, -2], "path": [[0, -1]]}, {"target": [-2, 0], "path": [[-1, 0]]}, {"target": [-2, 2], "path": [[-1, 0], [-2, 0], [-2, 1]]}],
+  "h4": [{"target": [0, -2], "path": [[0, -1]]}, {"target": [-2, 2], "path": [[-1, 0], [-2, 0], [-2, 1]]}],
 
   // Ranks 5-8: Exact 180° rotation of ranks 1-4
-  "a5": [{"target": [0, 2], "path": [[0, 1]]}, {"target": [2, 0], "path": [[1, 0]]}, {"target": [2, -2], "path": [[1, 0], [2, 0], [2, -1]]}],
+  "a5": [{"target": [0, 2], "path": [[0, 1]]}, {"target": [2, -2], "path": [[1, 0], [2, 0], [2, -1]]}],
   "b5": [{"target": [0, 1], "path": []}, {"target": [2, -2], "path": [[1, -1]]}, {"target": [-1, -1], "path": []}],
   "c5": [{"target": [1, 0], "path": []}, {"target": [-1, 0], "path": []}, {"target": [-1, -2], "path": [[0, -1], [0, -2]]}, {"target": [1, 2], "path": [[0, 1], [0, 2]]}],
   "d5": [{"target": [1, 0], "path": []}, {"target": [0, -2], "path": [[0, -1]]}, {"target": [-3, 3], "path": [[-1, 1], [-2, 2]]}],
@@ -64,7 +64,7 @@ export const SCHADA_VECTORS: Record<Square, MoveVector[]> = {
   "g5": [{"target": [1, -1], "path": []}, {"target": [-2, 2], "path": [[-1, 1]]}, {"target": [-2, -2], "path": [[-1, -1]]}],
   "h5": [{"target": [0, 2], "path": [[0, 1]]}, {"target": [-1, 1], "path": []}, {"target": [-1, -1], "path": []}],
 
-  "a6": [{"target": [1, 1], "path": []}, {"target": [1, -1], "path": []}, {"target": [3, -3], "path": [[1, -1], [2, -2]]}],
+  "a6": [{"target": [1, 1], "path": []}, {"target": [3, -3], "path": [[1, -1], [2, -2]]}],
   "b6": [{"target": [1, 0], "path": []}, {"target": [-1, 0], "path": []}, {"target": [0, 2], "path": [[0, 1]]}],
   "c6": [{"target": [0, 2], "path": [[0, 1]]}, {"target": [1, -1], "path": []}, {"target": [-2, -2], "path": [[-1, -1]]}],
   "d6": [{"target": [-2, 2], "path": [[-1, 1]]}, {"target": [-1, -1], "path": []}, {"target": [2, -2], "path": [[1, -1]]}],

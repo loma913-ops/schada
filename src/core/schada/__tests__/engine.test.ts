@@ -7,6 +7,8 @@ import {
   createEmptyBoard,
 } from '../engine';
 import { calculateScoreBreakdown, evaluateGameResult } from '../scoring';
+import { SCHADA_VECTORS, squareToColRow, colRowToSquare } from '../vectors';
+import type { Square } from '../types';
 
 describe('Schada Game Engine', () => {
   it('should initialize exactly 14 legal moves from the opening position for Blue', () => {
@@ -199,4 +201,185 @@ describe('Schada Game Engine', () => {
     expect(state.board['c4']).toBeDefined();
     expect(state.board['c4']?.type).toBe('pawn');
   });
+
+  it('ensures pieces must complete their full designated paths and cannot stop early', () => {
+    const board = createEmptyBoard();
+
+    // 1. Piece on a5 has bent path: 2 right, 2 down -> c3.
+    // Must NOT be able to stop early on b5 ([1, 0]) or c5 ([2, 0]).
+    board['a5'] = {
+      id: 'p_a5',
+      type: 'pawn',
+      color: 'blue',
+      hasLeftBase: true,
+      hasReachedGoal: false,
+    };
+    const a5Moves = getLegalMovesForSquare(board, 'a5');
+    const a5Destinations = a5Moves.map((m) => m.to);
+    expect(a5Destinations).toContain('c3'); // Full completed path
+    expect(a5Destinations).not.toContain('b5'); // Cannot stop early on intermediate step
+    expect(a5Destinations).not.toContain('c5'); // Cannot stop early at the corner bend
+
+    // 2. Piece on h4 has bent path: 2 left, 2 up -> f6.
+    // Must NOT be able to stop early on g4 ([-1, 0]) or f4 ([-2, 0]).
+    board['h4'] = {
+      id: 'p_h4',
+      type: 'pawn',
+      color: 'blue',
+      hasLeftBase: true,
+      hasReachedGoal: false,
+    };
+    const h4Moves = getLegalMovesForSquare(board, 'h4');
+    const h4Destinations = h4Moves.map((m) => m.to);
+    expect(h4Destinations).toContain('f6'); // Full completed path
+    expect(h4Destinations).not.toContain('g4'); // Cannot stop early on intermediate step
+    expect(h4Destinations).not.toContain('f4'); // Cannot stop early at the corner bend
+
+    // 3. Piece on h3 has 3-square diagonal: -> e6.
+    // Must NOT be able to stop early on g4 ([-1, 1]) or f5 ([-2, 2]).
+    board['h3'] = {
+      id: 'p_h3',
+      type: 'pawn',
+      color: 'blue',
+      hasLeftBase: true,
+      hasReachedGoal: false,
+    };
+    const h3Moves = getLegalMovesForSquare(board, 'h3');
+    const h3Destinations = h3Moves.map((m) => m.to);
+    expect(h3Destinations).toContain('e6'); // Full completed diagonal
+    expect(h3Destinations).not.toContain('g4'); // Cannot stop after 1 step
+    expect(h3Destinations).not.toContain('f5'); // Cannot stop after 2 steps
+
+    // 4. Piece on a6 has 3-square diagonal: -> d3.
+    // Must NOT be able to stop early on b5 ([1, -1]) or c4 ([2, -2]).
+    board['a6'] = {
+      id: 'p_a6',
+      type: 'pawn',
+      color: 'blue',
+      hasLeftBase: true,
+      hasReachedGoal: false,
+    };
+    const a6Moves = getLegalMovesForSquare(board, 'a6');
+    const a6Destinations = a6Moves.map((m) => m.to);
+    expect(a6Destinations).toContain('d3'); // Full completed diagonal
+    expect(a6Destinations).not.toContain('b5'); // Cannot stop after 1 step
+    expect(a6Destinations).not.toContain('c4'); // Cannot stop after 2 steps
+
+    // 5. Piece on f2 has bent path: 2 right, 1 down -> h1.
+    // Must NOT be able to stop early on g2 ([1, 0]) or h2 ([2, 0]).
+    board['f2'] = {
+      id: 'p_f2',
+      type: 'pawn',
+      color: 'blue',
+      hasLeftBase: false,
+      hasReachedGoal: false,
+    };
+    const f2Moves = getLegalMovesForSquare(board, 'f2');
+    const f2Destinations = f2Moves.map((m) => m.to);
+    expect(f2Destinations).toContain('h1');
+    expect(f2Destinations).not.toContain('g2');
+    expect(f2Destinations).not.toContain('h2');
+  });
+
+  it('enforces board-wide that no piece can ever land on intermediate path squares across all 64 squares', () => {
+    const squares = Object.keys(SCHADA_VECTORS) as Square[];
+    for (const sq of squares) {
+      const board = createEmptyBoard();
+      // Place a piece with hasLeftBase=true, hasReachedGoal=false
+      board[sq] = {
+        id: `test_pawn_${sq}`,
+        type: 'pawn',
+        color: 'blue',
+        hasLeftBase: true,
+        hasReachedGoal: false,
+      };
+
+      const legalMoves = getLegalMovesForSquare(board, sq);
+      const destinations = new Set(legalMoves.map((m) => m.to));
+
+      const [col, row] = squareToColRow(sq);
+      for (const vector of SCHADA_VECTORS[sq]) {
+        for (const [stepDc, stepDr] of vector.path) {
+          const stepCol = col + stepDc;
+          const stepRow = row + stepDr;
+          if (stepCol >= 0 && stepCol <= 7 && stepRow >= 0 && stepRow <= 7) {
+            const intermediateSquare = colRowToSquare(stepCol, stepRow)!;
+            expect(destinations.has(intermediateSquare)).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('prohibits moving or capturing when an enemy piece occupies an intermediate square', () => {
+    const board = createEmptyBoard();
+
+    // Blue piece on f2 with vector targeting h1 via path [g2, h2]
+    board['f2'] = {
+      id: 'p_f2',
+      type: 'pawn',
+      color: 'blue',
+      hasLeftBase: false,
+      hasReachedGoal: false,
+    };
+
+    // Enemy piece on intermediate square g2
+    board['g2'] = {
+      id: 'ep_g2',
+      type: 'pawn',
+      color: 'green',
+      hasLeftBase: true,
+      hasReachedGoal: false,
+    };
+
+    const movesWithEnemyOnG2 = getLegalMovesForSquare(board, 'f2');
+    // Cannot reach h1, cannot land on g2 (no early capture on intermediate square), cannot land on h2
+    expect(movesWithEnemyOnG2.some((m) => m.to === 'h1')).toBe(false);
+    expect(movesWithEnemyOnG2.some((m) => m.to === 'g2')).toBe(false);
+    expect(movesWithEnemyOnG2.some((m) => m.to === 'h2')).toBe(false);
+
+    // Now clear g2 and place enemy on h2 instead
+    board['g2'] = null;
+    board['h2'] = {
+      id: 'ep_h2',
+      type: 'pawn',
+      color: 'green',
+      hasLeftBase: true,
+      hasReachedGoal: false,
+    };
+
+    const movesWithEnemyOnH2 = getLegalMovesForSquare(board, 'f2');
+    expect(movesWithEnemyOnH2.some((m) => m.to === 'h1')).toBe(false);
+    expect(movesWithEnemyOnH2.some((m) => m.to === 'h2')).toBe(false);
+  });
+
+  it('allows Field Officers to leap friendly pieces to complete full path without stopping on them', () => {
+    const board = createEmptyBoard();
+
+    // Blue Field Officer on f2 targeting h1 via path [g2, h2]
+    board['f2'] = {
+      id: 'fo_f2',
+      type: 'field_officer',
+      color: 'blue',
+      hasLeftBase: false,
+      hasReachedGoal: false,
+    };
+
+    // Friendly piece on intermediate square h2
+    board['h2'] = {
+      id: 'p_h2',
+      type: 'pawn',
+      color: 'blue',
+      hasLeftBase: false,
+      hasReachedGoal: false,
+    };
+
+    const foMoves = getLegalMovesForSquare(board, 'f2');
+    // Field Officer can complete the full leap to h1
+    expect(foMoves.some((m) => m.to === 'h1')).toBe(true);
+    // But cannot stop on friendly h2 or g2
+    expect(foMoves.some((m) => m.to === 'h2')).toBe(false);
+    expect(foMoves.some((m) => m.to === 'g2')).toBe(false);
+  });
 });
+

@@ -171,6 +171,10 @@ export function getLegalMovesForSquare(board: BoardMatrix, square: Square): Move
     for (const [stepDc, stepDr] of vector.path) {
       const stepCol = col + stepDc;
       const stepRow = row + stepDr;
+      if (stepCol < 0 || stepCol > 7 || stepRow < 0 || stepRow > 7) {
+        pathBlocked = true;
+        break;
+      }
       const stepSquare = colRowToSquare(stepCol, stepRow)!;
       intermediateSquares.push(stepSquare);
 
