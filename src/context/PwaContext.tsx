@@ -47,17 +47,53 @@ export const PwaProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setIsStandalone(isStandaloneMode);
 
+    const isMobileDevice =
+      /iphone|ipad|ipod|android|mobile/i.test(userAgent) ||
+      window.matchMedia('(max-width: 768px)').matches;
+
     // Listen for beforeinstallprompt event (Chromium browsers)
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
+
+      try {
+        const dismissed = localStorage.getItem('schada_pwa_dismissed');
+        const inGame = window.location.pathname.startsWith('/game/');
+        if (isMobileDevice && !dismissed && !inGame) {
+          setTimeout(() => {
+            setInstallModalOpen(true);
+          }, 1500);
+        }
+      } catch {
+        // Ignore localStorage error if restricted
+      }
     };
 
     const handleAppInstalled = () => {
       setDeferredPrompt(null);
       setIsStandalone(true);
       setInstallModalOpen(false);
+      try {
+        localStorage.setItem('schada_pwa_dismissed', 'true');
+      } catch {
+        // Ignore
+      }
     };
+
+    // Auto-prompt on iOS mobile devices if eligible and not dismissed
+    if (isAppleDevice && isMobileDevice && !isStandaloneMode) {
+      try {
+        const dismissed = localStorage.getItem('schada_pwa_dismissed');
+        const inGame = window.location.pathname.startsWith('/game/');
+        if (!dismissed && !inGame) {
+          setTimeout(() => {
+            setInstallModalOpen(true);
+          }, 2000);
+        }
+      } catch {
+        // Ignore
+      }
+    }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);

@@ -90,12 +90,27 @@ body {
   .desktop-friends-btn {
     display: none !important;
   }
-  .install-btn-text {
-    display: none;
-  }
   .install-btn {
-    display: flex !important;
-    padding: 0.4rem !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem !important;
+    border-radius: var(--radius-sm);
+    background-color: rgba(229, 183, 88, 0.08) !important;
+    border: 1px solid var(--accent-gold) !important;
+    color: var(--accent-gold) !important;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .install-btn:hover {
+    background-color: rgba(229, 183, 88, 0.18) !important;
+    border-color: var(--accent-gold-hover) !important;
+    color: var(--accent-gold-hover) !important;
+  }
+  .install-btn-text {
+    display: inline;
+    font-size: 0.78rem;
   }
   .nav-username {
     max-width: 75px;
@@ -103,6 +118,15 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
     display: inline-block;
+  }
+}
+
+@media (max-width: 480px) {
+  .install-btn-text {
+    display: none;
+  }
+  .install-btn {
+    padding: 0.4rem !important;
   }
 }
 
@@ -607,6 +631,29 @@ body {
 }
 
 .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.btn-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

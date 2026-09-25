@@ -67,15 +67,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         {!isStandalone && (
           <button
             className="action-btn install-btn"
-            style={{
-              padding: '0.45rem 0.75rem',
-              borderColor: 'var(--accent-gold)',
-              color: 'var(--accent-gold)',
-              backgroundColor: 'rgba(229, 183, 88, 0.08)',
-              fontWeight: 600,
-            }}
             onClick={() => setInstallModalOpen(true)}
             title="Install Schada App"
+            aria-label="Install Schada App"
           >
             <Smartphone size={16} />
             <span className="install-btn-text">Install App</span>
