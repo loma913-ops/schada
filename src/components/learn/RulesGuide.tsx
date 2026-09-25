@@ -247,7 +247,7 @@ export const RulesGuide: React.FC = () => {
         <h1 className="rules-title">Rules of {gameMetadata.title}</h1>
         <p className="rules-subtitle">
           Invented by <strong>{gameMetadata.inventor}</strong> ({gameMetadata.cityOfOrigin},{' '}
-          {gameMetadata.yearInvented}) - <em>"{gameMetadata.tagline}"</em>
+          {gameMetadata.yearInvented})<br /><em>"{gameMetadata.tagline}"</em>
         </p>
 
         {/* Quick Stat Chips */}

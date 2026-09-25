@@ -160,7 +160,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               title={`Status: ${user.status}`}
             />
             <User size={15} color="var(--accent-gold)" />
-            <span className="nav-username" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{user.username}</span>
             <span
               className="nav-user-elo"
               style={{
