@@ -1,5 +1,6 @@
 @import './tokens.css';
 @import './board.css';
+@import './rules.css';
 
 *, *::before, *::after {
   box-sizing: border-box;

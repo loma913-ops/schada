@@ -15,7 +15,7 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
 }) {
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Group moves into pairs (Blue, Green) — only recompute when history grows
+  // Group moves into pairs (Blue, Green) - only recompute when history grows
   const movePairs: { num: number; blue?: Move; green?: Move }[] = useMemo(() => {
     const pairs: { num: number; blue?: Move; green?: Move }[] = [];
     for (let i = 0; i < history.length; i += 2) {
@@ -48,17 +48,15 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
             <div key={pair.num} className="move-row">
               <span className="move-num">{pair.num}.</span>
               <span
-                className={`move-cell ${
-                  currentMoveIndex === (pair.num - 1) * 2 ? 'active' : ''
-                }`}
+                className={`move-cell ${currentMoveIndex === (pair.num - 1) * 2 ? 'active' : ''
+                  }`}
                 onClick={() => onNavigateMove && onNavigateMove((pair.num - 1) * 2)}
               >
                 {pair.blue?.notation || ''}
               </span>
               <span
-                className={`move-cell ${
-                  pair.green && currentMoveIndex === (pair.num - 1) * 2 + 1 ? 'active' : ''
-                }`}
+                className={`move-cell ${pair.green && currentMoveIndex === (pair.num - 1) * 2 + 1 ? 'active' : ''
+                  }`}
                 onClick={() =>
                   pair.green && onNavigateMove && onNavigateMove((pair.num - 1) * 2 + 1)
                 }

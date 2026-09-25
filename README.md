@@ -119,10 +119,10 @@ npm run build && npx firebase-tools deploy
 
 To link your purchased domain `schada.org` to Firebase Hosting, configure these DNS records at your domain registrar (Namecheap, Cloudflare, GoDaddy, Google Domains, etc.):
 
-| Type | Name / Host | Value / Target | Purpose |
-| :--- | :--- | :--- | :--- |
-| **A** | `@` (or blank) | `199.36.158.100` | Points root domain `schada.org` to Firebase Hosting |
-| **CNAME** | `www` | `schada-online.web.app` | Points `www.schada.org` to the web app |
+| Type      | Name / Host    | Value / Target          | Purpose                                             |
+| :-------- | :------------- | :---------------------- | :-------------------------------------------------- |
+| **A**     | `@` (or blank) | `199.36.158.100`        | Points root domain `schada.org` to Firebase Hosting |
+| **CNAME** | `www`          | `schada-online.web.app` | Points `www.schada.org` to the web app              |
 
 > **SSL / HTTPS:** Firebase automatically provisions a free Let's Encrypt SSL certificate within 10–30 minutes after DNS records propagate.
 
@@ -180,16 +180,16 @@ schada/
 
 ## 6. Editing `src/core/schada/vectors.ts`
 
-`src/core/schada/vectors.ts` is the authoritative 64-square movement matrix. Each entry defines **where a piece on that square can move to** and **which intermediate squares the move passes through** (for blocking/capture purposes). The engine, tests, and UI all import this file directly — editing it is how you tune movement rules for any square.
+`src/core/schada/vectors.ts` is the authoritative 64-square movement matrix. Each entry defines **where a piece on that square can move to** and **which intermediate squares the move passes through** (for blocking/capture purposes). The engine, tests, and UI all import this file directly - editing it is how you tune movement rules for any square.
 
 ### Coordinate System
 
 All offsets are written as `[file_delta, rank_delta]`:
 
-| Axis | Positive direction | Negative direction |
-| :--- | :--- | :--- |
-| **File** (`[0]`) | Toward `h` (right) | Toward `a` (left) |
-| **Rank** (`[1]`) | Toward `8` (up) | Toward `1` (down) |
+| Axis             | Positive direction | Negative direction |
+| :--------------- | :----------------- | :----------------- |
+| **File** (`[0]`) | Toward `h` (right) | Toward `a` (left)  |
+| **Rank** (`[1]`) | Toward `8` (up)    | Toward `1` (down)  |
 
 **Example:** from `d4`, the offset `[2, -1]` points to `f3` (2 files right, 1 rank down).
 
@@ -206,10 +206,10 @@ Each top-level key is a square in algebraic notation. Its value is an **array of
 ]
 ```
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `"target"` | `[int, int]` | Offset from the piece's current square to the destination |
-| `"path"` | `[[int, int], …]` | Ordered list of intermediate squares the move travels **through**, not including the destination. Empty `[]` for direct moves. |
+| Field      | Type              | Description                                                                                                                    |
+| :--------- | :---------------- | :----------------------------------------------------------------------------------------------------------------------------- |
+| `"target"` | `[int, int]`      | Offset from the piece's current square to the destination                                                                      |
+| `"path"`   | `[[int, int], …]` | Ordered list of intermediate squares the move travels **through**, not including the destination. Empty `[]` for direct moves. |
 
 ### Direct Moves (`"path": []`)
 
@@ -237,36 +237,36 @@ A bent move travels through one or more **intermediate squares** before reaching
 
 This example (from `f2`) means: start at `f2`, pass through `g2` (offset `[1,0]`), pass through `h2` (offset `[2,0]`), arrive at `h1` (offset `[2,-1]`). Both `g2` and `h2` are blocking waypoints.
 
-> **Important:** every offset in `path` — just like `target` — is **always relative to the piece's starting square**, not relative to the previous waypoint.
+> **Important:** every offset in `path` - just like `target` - is **always relative to the piece's starting square**, not relative to the previous waypoint.
 
 ### 180° Symmetry Rule
 
 The top half of the board (ranks 5–8) is an exact 180° rotation of the bottom half (ranks 1–4). For any square on one half, its mirror on the other half must have **every offset negated** (each component multiplied by `−1`).
 
-| Square | Target | Mirror square | Target |
-| :--- | :--- | :--- | :--- |
-| `a5` | `[0, 1]` → a6 | `h4` | `[0, -1]` → h3 |
-| `f2` | `[2, -1]` via `[1,0],[2,0]` | `c7` | `[-2, 1]` via `[-1,0],[-2,0]` |
+| Square | Target                      | Mirror square | Target                        |
+| :----- | :-------------------------- | :------------ | :---------------------------- |
+| `a5`   | `[0, 1]` → a6               | `h4`          | `[0, -1]` → h3                |
+| `f2`   | `[2, -1]` via `[1,0],[2,0]` | `c7`          | `[-2, 1]` via `[-1,0],[-2,0]` |
 
 Always update **both** squares when you change one.
 
 ### Step-by-Step: Editing a Square's Moves
 
-1. **Identify the destination** — convert it to a `[file_delta, rank_delta]` offset from the source square.
-2. **Trace the path** — list every intermediate square the piece physically crosses, also as offsets from the source. Leave `"path": []` if the move is a single step with no waypoints.
-3. **Edit the source square's entry** — add, remove, or replace the relevant move object in its array in `src/core/schada/vectors.ts`.
-4. **Update the 180° mirror square** — negate all offsets in both `"target"` and every `"path"` waypoint.
+1. **Identify the destination** - convert it to a `[file_delta, rank_delta]` offset from the source square.
+2. **Trace the path** - list every intermediate square the piece physically crosses, also as offsets from the source. Leave `"path": []` if the move is a single step with no waypoints.
+3. **Edit the source square's entry** - add, remove, or replace the relevant move object in its array in `src/core/schada/vectors.ts`.
+4. **Update the 180° mirror square** - negate all offsets in both `"target"` and every `"path"` waypoint.
 5. **Run the test suite** (`npm test`) to catch any engine inconsistencies.
 
 ### Quick Reference: Common Offsets
 
-| Offset | Direction |
-| :--- | :--- |
-| `[1, 0]` | One file toward `h` |
-| `[-1, 0]` | One file toward `a` |
-| `[0, 1]` | One rank toward `8` |
-| `[0, -1]` | One rank toward `1` |
-| `[1, 1]` | Diagonal toward `h8` corner |
+| Offset     | Direction                   |
+| :--------- | :-------------------------- |
+| `[1, 0]`   | One file toward `h`         |
+| `[-1, 0]`  | One file toward `a`         |
+| `[0, 1]`   | One rank toward `8`         |
+| `[0, -1]`  | One rank toward `1`         |
+| `[1, 1]`   | Diagonal toward `h8` corner |
 | `[-1, -1]` | Diagonal toward `a1` corner |
-| `[1, -1]` | Diagonal toward `h1` corner |
-| `[-1, 1]` | Diagonal toward `a8` corner |
+| `[1, -1]`  | Diagonal toward `h1` corner |
+| `[-1, 1]`  | Diagonal toward `a8` corner |

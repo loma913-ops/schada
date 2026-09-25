@@ -239,7 +239,7 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
                     {filters.timeControls.bullet && <Check size={12} />}
                   </span>
                   <span className="filter-label-text">
-                    <strong>Bullet</strong> — Very fast games: less than 3 minutes
+                    <strong>Bullet</strong> - Very fast games: less than 3 minutes
                   </span>
                 </label>
 
@@ -258,7 +258,7 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
                     {filters.timeControls.blitz && <Check size={12} />}
                   </span>
                   <span className="filter-label-text">
-                    <strong>Blitz</strong> — Fast games: 3 to 8 minutes
+                    <strong>Blitz</strong> - Fast games: 3 to 8 minutes
                   </span>
                 </label>
 
@@ -277,7 +277,7 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
                     {filters.timeControls.rapid && <Check size={12} />}
                   </span>
                   <span className="filter-label-text">
-                    <strong>Rapid</strong> — Rapid games: 8 to 25 minutes
+                    <strong>Rapid</strong> - Rapid games: 8 to 25 minutes
                   </span>
                 </label>
 
@@ -296,7 +296,7 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
                     {filters.timeControls.classical && <Check size={12} />}
                   </span>
                   <span className="filter-label-text">
-                    <strong>Classical</strong> — Classical games: 25 minutes and more
+                    <strong>Classical</strong> - Classical games: 25 minutes and more
                   </span>
                 </label>
               </div>

@@ -1,12 +1,12 @@
 import React from 'react';
-import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, Smartphone } from 'lucide-react';
+import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, Smartphone, History } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { usePwa } from '@/context/PwaContext';
 
 interface NavbarProps {
-  currentTab: 'play' | 'leaderboard' | 'learn';
-  onSelectTab: (tab: 'play' | 'leaderboard' | 'learn') => void;
+  currentTab: 'play' | 'leaderboard' | 'learn' | 'history';
+  onSelectTab: (tab: 'play' | 'leaderboard' | 'learn' | 'history') => void;
   onOpenAuth: () => void;
   onOpenProfile: () => void;
   onOpenFriends: () => void;
@@ -58,6 +58,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <BookOpen size={16} />
           <span>Rules</span>
+        </button>
+        <button
+          className={`nav-tab ${currentTab === 'history' ? 'active' : ''}`}
+          onClick={() => onSelectTab('history')}
+        >
+          <History size={16} />
+          <span>History</span>
         </button>
       </div>
 

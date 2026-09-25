@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: 'Schada • Strategy Board Game',
         short_name: 'Schada',
-        description: 'Play Schada online — the classic abstract strategy game where the 64 squares dictate piece movement.',
+        description: 'Play Schada online - the classic abstract strategy game where the 64 squares dictate piece movement.',
         theme_color: '#12151c',
         background_color: '#12151c',
         display: 'standalone',

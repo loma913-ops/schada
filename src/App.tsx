@@ -16,6 +16,7 @@ const GameRoomView = lazy(() => import('./components/game/GameRoomView').then((m
 const Arena = lazy(() => import('./components/game/Arena').then((m) => ({ default: m.Arena })));
 const LeaderboardTable = lazy(() => import('./components/leaderboard/LeaderboardTable').then((m) => ({ default: m.LeaderboardTable })));
 const RulesGuide = lazy(() => import('./components/learn/RulesGuide').then((m) => ({ default: m.RulesGuide })));
+const HistoryGuide = lazy(() => import('./components/history/HistoryGuide').then((m) => ({ default: m.HistoryGuide })));
 const PlayAgainstComputerModal = lazy(() => import('./components/lobby/PlayAgainstComputerModal').then((m) => ({ default: m.PlayAgainstComputerModal })));
 const CreateRoomModal = lazy(() => import('./components/lobby/CreateRoomModal').then((m) => ({ default: m.CreateRoomModal })));
 const AuthModal = lazy(() => import('./components/auth/AuthModal').then((m) => ({ default: m.AuthModal })));
@@ -52,7 +53,7 @@ const MainApp: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [currentTab, setCurrentTab] = useState<'play' | 'leaderboard' | 'learn'>('play');
+  const [currentTab, setCurrentTab] = useState<'play' | 'leaderboard' | 'learn' | 'history'>('play');
   const [activeMatch, setActiveMatch] = useState<ActiveMatch | null>(null);
 
   // Modals
@@ -346,8 +347,10 @@ const MainApp: React.FC = () => {
                   )
                 ) : currentTab === 'leaderboard' ? (
                   <LeaderboardTable />
-                ) : (
+                ) : currentTab === 'learn' ? (
                   <RulesGuide />
+                ) : (
+                  <HistoryGuide />
                 )}
               </main>
             }

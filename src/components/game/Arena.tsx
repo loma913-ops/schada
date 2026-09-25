@@ -10,7 +10,7 @@ import { MoveHistory } from './MoveHistory';
 import { GameControls } from './GameControls';
 import { GameOverModal } from './GameOverModal';
 
-/** Pure helper — defined at module scope so it is never re-created on render. */
+/** Pure helper - defined at module scope so it is never re-created on render. */
 function getMaterialValue(pieces: Piece[]): number {
   return pieces.reduce(
     (sum, p) => sum + (p.type === 'field_officer' ? 3 : p.type === 'officer' ? 2 : 1),

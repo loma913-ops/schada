@@ -1,9 +1,9 @@
 import React from 'react';
-import { Crown, Trophy, BookOpen, Users } from 'lucide-react';
+import { Crown, Trophy, BookOpen, Users, History } from 'lucide-react';
 
 interface BottomNavProps {
-  currentTab: 'play' | 'leaderboard' | 'learn';
-  onSelectTab: (tab: 'play' | 'leaderboard' | 'learn') => void;
+  currentTab: 'play' | 'leaderboard' | 'learn' | 'history';
+  onSelectTab: (tab: 'play' | 'leaderboard' | 'learn' | 'history') => void;
   onOpenFriends: () => void;
   pendingRequestsCount?: number;
 }
@@ -44,6 +44,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <BookOpen size={20} />
         </div>
         <span className="bottom-nav-label">Rules</span>
+      </button>
+
+      <button
+        className={`bottom-nav-item ${currentTab === 'history' ? 'active' : ''}`}
+        onClick={() => onSelectTab('history')}
+      >
+        <div className="bottom-nav-icon">
+          <History size={20} />
+        </div>
+        <span className="bottom-nav-label">History</span>
       </button>
 
       <button
