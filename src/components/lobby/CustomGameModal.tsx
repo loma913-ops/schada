@@ -113,7 +113,12 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
             <button
               type="button"
               className={`action-btn ${colorPref === 'random' ? 'active' : ''}`}
-              style={{ flex: 1 }}
+              style={{
+                flex: 1,
+                backgroundColor: colorPref === 'random' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                color: colorPref === 'random' ? '#1a1a1a' : 'var(--text-primary)',
+                fontWeight: 700,
+              }}
               onClick={() => setColorPref('random')}
             >
               Random
@@ -123,7 +128,8 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
               className={`action-btn ${colorPref === 'blue' ? 'active' : ''}`}
               style={{
                 flex: 1,
-                color: 'var(--piece-blue)',
+                backgroundColor: colorPref === 'blue' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                color: colorPref === 'blue' ? '#1a1a1a' : 'var(--piece-blue)',
                 fontWeight: 700,
               }}
               onClick={() => setColorPref('blue')}
@@ -135,7 +141,8 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
               className={`action-btn ${colorPref === 'green' ? 'active' : ''}`}
               style={{
                 flex: 1,
-                color: 'var(--piece-green)',
+                backgroundColor: colorPref === 'green' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                color: colorPref === 'green' ? '#1a1a1a' : 'var(--piece-green)',
                 fontWeight: 700,
               }}
               onClick={() => setColorPref('green')}
