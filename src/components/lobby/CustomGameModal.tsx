@@ -5,7 +5,7 @@ import type { PieceColor } from '@/core/schada/types';
 interface CustomGameModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateGame: (minutes: number, isRanked: boolean, colorPref?: PieceColor) => void;
+  onCreateGame: (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => void;
 }
 
 export const CustomGameModal: React.FC<CustomGameModalProps> = ({
@@ -14,6 +14,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
   onCreateGame,
 }) => {
   const [minutes, setMinutes] = useState(5);
+  const [increment, setIncrement] = useState(0);
   const [isRanked, setIsRanked] = useState(true);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
 
   const handleStart = () => {
     const chosenColor = colorPref === 'random' ? undefined : colorPref;
-    onCreateGame(minutes, isRanked, chosenColor);
+    onCreateGame(minutes, minutes === 0 ? 0 : increment, isRanked, chosenColor);
     onClose();
   };
 
@@ -53,8 +54,8 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
         {/* Time Control Selector */}
         <div className="form-group">
           <label className="form-label">Time Control (Minutes per player)</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
-            {[3, 5, 10, 0].map((m) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
+            {[1, 3, 5, 10, 0].map((m) => (
               <button
                 key={m}
                 type="button"
@@ -72,6 +73,31 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
             ))}
           </div>
         </div>
+
+        {/* Increment per move */}
+        {minutes > 0 && (
+          <div className="form-group">
+            <label className="form-label">Increment per move</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
+              {[0, 1, 2, 3, 5].map((sec) => (
+                <button
+                  key={sec}
+                  type="button"
+                  className={`action-btn ${increment === sec ? 'active' : ''}`}
+                  style={{
+                    backgroundColor: increment === sec ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
+                    color: increment === sec ? '#1a1a1a' : 'var(--text-primary)',
+                    fontWeight: 700,
+                    padding: '0.5rem',
+                  }}
+                  onClick={() => setIncrement(sec)}
+                >
+                  {sec === 0 ? 'None' : `+${sec}s`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Match Type (Ranked vs Casual) */}
         <div className="form-group">
@@ -134,7 +160,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
               }}
               onClick={() => setColorPref('blue')}
             >
-              Blue (First)
+              Blue
             </button>
             <button
               type="button"

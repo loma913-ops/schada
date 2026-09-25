@@ -79,7 +79,7 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
           }}
         >
           <Share2 size={22} className="lichess-cta-icon" color="var(--accent-blue)" />
-          <span>Play with a Friend (Create Room / Invite Link)</span>
+          <span>Play with a Friend</span>
         </button>
 
         <button
@@ -101,7 +101,7 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
           onClick={onStartPassAndPlay}
         >
           <Users size={16} />
-          <span>Pass & Play (Local 2-Player Sandbox)</span>
+          <span>Pass & Play (Local 2-Player)</span>
         </button>
       </div>
 

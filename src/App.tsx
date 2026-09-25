@@ -152,7 +152,7 @@ const MainApp: React.FC = () => {
   };
 
   // Custom Match Creation (Player vs Player)
-  const handleCreateCustom = (minutes: number, isRanked: boolean, colorPref?: PieceColor) => {
+  const handleCreateCustom = (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => {
     const opponentPlayer: ArenaPlayer = {
       id: 'player_2',
       username: 'Player 2',
@@ -171,7 +171,7 @@ const MainApp: React.FC = () => {
       bluePlayer,
       greenPlayer,
       timeControlMinutes: minutes,
-      incrementSeconds: 0,
+      incrementSeconds: minutes === 0 ? 0 : increment,
       isRanked: isRanked && Boolean(user),
       userColor,
       isComputer: false,

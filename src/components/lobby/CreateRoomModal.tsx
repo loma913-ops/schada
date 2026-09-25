@@ -32,10 +32,10 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
       const creator = user
         ? { id: user.id, username: user.username, elo: user.eloRating }
         : {
-            id: 'guest_' + Math.random().toString(36).substring(2, 7),
-            username: localStorage.getItem('schada_guest_name') || 'Guest Host',
-            elo: 1200,
-          };
+          id: 'guest_' + Math.random().toString(36).substring(2, 7),
+          username: localStorage.getItem('schada_guest_name') || 'Guest Host',
+          elo: 1200,
+        };
 
       const result = await createGame({
         timeControlMinutes: timeControl,
@@ -211,8 +211,8 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
             {timeControl > 0 && (
               <div className="form-group">
                 <label className="form-label">Increment per move</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
-                  {[0, 1, 2, 5].map((sec) => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
+                  {[0, 1, 2, 3, 5].map((sec) => (
                     <button
                       key={sec}
                       type="button"
@@ -293,7 +293,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                   }}
                   onClick={() => setColorPref('blue')}
                 >
-                  Blue (First)
+                  Blue
                 </button>
                 <button
                   type="button"
