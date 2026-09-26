@@ -84,6 +84,22 @@ export const RulesGuide: React.FC = () => {
   const activeVectors = SCHADA_VECTORS[selectedVectorSquare] || [];
   const notableSquare = NOTABLE_SQUARES.find((n) => n.square === selectedVectorSquare);
 
+  // Precomputed destination and waypoint squares for the selected vector square (O(1))
+  const { targetSquares, pathSquares } = useMemo(() => {
+    const targets = new Set<Square>();
+    const paths = new Set<Square>();
+    const [c, r] = squareToColRow(selectedVectorSquare);
+    for (const vec of activeVectors) {
+      const dest = colRowToSquare(c + vec.target[0], r + vec.target[1]);
+      if (dest) targets.add(dest);
+      for (const [dc, dr] of vec.path) {
+        const step = colRowToSquare(c + dc, r + dr);
+        if (step) paths.add(step);
+      }
+    }
+    return { targetSquares: targets, pathSquares: paths };
+  }, [selectedVectorSquare, activeVectors]);
+
   // --- State for Leap Simulator ---
   const [selectedPieceType, setSelectedPieceType] = useState<PieceType>('field_officer');
   const [obstacleType, setObstacleType] = useState<'friendly' | 'enemy'>('friendly');
@@ -392,25 +408,55 @@ export const RulesGuide: React.FC = () => {
             {showFullGridPicker && (
               <div style={{ marginTop: '0.75rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                  Click any square on the 8×8 board to inspect its vector:
+                  Click any square on the 8×8 board to inspect its vector and possible moves:
                 </div>
                 <div className="rules-square-picker-grid">
                   {all64Squares.map((sq) => {
                     const [c, r] = squareToColRow(sq);
                     const isLight = (c + r) % 2 === 1;
                     const isCurrent = sq === selectedVectorSquare;
+                    const isTarget = targetSquares.has(sq);
+                    const isPath = !isTarget && pathSquares.has(sq);
                     return (
                       <button
                         key={sq}
                         type="button"
-                        className={`rules-picker-cell ${isLight ? 'light' : 'dark'} ${isCurrent ? 'active' : ''}`}
+                        className={`rules-picker-cell ${isLight ? 'light' : 'dark'} ${
+                          isCurrent ? 'active' : isTarget ? 'is-target' : isPath ? 'is-path' : ''
+                        }`}
                         onClick={() => setSelectedVectorSquare(sq)}
-                        title={`Inspect square ${sq}`}
+                        title={
+                          isCurrent
+                            ? `Selected origin square ${sq}`
+                            : isTarget
+                            ? `Possible move destination from ${selectedVectorSquare}: ${sq}`
+                            : isPath
+                            ? `Intermediate path waypoint for vector from ${selectedVectorSquare}`
+                            : `Inspect square ${sq}`
+                        }
                       >
                         {sq}
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Vector Highlight Legend */}
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-gold)', display: 'inline-block' }} />
+                    Selected (<strong>{selectedVectorSquare}</strong>)
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: '#629924', border: '1px solid #a3e635', display: 'inline-block' }} />
+                    Possible Moves ({Array.from(targetSquares).join(', ') || 'None'})
+                  </span>
+                  {pathSquares.size > 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(54, 146, 231, 0.65)', border: '1px solid #3692e7', display: 'inline-block' }} />
+                      Path Waypoints
+                    </span>
+                  )}
                 </div>
               </div>
             )}
