@@ -36,6 +36,16 @@
   }
 }
 
+/* Board elements opt out of algorithmic force-dark inversions (e.g. Samsung Internet / Chromium Auto Dark) */
+.schada-board-wrapper,
+.schada-board-grid,
+.board-square,
+.piece-container,
+.piece-icon,
+.square-vector-svg {
+  color-scheme: only light;
+}
+
 .board-square {
   position: relative;
   width: 100%;
@@ -52,18 +62,22 @@
 
 .board-square.light {
   background-color: var(--board-light);
+  background-image: linear-gradient(var(--board-light), var(--board-light));
 }
 
 .board-square.dark {
   background-color: var(--board-dark);
+  background-image: linear-gradient(var(--board-dark), var(--board-dark));
 }
 
 .board-square.selected {
   background-color: var(--sq-selected) !important;
+  background-image: linear-gradient(var(--sq-selected), var(--sq-selected)) !important;
 }
 
 .board-square.last-move {
   background-color: var(--sq-last-move);
+  background-image: linear-gradient(var(--sq-last-move), var(--sq-last-move));
 }
 
 .board-square:hover:not(.selected) {

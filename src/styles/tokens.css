@@ -1,4 +1,6 @@
 :root {
+  color-scheme: dark;
+  color-scheme: only dark;
   /* Lichess-inspired Warm Graphite Dark Mode */
   --bg-primary: #161512;
   --bg-secondary: #262421;
@@ -53,6 +55,8 @@
 }
 
 [data-theme='light'] {
+  color-scheme: light;
+  color-scheme: only light;
   --bg-primary: #edebe8;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f4f2ef;
@@ -68,4 +72,23 @@
 
   --sq-vector-line: rgba(70, 50, 30, 0.85);
   --sq-vector-dot: #1f140a;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  color-scheme: only dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    color-scheme: only dark;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    color-scheme: only light;
+  }
 }

@@ -304,12 +304,15 @@
   border-radius: var(--radius-sm);
   position: relative;
   background: var(--board-light);
+  background-image: linear-gradient(var(--board-light), var(--board-light));
+  color-scheme: only light;
   box-shadow: var(--shadow-md);
   margin-bottom: 1rem;
 }
 
 .square-zoom-box.dark {
   background: var(--board-dark);
+  background-image: linear-gradient(var(--board-dark), var(--board-dark));
 }
 
 .square-selector-chips {
@@ -346,15 +349,18 @@
   padding: 0;
   transition: all 0.12s ease;
   user-select: none;
+  color-scheme: only light;
 }
 
 .rules-picker-cell.light {
   background: var(--board-light);
+  background-image: linear-gradient(var(--board-light), var(--board-light));
   color: #4a3728;
 }
 
 .rules-picker-cell.dark {
   background: var(--board-dark);
+  background-image: linear-gradient(var(--board-dark), var(--board-dark));
   color: #ffffff;
 }
 
@@ -609,10 +615,13 @@
   justify-content: center;
   position: relative;
   background: var(--board-light);
+  background-image: linear-gradient(var(--board-light), var(--board-light));
+  color-scheme: only light;
 }
 
 .leap-square-cell.dark {
   background: var(--board-dark);
+  background-image: linear-gradient(var(--board-dark), var(--board-dark));
 }
 
 .leap-square-cell.target-allowed {
