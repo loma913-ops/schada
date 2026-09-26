@@ -75,9 +75,16 @@
   background-image: linear-gradient(var(--sq-selected), var(--sq-selected)) !important;
 }
 
-.board-square.last-move {
-  background-color: var(--sq-last-move);
-  background-image: linear-gradient(var(--sq-last-move), var(--sq-last-move));
+.board-square.last-move::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 3.5px solid var(--accent-green);
+  background-color: rgba(35, 80, 20, 0.4);
+  box-shadow: inset 0 0 6px rgba(98, 153, 36, 0.4);
+  pointer-events: none;
+  z-index: 2;
+  box-sizing: border-box;
 }
 
 .board-square:hover:not(.selected) {
@@ -93,6 +100,7 @@
   font-weight: 700;
   pointer-events: none;
   font-family: var(--font-mono);
+  z-index: 3;
 }
 
 .coord-rank {
@@ -103,6 +111,7 @@
   font-weight: 700;
   pointer-events: none;
   font-family: var(--font-mono);
+  z-index: 3;
 }
 
 .board-square.light .coord-file,
@@ -131,14 +140,14 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 22%;
-  height: 22%;
+  width: 40%;
+  height: 40%;
   border-radius: 50%;
-  background: rgba(40, 160, 40, 0.6);
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
+  background: rgba(40, 160, 40, 0.65);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.35), 0 0 8px rgba(56, 142, 60, 0.35);
   pointer-events: none;
   z-index: 5;
-  animation: pulseDot 1.5s infinite ease-in-out;
+  animation: pulseDot 2.4s infinite ease-in-out;
   will-change: transform, opacity;
 }
 
@@ -158,13 +167,29 @@
 }
 
 @keyframes pulseDot {
-  0%, 100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.85; }
-  50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.75);
+    opacity: 0.75;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.9;
+  }
 }
 
 @keyframes ringPulse {
-  0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.75; }
-  100% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+  0% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.75;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 1;
+  }
 }
 
 /* Pieces */

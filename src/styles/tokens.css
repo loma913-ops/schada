@@ -36,7 +36,7 @@
   --board-coord-dark: #f0d9b5;
 
   --sq-selected: rgba(100, 140, 50, 0.65);
-  --sq-last-move: rgba(205, 210, 106, 0.5);
+  --sq-last-move: var(--accent-green);
   --sq-hover: rgba(255, 255, 255, 0.15);
   --sq-vector-line: rgba(50, 40, 30, 0.7);
   --sq-vector-dot: #2b1f13;
