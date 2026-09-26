@@ -14,70 +14,16 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { subscribeToOpenRooms, type GameRoom } from '@/services/firebase/gameService';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import {
+  LOBBY_CONFIG,
+  parseStoredLobbyFilters,
+  determineTimeCategory,
+  formatTimeControlDisplay,
+  type LobbyFilterState,
+} from './lobbyConfig';
 
-export interface LobbyFilterState {
-  timeControls: {
-    bullet: boolean;
-    blitz: boolean;
-    rapid: boolean;
-    classical: boolean;
-  };
-  increment: {
-    yes: boolean;
-    no: boolean;
-  };
-  modes: {
-    casual: boolean;
-    ranked: boolean;
-  };
-}
-
-const DEFAULT_FILTERS: LobbyFilterState = {
-  timeControls: {
-    bullet: true,
-    blitz: true,
-    rapid: true,
-    classical: true,
-  },
-  increment: {
-    yes: true,
-    no: true,
-  },
-  modes: {
-    casual: true,
-    ranked: true,
-  },
-};
-
-const STORAGE_KEY = 'schada_lobby_filters';
-
-function loadStoredFilters(): LobbyFilterState {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      return { ...DEFAULT_FILTERS, ...JSON.parse(saved) };
-    }
-  } catch {
-    // fallback to default
-  }
-  return DEFAULT_FILTERS;
-}
-
-export function getTimeCategory(minutes: number, increment: number): 'bullet' | 'blitz' | 'rapid' | 'classical' {
-  if (minutes === 0) return 'classical';
-  const estimated = minutes + (increment * 40) / 60;
-  if (estimated < 3) return 'bullet';
-  if (estimated < 8) return 'blitz';
-  if (estimated < 25) return 'rapid';
-  return 'classical';
-}
-
-export function formatTimeControl(minutes: number, increment: number): string {
-  if (minutes === 0) return '∞';
-  if (minutes === 0.5) return `½+${increment}`;
-  if (minutes === 1.5) return `1.5+${increment}`;
-  return `${minutes}+${increment}`;
-}
+export type { LobbyFilterState };
 
 interface LobbyTableProps {
   onOpenCreateRoomModal?: () => void;
@@ -86,7 +32,12 @@ interface LobbyTableProps {
 export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal }) => {
   const [rooms, setRooms] = useState<GameRoom[]>([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<LobbyFilterState>(loadStoredFilters);
+  const [filters, setFilters] = useState<LobbyFilterState>(() => {
+    if (typeof localStorage === 'undefined') {
+      return LOBBY_CONFIG.defaultFilters;
+    }
+    return parseStoredLobbyFilters(localStorage.getItem(LOBBY_CONFIG.storageKey));
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -100,18 +51,22 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
     setFilters((prev) => {
       const next = updater(prev);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(LOBBY_CONFIG.storageKey, JSON.stringify(next));
+        }
       } catch {
-        // ignore
+        // ignore storage quota / access issues
       }
       return next;
     });
   };
 
   const handleResetFilters = () => {
-    setFilters(DEFAULT_FILTERS);
+    setFilters(LOBBY_CONFIG.defaultFilters);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_FILTERS));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LOBBY_CONFIG.storageKey, JSON.stringify(LOBBY_CONFIG.defaultFilters));
+      }
     } catch {
       // ignore
     }
@@ -119,7 +74,7 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
 
   // Check if non-default filters are active
   const isCustomFilterActive = useMemo(() => {
-    const { timeControls, increment, modes } = filters;
+    const { timeControls, increment, modes, statuses } = filters;
     return (
       !timeControls.bullet ||
       !timeControls.blitz ||
@@ -128,20 +83,31 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
       !increment.yes ||
       !increment.no ||
       !modes.casual ||
-      !modes.ranked
+      !modes.ranked ||
+      !statuses.open ||
+      !statuses.inProgress
     );
   }, [filters]);
 
-  // Filtered rooms
+  // Filtered rooms: rooms is already stably ordered by sortLobbyRooms (waiting rooms first, newest first).
+  // Array.prototype.filter preserves relative order with optimal O(N) linear time.
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
-      const category = getTimeCategory(room.timeControlMinutes, room.incrementSeconds || 0);
+      // 1. Status filter (Open vs In-Progress)
+      if (room.status === 'waiting' && !filters.statuses.open) return false;
+      if (room.status === 'in_progress' && !filters.statuses.inProgress) return false;
+      if (room.status !== 'waiting' && room.status !== 'in_progress') return false;
+
+      // 2. Time category filter
+      const category = determineTimeCategory(room.timeControlMinutes, room.incrementSeconds || 0);
       if (!filters.timeControls[category]) return false;
 
+      // 3. Increment filter
       const hasIncrement = (room.incrementSeconds || 0) > 0;
       if (hasIncrement && !filters.increment.yes) return false;
       if (!hasIncrement && !filters.increment.no) return false;
 
+      // 4. Mode filter (Ranked vs Casual)
       if (room.isRanked && !filters.modes.ranked) return false;
       if (!room.isRanked && !filters.modes.casual) return false;
 
@@ -382,6 +348,46 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
               </div>
             </div>
 
+            {/* Game Status Section (Open Rooms / In-Progress Games) */}
+            <div className="filter-group">
+              <div className="filter-group-label">Game status</div>
+              <div className="filter-options-inline">
+                <label className="filter-checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={filters.statuses.open}
+                    onChange={(e) =>
+                      handleUpdateFilters((prev) => ({
+                        ...prev,
+                        statuses: { ...prev.statuses, open: e.target.checked },
+                      }))
+                    }
+                  />
+                  <span className="custom-checkbox">
+                    {filters.statuses.open && <Check size={12} />}
+                  </span>
+                  <span className="filter-label-text">Open Rooms</span>
+                </label>
+
+                <label className="filter-checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={filters.statuses.inProgress}
+                    onChange={(e) =>
+                      handleUpdateFilters((prev) => ({
+                        ...prev,
+                        statuses: { ...prev.statuses, inProgress: e.target.checked },
+                      }))
+                    }
+                  />
+                  <span className="custom-checkbox">
+                    {filters.statuses.inProgress && <Check size={12} />}
+                  </span>
+                  <span className="filter-label-text">In-Progress</span>
+                </label>
+              </div>
+            </div>
+
             {/* Reset Actions */}
             <div className="filter-footer-actions">
               <button
@@ -448,11 +454,13 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
                   const host = room.bluePlayer || room.greenPlayer;
                   const opponent = room.bluePlayer && room.greenPlayer ? (room.bluePlayer === host ? room.greenPlayer : room.bluePlayer) : null;
 
-                  const hostName = host ? host.username : 'Anonymous';
-                  const oppName = opponent ? opponent.username : null;
+                  const defaultHostName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
+                  const defaultOpponentName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
+                  const hostName = host?.username?.trim() || defaultHostName;
+                  const oppName = opponent?.username?.trim() || (isWaiting ? null : defaultOpponentName);
 
-                  const category = getTimeCategory(room.timeControlMinutes, room.incrementSeconds || 0);
-                  const timeFormatted = formatTimeControl(room.timeControlMinutes, room.incrementSeconds || 0);
+                  const category = determineTimeCategory(room.timeControlMinutes, room.incrementSeconds || 0);
+                  const timeFormatted = formatTimeControlDisplay(room.timeControlMinutes, room.incrementSeconds || 0);
 
                   return (
                     <div

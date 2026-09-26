@@ -11,7 +11,6 @@ import {
   onSnapshot,
   runTransaction,
   limit,
-  orderBy,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
@@ -751,44 +750,101 @@ export function startAbandonedGamesCleanupWatcher(
   };
 }
 
+/**
+ * Orders lobby rooms with optimal algorithmic efficiency:
+ * 1. Waiting rooms first (so prospective players immediately discover open rooms to join).
+ * 2. In-progress games second (allowing spectators to watch live matches).
+ * 3. Chronological sorting (newest first) within each status partition.
+ *
+ * Algorithmic analysis:
+ * - Partitioning: O(N) linear time and space, where N <= maxOpenRoomsLobbyLimit (N <= 50).
+ * - Sort per partition: O(N_wait * log N_wait) + O(N_live * log N_live) <= O(N log N).
+ * - Immutability: Returns a newly constructed array without mutating the parameter.
+ */
+export function sortLobbyRooms(rooms: GameRoom[]): GameRoom[] {
+  if (!Array.isArray(rooms)) {
+    throw new TypeError('sortLobbyRooms: expected an array of GameRoom objects.');
+  }
+
+  const waitingRooms: GameRoom[] = [];
+  const inProgressRooms: GameRoom[] = [];
+
+  for (let i = 0; i < rooms.length; i++) {
+    const room = rooms[i];
+    if (room.status === 'waiting') {
+      waitingRooms.push(room);
+    } else {
+      inProgressRooms.push(room);
+    }
+  }
+
+  waitingRooms.sort((a, b) => {
+    const aTime = typeof a.createdAt === 'number' && !isNaN(a.createdAt) ? a.createdAt : 0;
+    const bTime = typeof b.createdAt === 'number' && !isNaN(b.createdAt) ? b.createdAt : 0;
+    return bTime - aTime;
+  });
+
+  inProgressRooms.sort((a, b) => {
+    const aTime = typeof a.createdAt === 'number' && !isNaN(a.createdAt) ? a.createdAt : 0;
+    const bTime = typeof b.createdAt === 'number' && !isNaN(b.createdAt) ? b.createdAt : 0;
+    return bTime - aTime;
+  });
+
+  return [...waitingRooms, ...inProgressRooms];
+}
+
 export async function getOpenRooms(
   limitCount: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit
 ): Promise<GameRoom[]> {
+  if (typeof limitCount !== 'number' || limitCount <= 0 || isNaN(limitCount)) {
+    throw new RangeError(
+      `getOpenRooms: Invalid limitCount. Expected positive number, received ${limitCount}.`
+    );
+  }
+
   if (isFirebaseConfigured() && db) {
     const q = query(
       collection(db, 'games'),
       where('isPrivate', '==', false),
-      where('status', '==', 'waiting'),
-      orderBy('createdAt', 'desc'),
+      where('status', 'in', ['waiting', 'in_progress']),
       limit(limitCount)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((docSnap) => docSnap.data() as GameRoom);
+    const rooms = snap.docs.map((docSnap) => docSnap.data() as GameRoom);
+    return sortLobbyRooms(rooms);
   }
 
   const all = mockStore.getAll();
-  return Object.values(all)
-    .filter((g) => !g.isPrivate && (g.status === 'waiting' || g.status === 'in_progress'))
-    .slice(0, limitCount);
+  const rooms = Object.values(all)
+    .filter((g) => !g.isPrivate && (g.status === 'waiting' || g.status === 'in_progress'));
+  return sortLobbyRooms(rooms).slice(0, limitCount);
 }
 
 export function subscribeToOpenRooms(
   callback: (rooms: GameRoom[]) => void,
   maxRooms: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit
 ): () => void {
+  if (typeof callback !== 'function') {
+    throw new TypeError('subscribeToOpenRooms: callback parameter must be a function.');
+  }
+  if (typeof maxRooms !== 'number' || maxRooms <= 0 || isNaN(maxRooms)) {
+    throw new RangeError(
+      `subscribeToOpenRooms: Invalid maxRooms. Expected positive number, received ${maxRooms}.`
+    );
+  }
+
   if (isFirebaseConfigured() && db) {
     const q = query(
       collection(db, 'games'),
       where('isPrivate', '==', false),
-      where('status', '==', 'waiting'),
-      orderBy('createdAt', 'desc'),
+      where('status', 'in', ['waiting', 'in_progress']),
       limit(maxRooms)
     );
     return onSnapshot(
       q,
       (snap) => {
         const rooms = snap.docs.map((docSnap) => docSnap.data() as GameRoom);
-        callback(rooms);
+        callback(sortLobbyRooms(rooms));
       },
       (err) => {
         console.error('Error listening to open rooms:', err);
@@ -799,11 +855,9 @@ export function subscribeToOpenRooms(
 
   const update = () => {
     const all = mockStore.getAll();
-    callback(
-      Object.values(all)
-        .filter((g) => !g.isPrivate && (g.status === 'waiting' || g.status === 'in_progress'))
-        .slice(0, maxRooms)
-    );
+    const rooms = Object.values(all)
+      .filter((g) => !g.isPrivate && (g.status === 'waiting' || g.status === 'in_progress'));
+    callback(sortLobbyRooms(rooms).slice(0, maxRooms));
   };
 
   update();

@@ -11,6 +11,8 @@ import {
   cleanupAbandonedGames,
   subscribeToGame,
   findOpenWaitingGame,
+  sortLobbyRooms,
+  subscribeToOpenRooms,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '../gameService';
@@ -357,5 +359,74 @@ describe('GameService Multiplayer Sync', () => {
 
     const limited = await getOpenRooms(2);
     expect(limited.length).toBeLessThanOrEqual(2);
+  });
+
+  it('includes both waiting and in_progress games and sorts waiting rooms at the top', async () => {
+    const creator1 = { id: 'p1', username: 'Host1', elo: 1300 };
+    const creator2 = { id: 'p2', username: 'Host2', elo: 1350 };
+
+    // 1. Create Game 1 (older, becomes in_progress)
+    const { gameId: gameId1 } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator: creator1,
+    });
+    // Have a second player join to make it in_progress
+    localStorage.removeItem('schada_player_token_' + gameId1);
+    await joinGame(gameId1, { id: 'p3', username: 'Opponent1', elo: 1200 });
+
+    // 2. Create Game 2 (newer waiting room)
+    const { gameId: gameId2 } = await createGame({
+      timeControlMinutes: 10,
+      colorPref: 'green',
+      isPrivate: false,
+      creator: creator2,
+    });
+
+    const openRooms = await getOpenRooms();
+    const g1 = openRooms.find((r) => r.id === gameId1);
+    const g2 = openRooms.find((r) => r.id === gameId2);
+
+    expect(g1).toBeDefined();
+    expect(g1?.status).toBe('in_progress');
+    expect(g2).toBeDefined();
+    expect(g2?.status).toBe('waiting');
+
+    // Index of waiting room should be before in_progress room
+    const idxG2 = openRooms.findIndex((r) => r.id === gameId2);
+    const idxG1 = openRooms.findIndex((r) => r.id === gameId1);
+    expect(idxG2).toBeLessThan(idxG1);
+
+    // Verify sortLobbyRooms directly
+    const testList = [
+      { id: 'live1', status: 'in_progress', createdAt: 200 } as GameRoom,
+      { id: 'wait1', status: 'waiting', createdAt: 100 } as GameRoom,
+      { id: 'wait2', status: 'waiting', createdAt: 300 } as GameRoom,
+      { id: 'live2', status: 'in_progress', createdAt: 400 } as GameRoom,
+    ];
+    const sorted = sortLobbyRooms(testList);
+    expect(sorted.map((r) => r.id)).toEqual(['wait2', 'wait1', 'live2', 'live1']);
+
+    // Verify subscribeToOpenRooms receives the sorted rooms
+    let subscribedRooms: GameRoom[] = [];
+    const unsub = subscribeToOpenRooms((rooms) => {
+      subscribedRooms = rooms;
+    });
+    unsub();
+    expect(subscribedRooms.some((r) => r.id === gameId1)).toBe(true);
+    expect(subscribedRooms.some((r) => r.id === gameId2)).toBe(true);
+  });
+
+  it('validates parameters and throws meaningful errors in lobby room functions', async () => {
+    expect(() => sortLobbyRooms(null as any)).toThrowError(TypeError);
+    expect(() => sortLobbyRooms('invalid' as any)).toThrowError(TypeError);
+
+    await expect(getOpenRooms(0)).rejects.toThrowError(RangeError);
+    await expect(getOpenRooms(-5)).rejects.toThrowError(RangeError);
+
+    expect(() => subscribeToOpenRooms(null as any)).toThrowError(TypeError);
+    expect(() => subscribeToOpenRooms(() => {}, 0)).toThrowError(RangeError);
+    expect(() => subscribeToOpenRooms(() => {}, -10)).toThrowError(RangeError);
   });
 });

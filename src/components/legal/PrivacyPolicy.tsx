@@ -236,7 +236,7 @@ export const PrivacyPolicy: React.FC = () => {
             </p>
             <p>
               <strong>Email:</strong> <a href="mailto:privacy@schada.org">privacy@schada.org</a><br />
-              <strong>Website:</strong> <a href="https://schada-online.web.app">schada-online.web.app</a>
+              <strong>Website:</strong> <a href="https://schada.org">schada.org</a>
             </p>
           </section>
         </div>
