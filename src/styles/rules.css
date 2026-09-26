@@ -569,14 +569,36 @@
 
 .leap-demo-controls {
   display: flex;
+  flex-direction: row;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.75rem 1.5rem;
   margin-bottom: 1rem;
 }
 
+.leap-control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.leap-control-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.leap-btn-group {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
 .leap-btn {
-  padding: 0.45rem 0.85rem;
-  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
   font-weight: 700;
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
@@ -584,6 +606,13 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.leap-btn:hover:not(.active) {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .leap-btn.active {

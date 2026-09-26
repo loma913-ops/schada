@@ -681,11 +681,11 @@ export const RulesGuide: React.FC = () => {
             </p>
 
             <div className="leap-demo-controls">
-              <div>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginRight: '0.5rem' }}>
+              <div className="leap-control-group">
+                <span className="leap-control-label">
                   Moving Piece on a1:
                 </span>
-                <div style={{ display: 'inline-flex', gap: '0.4rem', marginTop: '0.25rem' }}>
+                <div className="leap-btn-group">
                   <button
                     type="button"
                     className={`leap-btn ${selectedPieceType === 'field_officer' ? 'active' : ''}`}
@@ -710,11 +710,11 @@ export const RulesGuide: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginRight: '0.5rem' }}>
+              <div className="leap-control-group">
+                <span className="leap-control-label">
                   Obstacle on a2:
                 </span>
-                <div style={{ display: 'inline-flex', gap: '0.4rem', marginTop: '0.25rem' }}>
+                <div className="leap-btn-group">
                   <button
                     type="button"
                     className={`leap-btn ${obstacleType === 'friendly' ? 'active' : ''}`}

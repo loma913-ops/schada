@@ -61,7 +61,7 @@ export const TermsOfService: React.FC = () => {
             <h2>Introduction</h2>
             <p>
               Hello and welcome to <strong>Schada.org</strong> ("Schada", "we", "us", or "our"). Schada is a free and open-source
-              online platform dedicated to promoting, preserving, and playing the tactical mind sport of Schada—first invented in
+              online platform dedicated to promoting, preserving, and playing the tactical mind sport of Schada first invented in
               1936 by Jan Boogerd and Theodoor Jansen.
             </p>
             <p>
