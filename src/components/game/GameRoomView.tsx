@@ -37,6 +37,7 @@ export const GameRoomView: React.FC = () => {
   );
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
+  const [joinedColor, setJoinedColor] = useState<PieceColor | null>(null);
 
   // Track if elo was updated for this game
   const eloUpdatedRef = useRef(false);
@@ -117,6 +118,9 @@ export const GameRoomView: React.FC = () => {
 
     joinGame(gameId, joinUser).then((res) => {
       if (res.success) {
+        if (res.color) {
+          setJoinedColor(res.color);
+        }
         setHasJoined(true);
       }
     });
@@ -143,6 +147,9 @@ export const GameRoomView: React.FC = () => {
       elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
     }).then((res) => {
       if (res.success) {
+        if (res.color) {
+          setJoinedColor(res.color);
+        }
         setHasJoined(true);
       }
     });
@@ -161,7 +168,7 @@ export const GameRoomView: React.FC = () => {
   const isBlue = Boolean(sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken);
   const isGreen = Boolean(sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken);
 
-  const userColor: PieceColor | undefined = isBlue ? 'blue' : isGreen ? 'green' : undefined;
+  const userColor: PieceColor | undefined = isBlue ? 'blue' : isGreen ? 'green' : (joinedColor || undefined);
   const isSpectator = !userColor;
 
   // Set in-game presence context while player in an active match

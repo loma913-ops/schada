@@ -68,8 +68,22 @@ export const Arena: React.FC<ArenaProps> = ({
   onExit,
 }) => {
   const [gameState, setGameState] = useState<BoardState>(syncedGameState || initialState);
-  const [orientation, setOrientation] = useState<'blue' | 'green'>(userColor || 'blue');
   const [isBotThinking, setIsBotThinking] = useState(false);
+
+  const [orientation, setOrientation] = useState<'blue' | 'green'>(() => {
+    if (userColor) return userColor;
+    if (!isSpectator) return (syncedGameState || initialState).currentTurn;
+    return 'blue';
+  });
+
+  // Ensure board is oriented so that the Player's pieces are at the bottom and their opponents are at the top
+  useEffect(() => {
+    if (userColor) {
+      setOrientation((prev) => (prev !== userColor ? userColor : prev));
+    } else if (!isSpectator) {
+      setOrientation((prev) => (prev !== gameState.currentTurn ? gameState.currentTurn : prev));
+    }
+  }, [userColor, isSpectator, gameState.currentTurn]);
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
 
   const gameStateRef = useRef<BoardState>(gameState);

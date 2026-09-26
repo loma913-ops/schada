@@ -15,15 +15,30 @@ interface SchadaBoardProps {
   disabled?: boolean;
 }
 
+export function getBoardSquaresForOrientation(orientation: 'blue' | 'green' = 'blue'): Square[] {
+  const result: Square[] = [];
+  const rows = orientation === 'blue' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+  const cols = orientation === 'blue' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+
+  for (const r of rows) {
+    for (const c of cols) {
+      result.push(colRowToSquare(c, r)!);
+    }
+  }
+  return result;
+}
+
 export const SchadaBoard: React.FC<SchadaBoardProps> = memo(({
   board,
   currentTurn,
   playerColor,
-  orientation = 'blue',
+  orientation: propOrientation,
   lastMove,
   onMakeMove,
   disabled = false,
 }) => {
+  // Ensure board orientation defaults to player's pieces at bottom
+  const orientation: 'blue' | 'green' = propOrientation ?? playerColor ?? 'blue';
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
 
   // Compute legal moves for currently selected square
@@ -83,16 +98,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = memo(({
 
   // Generate 64 squares in display order (cached by orientation)
   const squares: Square[] = useMemo(() => {
-    const result: Square[] = [];
-    const rows = orientation === 'blue' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
-    const cols = orientation === 'blue' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
-
-    for (const r of rows) {
-      for (const c of cols) {
-        result.push(colRowToSquare(c, r)!);
-      }
-    }
-    return result;
+    return getBoardSquaresForOrientation(orientation);
   }, [orientation]);
 
   return (

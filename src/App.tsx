@@ -329,6 +329,7 @@ const MainApp: React.FC = () => {
                 {currentTab === 'play' ? (
                   activeMatch ? (
                     <Arena
+                      key={activeMatch.userColor ? `match-${activeMatch.userColor}-${activeMatch.isComputer ? 'bot' : 'pvp'}` : 'match-pass-and-play'}
                       initialState={activeMatch.initialState}
                       bluePlayer={activeMatch.bluePlayer}
                       greenPlayer={activeMatch.greenPlayer}
