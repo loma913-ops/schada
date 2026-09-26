@@ -235,7 +235,7 @@ export const GameRoomView: React.FC = () => {
 
   if (error || !game) {
     return (
-      <div style={{ maxWidth: '480px', margin: '4rem auto', padding: '2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+      <div style={{ maxWidth: '480px', margin: '4rem auto', padding: '2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
         <h3 style={{ margin: '0 0 1rem', color: 'var(--piece-green)' }}>Game Not Found</h3>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
           {error || 'Unable to load game room.'}
@@ -255,7 +255,7 @@ export const GameRoomView: React.FC = () => {
         <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
           This match was abandoned by the host.
         </p>
-        <p style={{ color: 'var(--text-muted, #71717a)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
           Abandoned games are automatically removed after {Math.round(ABANDONED_GAME_EXPIRY_MS / 60000)} minutes.
         </p>
         <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>
@@ -318,9 +318,9 @@ export const GameRoomView: React.FC = () => {
           justifyContent: 'space-between',
           marginBottom: '0.75rem',
           padding: '0.5rem 0.75rem',
-          background: isSpectator ? 'rgba(234, 179, 8, 0.1)' : 'rgba(56, 189, 248, 0.08)',
-          border: `1px solid ${isSpectator ? 'rgba(234, 179, 8, 0.3)' : 'rgba(56, 189, 248, 0.2)'}`,
-          borderRadius: '8px',
+          background: isSpectator ? 'rgba(229, 183, 88, 0.12)' : 'rgba(54, 146, 231, 0.12)',
+          border: `1px solid ${isSpectator ? 'rgba(229, 183, 88, 0.3)' : 'rgba(54, 146, 231, 0.3)'}`,
+          borderRadius: 'var(--radius-md)',
           width: '100%',
           boxSizing: 'border-box',
         }}

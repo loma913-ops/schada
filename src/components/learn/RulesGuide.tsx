@@ -337,8 +337,8 @@ export const RulesGuide: React.FC = () => {
 
           {/* Dos and Don'ts */}
           <div style={{ marginTop: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#10b981', fontWeight: 800, marginBottom: '0.5rem' }}>
+            <div style={{ background: 'rgba(98, 153, 36, 0.12)', border: '1px solid rgba(98, 153, 36, 0.3)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-green)', fontWeight: 800, marginBottom: '0.5rem' }}>
                 <CheckCircle2 size={18} /> Golden Strategic Dos
               </div>
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
@@ -348,8 +348,8 @@ export const RulesGuide: React.FC = () => {
               </ul>
             </div>
 
-            <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ef4444', fontWeight: 800, marginBottom: '0.5rem' }}>
+            <div style={{ background: 'rgba(204, 51, 51, 0.12)', border: '1px solid rgba(204, 51, 51, 0.3)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-red)', fontWeight: 800, marginBottom: '0.5rem' }}>
                 <AlertCircle size={18} /> Critical Rookie Mistakes
               </div>
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
@@ -448,12 +448,12 @@ export const RulesGuide: React.FC = () => {
                     Selected (<strong>{selectedVectorSquare}</strong>)
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: '#629924', border: '1px solid #a3e635', display: 'inline-block' }} />
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-green)', border: '1px solid var(--accent-green-hover)', display: 'inline-block' }} />
                     Possible Moves ({Array.from(targetSquares).join(', ') || 'None'})
                   </span>
                   {pathSquares.size > 0 && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(54, 146, 231, 0.65)', border: '1px solid #3692e7', display: 'inline-block' }} />
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(54, 146, 231, 0.65)', border: '1px solid var(--accent-blue)', display: 'inline-block' }} />
                       Path Waypoints
                     </span>
                   )}
@@ -759,7 +759,7 @@ export const RulesGuide: React.FC = () => {
                     width: '16px',
                     height: '16px',
                     borderRadius: '50%',
-                    background: isLeapMoveAllowed ? '#10b981' : '#ef4444',
+                    background: isLeapMoveAllowed ? 'var(--accent-green)' : 'var(--accent-red)',
                     opacity: 0.8,
                   }}
                 />

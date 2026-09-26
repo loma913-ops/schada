@@ -436,9 +436,6 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
                       style={{
                         fontSize: '0.85rem',
                         padding: '0.4rem 0.85rem',
-                        backgroundColor: 'var(--accent-gold)',
-                        color: '#1a1a1a',
-                        fontWeight: 700,
                       }}
                     >
                       <Plus size={14} />

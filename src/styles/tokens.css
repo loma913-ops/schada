@@ -10,10 +10,13 @@
 
   --border-subtle: #363431;
   --border-strong: #4a4742;
+  --border-color: var(--border-subtle);
 
   --text-primary: #edebe9;
   --text-secondary: #a8a5a0;
   --text-muted: #75726d;
+  --text-on-accent: #ffffff;
+  --accent-gold-text: #1a1a1a;
 
   --accent-gold: #e5b758;
   --accent-gold-hover: #f0c368;
@@ -22,6 +25,8 @@
   --accent-green: #629924;
   --accent-green-hover: #75b32e;
   --accent-red: #cc3333;
+  --accent-orange: #f97316;
+  --accent-amber: #b45309;
 
   /* Board Theme */
   --board-light: #f0d9b5;
@@ -65,10 +70,15 @@
 
   --border-subtle: #d6d3ce;
   --border-strong: #b8b4ad;
+  --border-color: var(--border-subtle);
 
   --text-primary: #1c1917;
   --text-secondary: #57534e;
   --text-muted: #8c8883;
+  --text-on-accent: #ffffff;
+  --accent-gold-text: #1a1a1a;
+  --accent-orange: #ea580c;
+  --accent-amber: #b45309;
 
   --sq-vector-line: rgba(70, 50, 30, 0.85);
   --sq-vector-dot: #1f140a;

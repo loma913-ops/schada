@@ -31,7 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Brand */}
       <div className="nav-brand" onClick={() => onSelectTab('play')}>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="24" height="24" aria-hidden="true">
-          <path fillRule="evenodd" d="M 50 18 L 62 42 L 85 45 L 68 62 L 72 85 L 50 74 L 28 85 L 32 62 L 15 45 L 38 42 Z M 58 50 A 8 8 0 0 1 50 58 A 8 8 0 0 1 42 50 A 8 8 0 0 1 50 42 A 8 8 0 0 1 58 50 Z" fill="#e5b758" stroke="#f0c368" strokeWidth="2" />
+          <path fillRule="evenodd" d="M 50 18 L 62 42 L 85 45 L 68 62 L 72 85 L 50 74 L 28 85 L 32 62 L 15 45 L 38 42 Z M 58 50 A 8 8 0 0 1 50 58 A 8 8 0 0 1 42 50 A 8 8 0 0 1 50 42 A 8 8 0 0 1 58 50 Z" fill="var(--accent-gold)" stroke="var(--accent-gold-hover)" strokeWidth="2" />
         </svg>
         <span>Schada.org</span>
       </div>
@@ -176,12 +176,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         ) : (
           <button
-            className="action-btn"
+            className="action-btn active"
             style={{
               padding: '0.4rem 0.9rem',
-              backgroundColor: 'var(--accent-gold)',
-              color: '#1a1a1a',
-              fontWeight: 700,
             }}
             onClick={onOpenAuth}
           >

@@ -76,12 +76,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                 <button
                   type="button"
                   className={`action-btn ${isPrivate ? 'active' : ''}`}
-                  style={{
-                    flex: 1,
-                    backgroundColor: isPrivate ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                    color: isPrivate ? '#1a1a1a' : 'var(--text-primary)',
-                    fontWeight: 700,
-                  }}
+                  style={{ flex: 1 }}
                   onClick={() => setIsPrivate(true)}
                 >
                   Private Link
@@ -89,12 +84,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                 <button
                   type="button"
                   className={`action-btn ${!isPrivate ? 'active' : ''}`}
-                  style={{
-                    flex: 1,
-                    backgroundColor: !isPrivate ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                    color: !isPrivate ? '#1a1a1a' : 'var(--text-primary)',
-                    fontWeight: 700,
-                  }}
+                  style={{ flex: 1 }}
                   onClick={() => setIsPrivate(false)}
                 >
                   Open in Lobby
@@ -111,12 +101,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                     key={m}
                     type="button"
                     className={`action-btn ${timeControl === m ? 'active' : ''}`}
-                    style={{
-                      backgroundColor: timeControl === m ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                      color: timeControl === m ? '#1a1a1a' : 'var(--text-primary)',
-                      fontWeight: 700,
-                      padding: '0.5rem',
-                    }}
+                    style={{ padding: '0.5rem' }}
                     onClick={() => setTimeControl(m)}
                   >
                     {m === 0 ? 'Unlimited' : `${m} min`}
@@ -135,12 +120,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                       key={sec}
                       type="button"
                       className={`action-btn ${increment === sec ? 'active' : ''}`}
-                      style={{
-                        backgroundColor: increment === sec ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                        color: increment === sec ? '#1a1a1a' : 'var(--text-primary)',
-                        fontWeight: 700,
-                        padding: '0.5rem',
-                      }}
+                      style={{ padding: '0.5rem' }}
                       onClick={() => setIncrement(sec)}
                     >
                       {sec === 0 ? 'None' : `+${sec}s`}
@@ -157,12 +137,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                 <button
                   type="button"
                   className={`action-btn ${isRanked ? 'active' : ''}`}
-                  style={{
-                    flex: 1,
-                    backgroundColor: isRanked ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                    color: isRanked ? '#1a1a1a' : 'var(--text-primary)',
-                    fontWeight: 700,
-                  }}
+                  style={{ flex: 1 }}
                   onClick={() => setIsRanked(true)}
                 >
                   Ranked (Elo)
@@ -170,12 +145,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                 <button
                   type="button"
                   className={`action-btn ${!isRanked ? 'active' : ''}`}
-                  style={{
-                    flex: 1,
-                    backgroundColor: !isRanked ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                    color: !isRanked ? '#1a1a1a' : 'var(--text-primary)',
-                    fontWeight: 700,
-                  }}
+                  style={{ flex: 1 }}
                   onClick={() => setIsRanked(false)}
                 >
                   Casual / Friendly
@@ -190,38 +160,23 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                 <button
                   type="button"
                   className={`action-btn ${colorPref === 'random' ? 'active' : ''}`}
-                  style={{
-                    flex: 1,
-                    backgroundColor: colorPref === 'random' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                    color: colorPref === 'random' ? '#1a1a1a' : 'var(--text-primary)',
-                    fontWeight: 700,
-                  }}
+                  style={{ flex: 1 }}
                   onClick={() => setColorPref('random')}
                 >
                   Random
                 </button>
                 <button
                   type="button"
-                  className={`action-btn ${colorPref === 'blue' ? 'active' : ''}`}
-                  style={{
-                    flex: 1,
-                    backgroundColor: colorPref === 'blue' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                    color: colorPref === 'blue' ? '#1a1a1a' : 'var(--piece-blue)',
-                    fontWeight: 700,
-                  }}
+                  className={`action-btn ${colorPref === 'blue' ? 'active' : ''} pref-blue`}
+                  style={{ flex: 1 }}
                   onClick={() => setColorPref('blue')}
                 >
                   Blue
                 </button>
                 <button
                   type="button"
-                  className={`action-btn ${colorPref === 'green' ? 'active' : ''}`}
-                  style={{
-                    flex: 1,
-                    backgroundColor: colorPref === 'green' ? 'var(--accent-gold)' : 'var(--bg-tertiary)',
-                    color: colorPref === 'green' ? '#1a1a1a' : 'var(--piece-green)',
-                    fontWeight: 700,
-                  }}
+                  className={`action-btn ${colorPref === 'green' ? 'active' : ''} pref-green`}
+                  style={{ flex: 1 }}
                   onClick={() => setColorPref('green')}
                 >
                   Green
