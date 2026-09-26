@@ -68,13 +68,13 @@ export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
       <circle
         cx="50"
         cy="50"
-        r="34"
+        r="31"
         fill={primaryColor}
         stroke={secondaryColor}
         strokeWidth="3.5"
       />
       {/* Central Ring */}
-      <circle cx="50" cy="50" r="20" fill="none" stroke="#ffffff" strokeWidth="3" opacity="0.9" />
+      <circle cx="50" cy="50" r="20" fill="none" stroke={highlightColor} strokeWidth="3" />
       <circle cx="50" cy="50" r="7" fill="#ffffff" />
     </svg>
   );
