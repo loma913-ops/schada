@@ -49,12 +49,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <div className="modal-header">
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
-              className={`action-btn ${tab === 'login' ? 'active' : ''}`}
-              style={{
-                backgroundColor: tab === 'login' ? 'var(--bg-tertiary)' : 'transparent',
-                borderColor: tab === 'login' ? 'var(--border-strong)' : 'transparent',
-                fontWeight: 700,
-              }}
+              type="button"
+              className={`auth-tab-btn ${tab === 'login' ? 'active' : ''}`}
               onClick={() => {
                 setTab('login');
                 setError(null);
@@ -63,12 +59,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               Sign In
             </button>
             <button
-              className={`action-btn ${tab === 'register' ? 'active' : ''}`}
-              style={{
-                backgroundColor: tab === 'register' ? 'var(--bg-tertiary)' : 'transparent',
-                borderColor: tab === 'register' ? 'var(--border-strong)' : 'transparent',
-                fontWeight: 700,
-              }}
+              type="button"
+              className={`auth-tab-btn ${tab === 'register' ? 'active' : ''}`}
               onClick={() => {
                 setTab('register');
                 setError(null);

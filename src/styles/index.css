@@ -601,6 +601,62 @@ body {
   color: var(--text-primary);
 }
 
+/* Auth Modal Tabs */
+.auth-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  background-color: var(--bg-tertiary);
+  color: var(--accent-gold);
+  border: 1px solid rgba(229, 183, 88, 0.4);
+  transition: all 0.15s ease;
+}
+
+.auth-tab-btn:hover {
+  background-color: var(--border-subtle);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold-hover);
+}
+
+.auth-tab-btn.active {
+  background-color: var(--accent-gold);
+  color: var(--accent-gold-text);
+  border-color: var(--accent-gold);
+}
+
+.auth-tab-btn.active:hover {
+  background-color: var(--accent-gold-hover);
+  border-color: var(--accent-gold-hover);
+}
+
+[data-theme='light'] .auth-tab-btn {
+  background-color: var(--bg-tertiary);
+  color: #925f0a;
+  border-color: rgba(146, 95, 10, 0.35);
+}
+
+[data-theme='light'] .auth-tab-btn:hover {
+  background-color: rgba(229, 183, 88, 0.15);
+  border-color: #925f0a;
+  color: #784804;
+}
+
+[data-theme='light'] .auth-tab-btn.active {
+  background-color: var(--accent-gold);
+  color: var(--accent-gold-text);
+  border-color: var(--accent-gold);
+}
+
+[data-theme='light'] .auth-tab-btn.active:hover {
+  background-color: var(--accent-gold-hover);
+  border-color: var(--accent-gold-hover);
+}
+
 /* Input & Form Controls */
 .form-group {
   margin-bottom: 1rem;
