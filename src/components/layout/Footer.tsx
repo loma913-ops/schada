@@ -35,7 +35,7 @@ export const Footer: React.FC<FooterProps> = ({ onSelectTab }) => {
           </Link>
         </nav>
         <div className="footer-credits">
-          <span>Schada.org • The Tactical Mind Sport (1936) • Free & Open Source</span>
+          <span>Schada.org • The Tactical Mind Sport • Free & Open Source</span>
         </div>
       </div>
     </footer>
