@@ -43,7 +43,51 @@ export interface GameRoom {
   abandonedAt?: number;
 }
 
+export interface GameTimeoutResult {
+  readonly timedOut: boolean;
+  readonly timedOutColor?: PieceColor;
+}
+
 export const ABANDONED_GAME_EXPIRY_MS = MULTIPLAYER_SCALE_CONFIG.matchmaking.abandonedGameExpiryMs;
+
+/**
+ * Evaluates whether an in-progress game has expired based on Fischer/standard clock limits.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time, consisting of atomic numeric comparisons and arithmetic.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - Bounded strictly at O(1) independent of total game history, room size, or global data volume.
+ *
+ * @param game The target GameRoom to inspect.
+ * @returns GameTimeoutResult indicating whether the game has timed out and which player's clock expired.
+ */
+export function isGameTimedOut(game: GameRoom | null | undefined): GameTimeoutResult {
+  if (!game || typeof game !== 'object') {
+    return { timedOut: false };
+  }
+  if (game.status !== 'in_progress' || typeof game.timeControlMinutes !== 'number' || game.timeControlMinutes <= 0) {
+    return { timedOut: false };
+  }
+  if (game.currentTurn !== 'blue' && game.currentTurn !== 'green') {
+    return { timedOut: false };
+  }
+  const now = Date.now();
+  const elapsed = typeof game.lastTurnStartTimeMs === 'number' && !isNaN(game.lastTurnStartTimeMs)
+    ? Math.max(0, now - game.lastTurnStartTimeMs)
+    : 0;
+  const currentTurn = game.currentTurn;
+  const currentClockMs = currentTurn === 'blue' ? game.blueTimeMs : game.greenTimeMs;
+  if (typeof currentClockMs !== 'number' || isNaN(currentClockMs)) {
+    return { timedOut: false };
+  }
+  const remainingTime = currentClockMs - elapsed;
+  if (remainingTime <= 0) {
+    return { timedOut: true, timedOutColor: currentTurn };
+  }
+  return { timedOut: false };
+}
 
 const SESSION_STORAGE_PREFIX = 'schada_player_token_';
 const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
@@ -129,8 +173,14 @@ class MockGameStore {
     }
   }
 
+  private resolvingTimeout = new Set<string>();
+
+  public getRaw(id: string): GameRoom | null {
+    return this.getAll()[id] || null;
+  }
+
   public get(id: string): GameRoom | null {
-    const game = this.getAll()[id] || null;
+    const game = this.getRaw(id);
     if (
       game &&
       game.status === 'abandoned' &&
@@ -138,6 +188,18 @@ class MockGameStore {
     ) {
       this.delete(id);
       return null;
+    }
+    if (game && game.status === 'in_progress' && !this.resolvingTimeout.has(id)) {
+      const timeoutCheck = isGameTimedOut(game);
+      if (timeoutCheck.timedOut && timeoutCheck.timedOutColor) {
+        this.resolvingTimeout.add(id);
+        timeoutGameAction(id, timeoutCheck.timedOutColor)
+          .catch(() => {})
+          .finally(() => {
+            this.resolvingTimeout.delete(id);
+          });
+        return this.getRaw(id);
+      }
     }
     return game;
   }
@@ -456,6 +518,14 @@ export function subscribeToGame(
             onUpdate(null);
             return;
           }
+          if (game.status === 'in_progress') {
+            const timeoutCheck = isGameTimedOut(game);
+            if (timeoutCheck.timedOut && timeoutCheck.timedOutColor) {
+              timeoutGameAction(gameId, timeoutCheck.timedOutColor).catch((err) => {
+                console.warn('Error auto-timing out game in subscription:', err);
+              });
+            }
+          }
           onUpdate(game);
         }
       },
@@ -615,7 +685,7 @@ export async function timeoutGameAction(
       game = snap.data() as GameRoom;
     }
   } else {
-    game = mockStore.get(gameId);
+    game = mockStore.getRaw(gameId);
   }
 
   if (!game || game.status !== 'in_progress') return;
@@ -661,12 +731,6 @@ export async function abandonGame(gameId: string): Promise<void> {
   } else {
     mockStore.set({ ...game, ...updatePayload });
   }
-
-  if (typeof window !== 'undefined') {
-    setTimeout(() => {
-      cleanupAbandonedGames().catch(() => {});
-    }, ABANDONED_GAME_EXPIRY_MS + 100);
-  }
 }
 
 export async function deleteGame(gameId: string): Promise<void> {
@@ -682,21 +746,45 @@ export async function deleteGame(gameId: string): Promise<void> {
 }
 
 /**
- * Removes and cleans up games that have been abandoned for 10 minutes (or specified duration).
- * Deletes documents from Firestore / MockStore and clears associated local player tokens.
+ * Removes abandoned games and auto-resolves timed-out in-progress games.
+ * Bounded by maxCleanupBatchSize to ensure sustainable O(K) query scaling.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Firestore Mode:
+ *   - Query Time Complexity: O(log N + K) where N is total matching documents in the Firestore index
+ *     and K = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxCleanupBatchSize (K <= 50).
+ *   - Processing Time Complexity: O(K) bounded iterations per batch.
+ *   - Auxiliary Space Complexity: O(K) memory for the fetched document snapshots.
+ *   - Growth Rate: Strictly sub-linear / constant per cycle O(K) as overall database volume N scales to millions of matches.
+ * - Local / Mock Mode:
+ *   - Iteration Time Complexity: O(min(M, K)) where M is total mock games in localStorage and K is maxCleanupBatchSize.
+ *   - Auxiliary Space Complexity: O(K) for tracking removed identifiers.
+ *
+ * @param maxAgeMs Maximum inactivity age in milliseconds before an abandoned game is deleted.
+ * @returns Array of document IDs removed.
+ * @throws RangeError if maxAgeMs is invalid or negative.
  */
 export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EXPIRY_MS): Promise<string[]> {
+  if (typeof maxAgeMs !== 'number' || isNaN(maxAgeMs) || maxAgeMs < 0) {
+    throw new RangeError(
+      `cleanupAbandonedGames: Invalid maxAgeMs. Expected non-negative number, received ${maxAgeMs}.`
+    );
+  }
+
   const now = Date.now();
   const removedIds: string[] = [];
+  const batchLimit = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxCleanupBatchSize;
 
   if (isFirebaseConfigured() && db) {
     try {
-      const q = query(
+      // 1. Remove games explicitly marked as 'abandoned' for maxAgeMs (bounded to batchLimit)
+      const qAbandoned = query(
         collection(db, 'games'),
-        where('status', '==', 'abandoned')
+        where('status', '==', 'abandoned'),
+        limit(batchLimit)
       );
-      const snap = await getDocs(q);
-      for (const docSnap of snap.docs) {
+      const snapAbandoned = await getDocs(qAbandoned);
+      for (const docSnap of snapAbandoned.docs) {
         const game = docSnap.data() as GameRoom;
         const abandonedTime = game.abandonedAt || game.createdAt;
         if (abandonedTime && now - abandonedTime >= maxAgeMs) {
@@ -707,12 +795,49 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
           }
         }
       }
+
+      // 2. Auto-resolve in-progress games that have timed out (bounded to batchLimit)
+      const qInProgress = query(
+        collection(db, 'games'),
+        where('status', '==', 'in_progress'),
+        limit(batchLimit)
+      );
+      const snapInProgress = await getDocs(qInProgress);
+      for (const docSnap of snapInProgress.docs) {
+        const game = docSnap.data() as GameRoom;
+        const timeoutCheck = isGameTimedOut(game);
+        if (timeoutCheck.timedOut && timeoutCheck.timedOutColor) {
+          await timeoutGameAction(docSnap.id, timeoutCheck.timedOutColor).catch((err) => {
+            console.warn('Failed to timeout in-progress game in cleanup:', docSnap.id, err);
+          });
+        }
+      }
+
+      // 3. Mark stale waiting games as abandoned if older than maxAgeMs (when maxAgeMs > 0, bounded to batchLimit)
+      if (maxAgeMs > 0) {
+        const qWaiting = query(
+          collection(db, 'games'),
+          where('status', '==', 'waiting'),
+          limit(batchLimit)
+        );
+        const snapWaiting = await getDocs(qWaiting);
+        for (const docSnap of snapWaiting.docs) {
+          const game = docSnap.data() as GameRoom;
+          if (game.createdAt && now - game.createdAt >= maxAgeMs) {
+            await abandonGame(docSnap.id).catch((err) => {
+              console.warn('Failed to abandon stale waiting game in cleanup:', docSnap.id, err);
+            });
+          }
+        }
+      }
     } catch (err) {
       console.warn('Failed to cleanup abandoned games from Firestore:', err);
     }
   } else {
     const all = mockStore.getAll();
+    let processedCount = 0;
     for (const [id, game] of Object.entries(all)) {
+      if (processedCount >= batchLimit) break;
       if (game.status === 'abandoned') {
         const abandonedTime = game.abandonedAt || game.createdAt;
         if (abandonedTime && now - abandonedTime >= maxAgeMs) {
@@ -721,6 +846,18 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
           if (typeof localStorage !== 'undefined') {
             localStorage.removeItem(SESSION_STORAGE_PREFIX + id);
           }
+          processedCount++;
+        }
+      } else if (game.status === 'in_progress') {
+        const timeoutCheck = isGameTimedOut(game);
+        if (timeoutCheck.timedOut && timeoutCheck.timedOutColor) {
+          timeoutGameAction(id, timeoutCheck.timedOutColor).catch(() => {});
+          processedCount++;
+        }
+      } else if (game.status === 'waiting' && maxAgeMs > 0) {
+        if (game.createdAt && now - game.createdAt >= maxAgeMs) {
+          abandonGame(id).catch(() => {});
+          processedCount++;
         }
       }
     }
@@ -730,11 +867,25 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
 }
 
 /**
- * Starts a recurring background watcher that cleans up games abandoned for 10 minutes.
+ * Starts a recurring background watcher that cleans up abandoned and timed-out games.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Invocations: Scheduled at O(1) interval rate (intervalMs).
+ * - Per execution: Bounded by cleanupAbandonedGames' O(K) batch ceiling (K <= 50).
+ *
+ * @param intervalMs Milliseconds between cleanup runs.
+ * @returns Cleanup unregister callback.
+ * @throws RangeError if intervalMs is non-positive or invalid.
  */
 export function startAbandonedGamesCleanupWatcher(
   intervalMs: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultCleanupIntervalMs
 ): () => void {
+  if (typeof intervalMs !== 'number' || isNaN(intervalMs) || intervalMs <= 0) {
+    throw new RangeError(
+      `startAbandonedGamesCleanupWatcher: Invalid intervalMs. Expected positive number, received ${intervalMs}.`
+    );
+  }
+
   cleanupAbandonedGames().catch(() => {});
 
   if (typeof window === 'undefined') {
@@ -756,10 +907,16 @@ export function startAbandonedGamesCleanupWatcher(
  * 2. In-progress games second (allowing spectators to watch live matches).
  * 3. Chronological sorting (newest first) within each status partition.
  *
- * Algorithmic analysis:
- * - Partitioning: O(N) linear time and space, where N <= maxOpenRoomsLobbyLimit (N <= 50).
+ * Algorithmic analysis (Big O):
+ * - Partitioning & Timeout Verification: O(N) linear time and space, where N <= maxOpenRoomsLobbyLimit (N <= 50).
  * - Sort per partition: O(N_wait * log N_wait) + O(N_live * log N_live) <= O(N log N).
+ * - Memory / Auxiliary Space: O(N) auxiliary space for partitions and result array.
+ * - Growth Rate: Strictly bounded since N is capped by maxOpenRoomsLobbyLimit in callers.
  * - Immutability: Returns a newly constructed array without mutating the parameter.
+ *
+ * @param rooms Array of GameRoom objects to filter and sort.
+ * @returns Sorted array of active open rooms.
+ * @throws TypeError if rooms is not an array.
  */
 export function sortLobbyRooms(rooms: GameRoom[]): GameRoom[] {
   if (!Array.isArray(rooms)) {
@@ -773,7 +930,14 @@ export function sortLobbyRooms(rooms: GameRoom[]): GameRoom[] {
     const room = rooms[i];
     if (room.status === 'waiting') {
       waitingRooms.push(room);
-    } else {
+    } else if (room.status === 'in_progress') {
+      const timeoutCheck = isGameTimedOut(room);
+      if (timeoutCheck.timedOut) {
+        if (timeoutCheck.timedOutColor) {
+          timeoutGameAction(room.id, timeoutCheck.timedOutColor).catch(() => {});
+        }
+        continue;
+      }
       inProgressRooms.push(room);
     }
   }
@@ -801,6 +965,8 @@ export async function getOpenRooms(
       `getOpenRooms: Invalid limitCount. Expected positive number, received ${limitCount}.`
     );
   }
+
+  cleanupAbandonedGames().catch(() => {});
 
   if (isFirebaseConfigured() && db) {
     const q = query(
@@ -832,6 +998,8 @@ export function subscribeToOpenRooms(
       `subscribeToOpenRooms: Invalid maxRooms. Expected positive number, received ${maxRooms}.`
     );
   }
+
+  cleanupAbandonedGames().catch(() => {});
 
   if (isFirebaseConfigured() && db) {
     const q = query(

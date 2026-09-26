@@ -2,6 +2,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, deleteDoc
 import { auth, db, isFirebaseConfigured } from './config';
 import { mockBackend } from './mockProvider';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
+import { isGameTimedOut, type GameRoom } from './gameService';
 
 export interface LobbyStats {
   playersOnline: number; // Strictly players who registered, signed in, and are active
@@ -404,16 +405,28 @@ export function getLocalSessionStats(): { registeredUsersCount: number; guestSes
 }
 
 /**
- * Returns count of active games waiting or in progress.
+ * Returns count of active games waiting or in progress, excluding timed-out games.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(M) where M is the number of local games stored in localStorage.
+ *   Evaluating isGameTimedOut per game is O(1).
+ * - Auxiliary Space Complexity: O(M) for JSON parsing and Object.values array.
+ *
+ * @returns Total count of non-timed-out active games.
  */
 export function getLocalActiveGamesCount(): number {
   try {
     const rawGames = typeof localStorage !== 'undefined' ? localStorage.getItem(MOCK_GAMES_STORAGE_KEY) : null;
     if (!rawGames) return 0;
-    const games = JSON.parse(rawGames) as Record<string, { status?: string }>;
-    return Object.values(games).filter(
-      (g) => g && (g.status === 'in_progress' || g.status === 'waiting')
-    ).length;
+    const games = JSON.parse(rawGames) as Record<string, GameRoom>;
+    return Object.values(games).filter((g) => {
+      if (!g) return false;
+      if (g.status === 'waiting') return true;
+      if (g.status === 'in_progress') {
+        return !isGameTimedOut(g).timedOut;
+      }
+      return false;
+    }).length;
   } catch {
     return 0;
   }

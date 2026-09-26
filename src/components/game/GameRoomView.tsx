@@ -10,6 +10,7 @@ import {
   abandonGame,
   getLocalSessionToken,
   deleteGame,
+  isGameTimedOut,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '@/services/firebase/gameService';
@@ -84,6 +85,17 @@ export const GameRoomView: React.FC = () => {
     }, remainingMs);
 
     return () => clearTimeout(timer);
+  }, [game, gameId]);
+
+  // Auto-resolve if viewing an in-progress game whose time limit has expired
+  useEffect(() => {
+    if (!gameId || !game) return;
+    const timeoutCheck = isGameTimedOut(game);
+    if (timeoutCheck.timedOut && timeoutCheck.timedOutColor) {
+      timeoutGameAction(gameId, timeoutCheck.timedOutColor).catch((err) => {
+        console.warn('Failed to auto-timeout expired game:', err);
+      });
+    }
   }, [game, gameId]);
 
   // 2. Determine player identity and join
@@ -372,6 +384,8 @@ export const GameRoomView: React.FC = () => {
         onExit={async () => {
           if (game.status === 'waiting' && gameId) {
             await abandonGame(gameId);
+          } else if (game.status === 'in_progress' && userColor && !isSpectator && gameId) {
+            await resignGameAction(gameId, userColor);
           }
           navigate('/');
         }}

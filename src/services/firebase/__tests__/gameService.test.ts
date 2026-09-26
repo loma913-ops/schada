@@ -13,6 +13,8 @@ import {
   findOpenWaitingGame,
   sortLobbyRooms,
   subscribeToOpenRooms,
+  isGameTimedOut,
+  startAbandonedGamesCleanupWatcher,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '../gameService';
@@ -429,4 +431,127 @@ describe('GameService Multiplayer Sync', () => {
     expect(() => subscribeToOpenRooms(() => {}, 0)).toThrowError(RangeError);
     expect(() => subscribeToOpenRooms(() => {}, -10)).toThrowError(RangeError);
   });
+
+  it('correctly evaluates isGameTimedOut for in-progress and waiting games', () => {
+    // Waiting game: should never be timed out
+    const waitingGame = {
+      status: 'waiting',
+      timeControlMinutes: 5,
+      currentTurn: 'blue',
+      blueTimeMs: 300000,
+      greenTimeMs: 300000,
+      lastTurnStartTimeMs: Date.now() - 400000,
+    } as GameRoom;
+    expect(isGameTimedOut(waitingGame)).toEqual({ timedOut: false });
+
+    // In-progress untimed game: should never be timed out
+    const untimedGame = {
+      status: 'in_progress',
+      timeControlMinutes: 0,
+      currentTurn: 'blue',
+      blueTimeMs: 0,
+      greenTimeMs: 0,
+      lastTurnStartTimeMs: Date.now() - 400000,
+    } as GameRoom;
+    expect(isGameTimedOut(untimedGame)).toEqual({ timedOut: false });
+
+    // In-progress active game within time: should not be timed out
+    const liveGame = {
+      status: 'in_progress',
+      timeControlMinutes: 5,
+      currentTurn: 'blue',
+      blueTimeMs: 300000,
+      greenTimeMs: 300000,
+      lastTurnStartTimeMs: Date.now() - 10000, // 10s elapsed out of 300s
+    } as GameRoom;
+    expect(isGameTimedOut(liveGame)).toEqual({ timedOut: false });
+
+    // In-progress game where active turn time has run out
+    const expiredBlueGame = {
+      status: 'in_progress',
+      timeControlMinutes: 2,
+      currentTurn: 'blue',
+      blueTimeMs: 120000,
+      greenTimeMs: 120000,
+      lastTurnStartTimeMs: Date.now() - 130000, // 130s elapsed out of 120s
+    } as GameRoom;
+    expect(isGameTimedOut(expiredBlueGame)).toEqual({ timedOut: true, timedOutColor: 'blue' });
+
+    const expiredGreenGame = {
+      status: 'in_progress',
+      timeControlMinutes: 1,
+      currentTurn: 'green',
+      blueTimeMs: 60000,
+      greenTimeMs: 40000,
+      lastTurnStartTimeMs: Date.now() - 50000, // 50s elapsed out of 40s
+    } as GameRoom;
+    expect(isGameTimedOut(expiredGreenGame)).toEqual({ timedOut: true, timedOutColor: 'green' });
+  });
+
+  it('filters out timed-out in-progress games in sortLobbyRooms and auto-resolves in cleanup', async () => {
+    const creator = { id: 'p1', username: 'Host1', elo: 1300 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 1,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+    });
+
+    // Join second player
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: 'p2', username: 'Player2', elo: 1200 });
+
+    // Game is now in_progress. Simulate time elapsed exceeding 1 minute
+    const raw = localStorage.getItem('schada_mock_games');
+    const parsed = JSON.parse(raw || '{}');
+    parsed[gameId].lastTurnStartTimeMs = Date.now() - 70000; // 70s elapsed on 60s clock
+    localStorage.setItem('schada_mock_games', JSON.stringify(parsed));
+
+    // sortLobbyRooms should filter out the expired game
+    const currentRooms = [parsed[gameId]];
+    const sorted = sortLobbyRooms(currentRooms);
+    expect(sorted.length).toBe(0);
+
+    // cleanupAbandonedGames should automatically complete the game via timeout
+    await cleanupAbandonedGames();
+
+    // Verify game was transitioned to completed with timeout reason
+    let fetchedGame: GameRoom | null = null;
+    const unsub = subscribeToGame(gameId, (g) => {
+      fetchedGame = g;
+    });
+    unsub();
+
+    const nonNullGame = fetchedGame as unknown as GameRoom;
+    expect(nonNullGame).not.toBeNull();
+    expect(nonNullGame.status).toBe('completed');
+    expect(nonNullGame.winReason).toBe('timeout');
+    expect(nonNullGame.winner).toBe('green'); // blue ran out of time, green won
+  });
+
+  it('validates cleanupAbandonedGames parameters strictly', async () => {
+    await expect(cleanupAbandonedGames(-1)).rejects.toThrowError(RangeError);
+    await expect(cleanupAbandonedGames(NaN)).rejects.toThrowError(RangeError);
+    await expect(cleanupAbandonedGames('invalid' as any)).rejects.toThrowError(RangeError);
+  });
+
+  it('validates startAbandonedGamesCleanupWatcher parameters and manages timer lifecycle', () => {
+    expect(() => startAbandonedGamesCleanupWatcher(0)).toThrowError(RangeError);
+    expect(() => startAbandonedGamesCleanupWatcher(-500)).toThrowError(RangeError);
+    expect(() => startAbandonedGamesCleanupWatcher(NaN)).toThrowError(RangeError);
+
+    const stop = startAbandonedGamesCleanupWatcher(60_000);
+    expect(typeof stop).toBe('function');
+    expect(() => stop()).not.toThrow();
+  });
+
+  it('handles null, undefined, or malformed rooms gracefully in isGameTimedOut', () => {
+    expect(isGameTimedOut(null)).toEqual({ timedOut: false });
+    expect(isGameTimedOut(undefined)).toEqual({ timedOut: false });
+    expect(isGameTimedOut({} as any)).toEqual({ timedOut: false });
+    expect(isGameTimedOut({ status: 'in_progress', timeControlMinutes: 5, currentTurn: 'invalid' } as any)).toEqual({
+      timedOut: false,
+    });
+  });
 });
+

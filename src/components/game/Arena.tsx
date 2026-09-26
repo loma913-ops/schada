@@ -3,6 +3,7 @@ import type { BoardState, Move, Piece, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import { selectBotMove, getBotThinkingDelayMs } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { RotateCcw, Flag, ListOrdered, X, ArrowLeft } from 'lucide-react';
 import { SchadaBoard } from '../board/SchadaBoard';
 import { PlayerCard } from './PlayerCard';
@@ -135,6 +136,16 @@ export const Arena: React.FC<ArenaProps> = ({
     });
   }, [customTimeout, onGameComplete]);
 
+  // Immediate timeout check if time has already run out
+  useEffect(() => {
+    if (isWaiting || gameState.isGameOver || timeControlMinutes <= 0) return;
+    if (gameState.currentTurn === 'blue' && blueTime <= 0) {
+      handleTimeout('blue');
+    } else if (gameState.currentTurn === 'green' && greenTime <= 0) {
+      handleTimeout('green');
+    }
+  }, [isWaiting, gameState.isGameOver, timeControlMinutes, gameState.currentTurn, blueTime, greenTime, handleTimeout]);
+
   // Clock countdown timer
   useEffect(() => {
     if (isWaiting || gameState.isGameOver || timeControlMinutes <= 0) return;
@@ -148,22 +159,24 @@ export const Arena: React.FC<ArenaProps> = ({
 
       if (gameState.currentTurn === 'blue') {
         setBlueTime((prev) => {
+          if (prev <= 0) return 0;
           const next = Math.max(0, prev - delta);
-          if (next === 0 && prev > 0) {
+          if (next === 0) {
             handleTimeout('blue');
           }
           return next;
         });
       } else {
         setGreenTime((prev) => {
+          if (prev <= 0) return 0;
           const next = Math.max(0, prev - delta);
-          if (next === 0 && prev > 0) {
+          if (next === 0) {
             handleTimeout('green');
           }
           return next;
         });
       }
-    }, 100);
+    }, MULTIPLAYER_SCALE_CONFIG.matchmaking.clockTickIntervalMs);
 
     return () => clearInterval(interval);
   }, [

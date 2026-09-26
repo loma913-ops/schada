@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -34,6 +34,7 @@ import {
   createGame,
   joinGame,
   findOpenWaitingGame,
+  startAbandonedGamesCleanupWatcher,
 } from './services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
 import type { BoardState, PieceColor } from './core/schada/types';
@@ -91,6 +92,12 @@ const MainApp: React.FC = () => {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
+
+  // Periodic background cleanup of abandoned / timed-out games
+  useEffect(() => {
+    const stopWatcher = startAbandonedGamesCleanupWatcher();
+    return () => stopWatcher();
+  }, []);
 
   // Start a Quick Pair game (Player vs Player) - checks lobby for open game or creates new open room
   const handleStartQuickPair = async (minutes: number, increment: number, isRanked: boolean) => {

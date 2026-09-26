@@ -30,6 +30,8 @@ export interface MatchmakingConfig {
   readonly botBaseElo: number;
   readonly botEloStepPerLevel: number;
   readonly defaultCleanupIntervalMs: number;
+  readonly maxCleanupBatchSize: number;
+  readonly clockTickIntervalMs: number;
 }
 
 export interface MultiplayerScaleConfig {
@@ -186,6 +188,26 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
       `Invalid matchmaking.defaultCleanupIntervalMs: expected positive number, received ${matchmaking.defaultCleanupIntervalMs}.`
     );
   }
+
+  if (
+    typeof matchmaking.maxCleanupBatchSize !== 'number' ||
+    matchmaking.maxCleanupBatchSize <= 0 ||
+    matchmaking.maxCleanupBatchSize > 500
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.maxCleanupBatchSize: expected number between 1 and 500, received ${matchmaking.maxCleanupBatchSize}.`
+    );
+  }
+
+  if (
+    typeof matchmaking.clockTickIntervalMs !== 'number' ||
+    matchmaking.clockTickIntervalMs < 10 ||
+    matchmaking.clockTickIntervalMs > 5000
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.clockTickIntervalMs: expected number between 10 and 5000, received ${matchmaking.clockTickIntervalMs}.`
+    );
+  }
 }
 
 export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
@@ -212,6 +234,8 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     botBaseElo: 1000,
     botEloStepPerLevel: 80,
     defaultCleanupIntervalMs: 60_000,
+    maxCleanupBatchSize: 50,
+    clockTickIntervalMs: 100,
   }),
 });
 

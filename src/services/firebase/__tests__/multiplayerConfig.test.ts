@@ -111,5 +111,27 @@ describe('MultiplayerScaleConfig validation', () => {
     expect(() => validateMultiplayerScaleConfig(invalidBotElo)).toThrowError(
       /Invalid matchmaking.botBaseElo/
     );
+
+    const invalidBatchSize: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        maxCleanupBatchSize: 0,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidBatchSize)).toThrowError(
+      /Invalid matchmaking.maxCleanupBatchSize/
+    );
+
+    const invalidTickInterval: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        clockTickIntervalMs: 5,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidTickInterval)).toThrowError(
+      /Invalid matchmaking.clockTickIntervalMs/
+    );
   });
 });
