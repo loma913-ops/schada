@@ -1,3 +1,5 @@
+import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -178,7 +180,7 @@ class MockBackend {
       username: username.trim(),
       usernameLower,
       usernameChangeCount: 0,
-      eloRating: 1200,
+      eloRating: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
       gamesPlayed: 0,
       gamesWon: 0,
       gamesLost: 0,

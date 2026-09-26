@@ -18,6 +18,7 @@ import {
   syncPresenceHeartbeat,
   cleanupCurrentTabSession,
 } from './presenceService';
+import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 
 export function validateUsernameFormat(username: string): { valid: boolean; error?: string } {
   const trimmed = username.trim();
@@ -84,7 +85,7 @@ export async function registerUser(
       username: username.trim(),
       usernameLower,
       usernameChangeCount: 0,
-      eloRating: 1200,
+      eloRating: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
       gamesPlayed: 0,
       gamesWon: 0,
       gamesLost: 0,

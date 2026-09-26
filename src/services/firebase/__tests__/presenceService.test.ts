@@ -39,6 +39,7 @@ import {
   AUTH_CACHED_UID_KEY,
   IDLE_TIMEOUT_MS,
   type SessionHeartbeat,
+  type LobbyStats,
 } from '../presenceService';
 import { mockBackend } from '../mockProvider';
 
@@ -72,13 +73,14 @@ describe('User Online & Active Presence Service', () => {
     syncPresenceHeartbeat();
 
     // Verify stats: 0 players online, 1 guest online
-    let emittedStats: any = null;
+    let emittedStats: LobbyStats | null = null;
     const unsub = subscribeToLobbyStats((stats) => {
       emittedStats = stats;
     });
 
-    expect(emittedStats.playersOnline).toBe(0);
-    expect(emittedStats.guestsOnline).toBe(1);
+    const receivedStats = emittedStats as unknown as LobbyStats;
+    expect(receivedStats.playersOnline).toBe(0);
+    expect(receivedStats.guestsOnline).toBe(1);
 
     unsub();
   });
@@ -98,13 +100,14 @@ describe('User Online & Active Presence Service', () => {
     expect(currentUser?.status).toBe('online');
 
     // Stats reflect 1 player online
-    let emittedStats: any = null;
+    let emittedStats: LobbyStats | null = null;
     const unsub = subscribeToLobbyStats((stats) => {
       emittedStats = stats;
     });
 
-    expect(emittedStats.playersOnline).toBe(1);
-    expect(emittedStats.guestsOnline).toBe(0);
+    const receivedStats = emittedStats as unknown as LobbyStats;
+    expect(receivedStats.playersOnline).toBe(1);
+    expect(receivedStats.guestsOnline).toBe(0);
 
     unsub();
   });
@@ -128,11 +131,12 @@ describe('User Online & Active Presence Service', () => {
     expect(user?.status).toBe('offline');
 
     // Players online count drops to 0
-    let emittedStats: any = null;
+    let emittedStats: LobbyStats | null = null;
     const unsub = subscribeToLobbyStats((stats) => {
       emittedStats = stats;
     });
-    expect(emittedStats.playersOnline).toBe(0);
+    const receivedStats = emittedStats as unknown as LobbyStats;
+    expect(receivedStats.playersOnline).toBe(0);
     unsub();
   });
 
@@ -153,11 +157,12 @@ describe('User Online & Active Presence Service', () => {
     expect(isCurrentClientActive()).toBe(true);
     expect(mockBackend.getCurrentUser()?.status).toBe('online');
 
-    let emittedStats: any = null;
+    let emittedStats: LobbyStats | null = null;
     const unsub = subscribeToLobbyStats((stats) => {
       emittedStats = stats;
     });
-    expect(emittedStats.playersOnline).toBe(1);
+    const receivedStats = emittedStats as unknown as LobbyStats;
+    expect(receivedStats.playersOnline).toBe(1);
     unsub();
   });
 
@@ -285,13 +290,14 @@ describe('User Online & Active Presence Service', () => {
     syncPresenceHeartbeat();
 
     // Verify stats: guest session was purged, exactly 1 player and 0 guests
-    let emittedStats: any = null;
+    let emittedStats: LobbyStats | null = null;
     const unsub = subscribeToLobbyStats((stats) => {
       emittedStats = stats;
     });
 
-    expect(emittedStats.playersOnline).toBe(1);
-    expect(emittedStats.guestsOnline).toBe(0);
+    const receivedStats = emittedStats as unknown as LobbyStats;
+    expect(receivedStats.playersOnline).toBe(1);
+    expect(receivedStats.guestsOnline).toBe(0);
 
     unsub();
   });

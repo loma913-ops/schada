@@ -9,7 +9,7 @@ import {
   timeoutGameAction,
   abandonGame,
   getLocalSessionToken,
-  cleanupAbandonedGames,
+  deleteGame,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '@/services/firebase/gameService';
@@ -19,6 +19,7 @@ import { Copy, Check, Share2, ArrowLeft, Loader2, UserCheck, Eye, Cpu } from 'lu
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { mockBackend } from '@/services/firebase/mockProvider';
 import { setActivityContext } from '@/services/firebase/presenceService';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 
 export const GameRoomView: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -31,7 +32,9 @@ export const GameRoomView: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   // Guest prompt state
-  const [guestName, setGuestName] = useState(() => localStorage.getItem('schada_guest_name') || 'Guest');
+  const [guestName, setGuestName] = useState(
+    () => localStorage.getItem('schada_guest_name') || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName
+  );
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
 
@@ -69,18 +72,18 @@ export const GameRoomView: React.FC = () => {
 
   // Auto-cleanup timer if viewing an abandoned game when the 10 minutes elapse
   useEffect(() => {
-    if (!game || game.status !== 'abandoned') return;
+    if (!game || game.status !== 'abandoned' || !gameId) return;
 
     const abandonedTime = game.abandonedAt || game.createdAt;
     const elapsed = Date.now() - abandonedTime;
     const remainingMs = Math.max(0, ABANDONED_GAME_EXPIRY_MS - elapsed);
 
     const timer = setTimeout(async () => {
-      await cleanupAbandonedGames();
+      await deleteGame(gameId);
     }, remainingMs);
 
     return () => clearTimeout(timer);
-  }, [game?.status, game?.abandonedAt, game?.createdAt]);
+  }, [game, gameId]);
 
   // 2. Determine player identity and join
   useEffect(() => {
@@ -108,8 +111,8 @@ export const GameRoomView: React.FC = () => {
       ? { id: user.id, username: user.username, elo: user.eloRating }
       : {
           id: 'guest_' + (localStorage.getItem('schada_guest_id') || Math.random().toString(36).substring(2, 8)),
-          username: guestName.trim() || 'Guest',
-          elo: 1200,
+          username: guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
+          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
         };
 
     joinGame(gameId, joinUser).then((res) => {
@@ -123,7 +126,7 @@ export const GameRoomView: React.FC = () => {
     e.preventDefault();
     if (!gameId) return;
 
-    const trimmed = guestName.trim() || 'Guest';
+    const trimmed = guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
     localStorage.setItem('schada_guest_name', trimmed);
     localStorage.setItem('schada_guest_confirmed', 'true');
     setGuestPromptOpen(false);
@@ -137,7 +140,7 @@ export const GameRoomView: React.FC = () => {
     joinGame(gameId, {
       id: guestId,
       username: trimmed,
-      elo: 1200,
+      elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
     }).then((res) => {
       if (res.success) {
         setHasJoined(true);
@@ -234,7 +237,7 @@ export const GameRoomView: React.FC = () => {
           This match was abandoned by the host.
         </p>
         <p style={{ color: 'var(--text-muted, #71717a)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-          Abandoned games are automatically removed after 10 minutes.
+          Abandoned games are automatically removed after {Math.round(ABANDONED_GAME_EXPIRY_MS / 60000)} minutes.
         </p>
         <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>
           Return to Lobby
@@ -280,11 +283,11 @@ export const GameRoomView: React.FC = () => {
 
   const bluePlayer: ArenaPlayer = game.bluePlayer
     ? { id: game.bluePlayer.id, username: game.bluePlayer.username, elo: game.bluePlayer.elo }
-    : { id: 'blue', username: 'Waiting for player...', elo: 1200 };
+    : { id: 'blue', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
 
   const greenPlayer: ArenaPlayer = game.greenPlayer
     ? { id: game.greenPlayer.id, username: game.greenPlayer.username, elo: game.greenPlayer.elo }
-    : { id: 'green', username: 'Waiting for player...', elo: 1200 };
+    : { id: 'green', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
 
   return (
     <div className="game-room-container">

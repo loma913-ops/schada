@@ -1,6 +1,7 @@
-import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, deleteDoc, serverTimestamp, getCountFromServer } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { mockBackend } from './mockProvider';
+import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 
 export interface LobbyStats {
   playersOnline: number; // Strictly players who registered, signed in, and are active
@@ -21,19 +22,19 @@ export const ACTIVE_SESSIONS_STORAGE_KEY = 'schada_active_sessions_v2';
 export const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
 export const AUTH_CACHED_UID_KEY = 'schada_auth_cached_uid';
 
-// Timing constants for presence & activity detection
-export const IDLE_TIMEOUT_MS = 120_000;       // 2 minutes of no user interactions = idle/inactive
-export const HIDDEN_GRACE_PERIOD_MS = 60_000; // 60 seconds after tab is hidden = inactive
-export const SESSION_TTL_MS = 60_000;         // 60 seconds without heartbeat = session expired
-export const HEARTBEAT_INTERVAL_MS = 30_000;   // Heartbeat ping interval
+// Timing constants from validated centralized configuration
+export const IDLE_TIMEOUT_MS = MULTIPLAYER_SCALE_CONFIG.presence.idleTimeoutMs;
+export const HIDDEN_GRACE_PERIOD_MS = MULTIPLAYER_SCALE_CONFIG.presence.hiddenGracePeriodMs;
+export const SESSION_TTL_MS = MULTIPLAYER_SCALE_CONFIG.presence.sessionTtlMs;
+export const HEARTBEAT_INTERVAL_MS = MULTIPLAYER_SCALE_CONFIG.presence.heartbeatIntervalMs;
 
 // In-memory tab activity state
 let lastUserActivityTime = Date.now();
 let hiddenSince: number | null = null;
 let currentActivityContext: 'online' | 'in-game' = 'online';
 let trackingRefCount = 0;
-let heartbeatIntervalId: any = null;
-let hiddenGraceTimerId: any = null;
+let heartbeatIntervalId: ReturnType<typeof setInterval> | null = null;
+let hiddenGraceTimerId: ReturnType<typeof setTimeout> | null = null;
 let isListenersAttached = false;
 const statsSubscribers = new Set<(stats: LobbyStats) => void>();
 
@@ -157,7 +158,7 @@ export function resetPresenceStateForTesting(): void {
 
 export function recordUserActivity(): void {
   const now = Date.now();
-  if (now >= lastThrottleRecord && now - lastThrottleRecord < 1000) return;
+  if (now >= lastThrottleRecord && now - lastThrottleRecord < MULTIPLAYER_SCALE_CONFIG.presence.activityThrottleMs) return;
   lastThrottleRecord = now;
   lastUserActivityTime = now;
 
@@ -409,9 +410,9 @@ export function getLocalActiveGamesCount(): number {
   try {
     const rawGames = typeof localStorage !== 'undefined' ? localStorage.getItem(MOCK_GAMES_STORAGE_KEY) : null;
     if (!rawGames) return 0;
-    const games = JSON.parse(rawGames);
+    const games = JSON.parse(rawGames) as Record<string, { status?: string }>;
     return Object.values(games).filter(
-      (g: any) => g.status === 'in_progress' || g.status === 'waiting'
+      (g) => g && (g.status === 'in_progress' || g.status === 'waiting')
     ).length;
   } catch {
     return 0;
@@ -500,71 +501,77 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
     window.addEventListener('schada_user_status_changed', handleCustomStatus);
   }
 
-  // Firestore real-time listeners if live Firebase is configured
-  let unsubscribeUsers: (() => void) | null = null;
-  let unsubscribeGuests: (() => void) | null = null;
-  let unsubscribeGames: (() => void) | null = null;
+  // Firestore real-time listener for aggregated platform stats
+  // Rather than downloading full collections of tens of thousands of users/games,
+  // we listen to a single aggregate document 'stats/lobby' (O(1) read).
+  // Fallback: throttled server-side count queries (getCountFromServer) without downloading document bodies.
+  let unsubscribeStatsDoc: (() => void) | null = null;
+  let countPollTimer: ReturnType<typeof setInterval> | null = null;
 
   if (isFirebaseConfigured() && db) {
     try {
-      const qUsers = query(collection(db, 'users'), where('status', 'in', ['online', 'in-game']));
-      unsubscribeUsers = onSnapshot(
-        qUsers,
+      const statsDocRef = doc(db, 'stats', 'lobby');
+      unsubscribeStatsDoc = onSnapshot(
+        statsDocRef,
         (snapshot) => {
-          firestoreRegisteredCount = snapshot.docs.length;
-          notifyStatsSubscribers();
-        },
-        (err) => {
-          console.warn('Firestore online users count listener fallback:', err);
-          firestoreRegisteredCount = null;
-          notifyStatsSubscribers();
-        }
-      );
-
-      const qGuests = collection(db, 'guest_sessions');
-      unsubscribeGuests = onSnapshot(
-        qGuests,
-        (snapshot) => {
-          const now = Date.now();
-          let count = 0;
-          for (const docSnap of snapshot.docs) {
-            const data = docSnap.data();
-            const updatedAt = typeof data.updatedAt === 'number' ? data.updatedAt : 0;
-            if (now - updatedAt <= SESSION_TTL_MS) {
-              count += 1;
-            } else if (now - updatedAt > SESSION_TTL_MS * 3) {
-              // Clean up ancient stale guest docs
-              deleteDoc(docSnap.ref).catch(() => {});
-            }
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            if (typeof data.playersOnline === 'number') firestoreRegisteredCount = data.playersOnline;
+            if (typeof data.guestsOnline === 'number') firestoreGuestsCount = data.guestsOnline;
+            if (typeof data.activeGames === 'number') firestoreGamesCount = data.activeGames;
+            notifyStatsSubscribers();
           }
-          firestoreGuestsCount = count;
-          notifyStatsSubscribers();
         },
         (err) => {
-          console.warn('Firestore guest sessions listener fallback:', err);
-          firestoreGuestsCount = null;
-          notifyStatsSubscribers();
+          console.warn('Stats document listener notice:', err);
         }
       );
 
-      const qGames = query(
-        collection(db, 'games'),
-        where('status', 'in', ['waiting', 'in_progress'])
-      );
-      unsubscribeGames = onSnapshot(
-        qGames,
-        (snapshot) => {
-          firestoreGamesCount = snapshot.docs.length;
-          notifyStatsSubscribers();
-        },
-        (err) => {
-          console.warn('Firestore active games count listener fallback:', err);
-          firestoreGamesCount = null;
-          notifyStatsSubscribers();
+      // Throttled server-side count fallback: refreshes server counts with getCountFromServer
+      const refreshServerCounts = async () => {
+        if (!db) return;
+        try {
+          const qUsers = query(collection(db, 'users'), where('status', 'in', ['online', 'in-game']));
+          const qGuests = collection(db, 'guest_sessions');
+          const qGames = query(collection(db, 'games'), where('status', 'in', ['waiting', 'in_progress']));
+
+          const [usersSnap, guestsSnap, gamesSnap] = await Promise.all([
+            getCountFromServer(qUsers).catch(() => null),
+            getCountFromServer(qGuests).catch(() => null),
+            getCountFromServer(qGames).catch(() => null),
+          ]);
+
+          let changed = false;
+          if (usersSnap) {
+            firestoreRegisteredCount = usersSnap.data().count;
+            changed = true;
+          }
+          if (guestsSnap) {
+            firestoreGuestsCount = guestsSnap.data().count;
+            changed = true;
+          }
+          if (gamesSnap) {
+            firestoreGamesCount = gamesSnap.data().count;
+            changed = true;
+          }
+
+          if (changed) {
+            notifyStatsSubscribers();
+          }
+        } catch {
+          // Graceful fallback to local session stats
         }
-      );
+      };
+
+      // Periodic count fallback with random jitter so thousands of clients don't poll at the same second
+      const pollDelay =
+        MULTIPLAYER_SCALE_CONFIG.presence.statsPollIntervalMs +
+        Math.floor(Math.random() * MULTIPLAYER_SCALE_CONFIG.presence.statsPollJitterMs);
+      countPollTimer = setInterval(refreshServerCounts, pollDelay);
+      // Run initial count fallback after brief delay if stats/lobby doc isn't present
+      setTimeout(refreshServerCounts, MULTIPLAYER_SCALE_CONFIG.presence.statsInitialFallbackDelayMs);
     } catch (e) {
-      console.warn('Could not initialize Firestore listeners:', e);
+      console.warn('Could not initialize Firestore lobby stats:', e);
     }
   }
 
@@ -574,9 +581,8 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('schada_user_status_changed', handleCustomStatus);
     }
-    if (unsubscribeUsers) unsubscribeUsers();
-    if (unsubscribeGuests) unsubscribeGuests();
-    if (unsubscribeGames) unsubscribeGames();
+    if (unsubscribeStatsDoc) unsubscribeStatsDoc();
+    if (countPollTimer) clearInterval(countPollTimer);
     stopTracking();
   };
 }

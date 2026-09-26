@@ -10,8 +10,11 @@ import {
   deleteGame,
   cleanupAbandonedGames,
   subscribeToGame,
+  findOpenWaitingGame,
   ABANDONED_GAME_EXPIRY_MS,
+  type GameRoom,
 } from '../gameService';
+import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
 
 vi.mock('../config', () => ({
@@ -181,16 +184,17 @@ describe('GameService Multiplayer Sync', () => {
     await abandonGame(gameId);
     const after = Date.now();
 
-    let fetchedGame: any = null;
+    let fetchedGame: GameRoom | null = null;
     const unsub = subscribeToGame(gameId, (g) => {
       fetchedGame = g;
     });
     unsub();
 
-    expect(fetchedGame).not.toBeNull();
-    expect(fetchedGame.status).toBe('abandoned');
-    expect(fetchedGame.abandonedAt).toBeGreaterThanOrEqual(before);
-    expect(fetchedGame.abandonedAt).toBeLessThanOrEqual(after);
+    const nonNullGame = fetchedGame as unknown as GameRoom;
+    expect(nonNullGame).not.toBeNull();
+    expect(nonNullGame.status).toBe('abandoned');
+    expect(nonNullGame.abandonedAt).toBeGreaterThanOrEqual(before);
+    expect(nonNullGame.abandonedAt).toBeLessThanOrEqual(after);
   });
 
   it('retains abandoned game if under 10 minutes old', async () => {
@@ -204,18 +208,19 @@ describe('GameService Multiplayer Sync', () => {
 
     await abandonGame(gameId);
 
-    // Run cleanup with standard 10 minutes (600,000 ms) threshold
+    // Run cleanup with standard threshold
     const removed = await cleanupAbandonedGames(ABANDONED_GAME_EXPIRY_MS);
     expect(removed).not.toContain(gameId);
 
-    let fetchedGame: any = null;
+    let fetchedGame: GameRoom | null = null;
     const unsub = subscribeToGame(gameId, (g) => {
       fetchedGame = g;
     });
     unsub();
 
-    expect(fetchedGame).not.toBeNull();
-    expect(fetchedGame.status).toBe('abandoned');
+    const nonNullGame = fetchedGame as unknown as GameRoom;
+    expect(nonNullGame).not.toBeNull();
+    expect(nonNullGame.status).toBe('abandoned');
   });
 
   it('removes and cleans up games that have been abandoned for 10 minutes or more', async () => {
@@ -231,12 +236,12 @@ describe('GameService Multiplayer Sync', () => {
 
     await abandonGame(gameId);
 
-    // Simulate 10 minutes (600,000 ms) having passed since abandonment by running cleanup with maxAgeMs = 0
+    // Simulate expiration having passed since abandonment by running cleanup with maxAgeMs = 0
     const removed = await cleanupAbandonedGames(0);
     expect(removed).toContain(gameId);
 
     // Game should now be completely deleted from store
-    let fetchedGame: any = 'initial';
+    let fetchedGame: GameRoom | null = null;
     const unsub = subscribeToGame(gameId, (g) => {
       fetchedGame = g;
     });
@@ -260,14 +265,15 @@ describe('GameService Multiplayer Sync', () => {
     const removed = await cleanupAbandonedGames(0);
     expect(removed).not.toContain(activeGameId);
 
-    let activeGame: any = null;
+    let activeGame: GameRoom | null = null;
     const unsub = subscribeToGame(activeGameId, (g) => {
       activeGame = g;
     });
     unsub();
 
-    expect(activeGame).not.toBeNull();
-    expect(activeGame.status).toBe('waiting');
+    const nonNullActive = activeGame as unknown as GameRoom;
+    expect(nonNullActive).not.toBeNull();
+    expect(nonNullActive.status).toBe('waiting');
   });
 
   it('cleans up expired abandoned game on direct subscription', async () => {
@@ -281,13 +287,13 @@ describe('GameService Multiplayer Sync', () => {
 
     await abandonGame(gameId);
 
-    // Manually manipulate the stored mock game abandonedAt to be 11 minutes ago
+    // Manually manipulate the stored mock game abandonedAt to exceed expiry
     const raw = localStorage.getItem('schada_mock_games');
     const parsed = JSON.parse(raw || '{}');
-    parsed[gameId].abandonedAt = Date.now() - 11 * 60 * 1000;
+    parsed[gameId].abandonedAt = Date.now() - (MULTIPLAYER_SCALE_CONFIG.matchmaking.abandonedGameExpiryMs + 60_000);
     localStorage.setItem('schada_mock_games', JSON.stringify(parsed));
 
-    let fetchedGame: any = 'placeholder';
+    let fetchedGame: GameRoom | null = null;
     const unsub = subscribeToGame(gameId, (g) => {
       fetchedGame = g;
     });
@@ -307,7 +313,7 @@ describe('GameService Multiplayer Sync', () => {
 
     await deleteGame(gameId);
 
-    let fetchedGame: any = 'placeholder';
+    let fetchedGame: GameRoom | null = null;
     const unsub = subscribeToGame(gameId, (g) => {
       fetchedGame = g;
     });
@@ -315,5 +321,41 @@ describe('GameService Multiplayer Sync', () => {
 
     expect(fetchedGame).toBeNull();
     expect(getLocalSessionToken(gameId)).toBeNull();
+  });
+
+  it('locates matching open waiting game via findOpenWaitingGame', async () => {
+    const creator = { id: 'host_p1', username: 'FastSeeker', elo: 1400 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 3,
+      incrementSeconds: 2,
+      colorPref: 'random',
+      isPrivate: false,
+      creator,
+    });
+
+    // Same host searching should exclude their own room
+    const hostFound = await findOpenWaitingGame(3, 2, 'host_p1');
+    expect(hostFound).toBeNull();
+
+    // Challenger with different time control should not match
+    const diffTimeControl = await findOpenWaitingGame(5, 0, 'challenger_p2');
+    expect(diffTimeControl).toBeNull();
+
+    // Challenger looking for 3+2 should find this exact room instantly
+    const matchFound = await findOpenWaitingGame(3, 2, 'challenger_p2');
+    expect(matchFound).not.toBeNull();
+    expect(matchFound?.id).toBe(gameId);
+  });
+
+  it('respects limitCount parameter on getOpenRooms', async () => {
+    const creator = { id: 'p1', username: 'LimitTester', elo: 1300 };
+    await Promise.all([
+      createGame({ timeControlMinutes: 5, colorPref: 'blue', isPrivate: false, creator }),
+      createGame({ timeControlMinutes: 10, colorPref: 'blue', isPrivate: false, creator }),
+      createGame({ timeControlMinutes: 3, colorPref: 'blue', isPrivate: false, creator }),
+    ]);
+
+    const limited = await getOpenRooms(2);
+    expect(limited.length).toBeLessThanOrEqual(2);
   });
 });

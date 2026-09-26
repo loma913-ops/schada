@@ -66,6 +66,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Platform-wide aggregate stats (O(1) lobby stats for tens of thousands of users)
+    match /stats/{statId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
     // Matchmaking queue tickets
     match /matchmaking_queue/{ticketId} {
       allow read: if isAuthenticated();

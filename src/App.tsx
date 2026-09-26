@@ -32,12 +32,18 @@ import { calculateEloUpdate } from './core/elo/eloService';
 import { mockBackend, type UserProfile } from './services/firebase/mockProvider';
 import {
   createGame,
-  getOpenRooms,
   joinGame,
-  getLocalSessionToken,
-  startAbandonedGamesCleanupWatcher,
+  findOpenWaitingGame,
 } from './services/firebase/gameService';
+import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
 import type { BoardState, PieceColor } from './core/schada/types';
+
+interface ComputerModalNavState {
+  openComputerModal?: boolean;
+  timeControlMinutes?: number;
+  incrementSeconds?: number;
+  userColor?: 'random' | 'blue' | 'green';
+}
 
 interface ActiveMatch {
   bluePlayer: ArenaPlayer;
@@ -72,21 +78,10 @@ const MainApp: React.FC = () => {
   }>({});
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
 
-  // Periodic background cleanup of games abandoned for >= 10 minutes
-  React.useEffect(() => {
-    const stopCleanup = startAbandonedGamesCleanupWatcher();
-    return () => stopCleanup();
-  }, []);
-
   // Check if routed with request to open Computer Modal
   React.useEffect(() => {
-    if (location.state && (location.state as any).openComputerModal) {
-      const state = location.state as {
-        openComputerModal?: boolean;
-        timeControlMinutes?: number;
-        incrementSeconds?: number;
-        userColor?: 'random' | 'blue' | 'green';
-      };
+    const state = location.state as ComputerModalNavState | null;
+    if (state && state.openComputerModal) {
       setComputerModalSettings({
         timeControlMinutes: state.timeControlMinutes,
         incrementSeconds: state.incrementSeconds,
@@ -105,30 +100,24 @@ const MainApp: React.FC = () => {
       localStorage.setItem('schada_guest_id', guestId);
     }
 
+    const defaultGuestName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
+    const defaultGuestRating = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating;
+
     const currentUser = user
       ? { id: user.id, username: user.username, elo: user.eloRating }
       : {
           id: guestId,
-          username: localStorage.getItem('schada_guest_name') || 'Guest Player',
-          elo: 1200,
+          username: localStorage.getItem('schada_guest_name') || defaultGuestName,
+          elo: defaultGuestRating,
         };
 
     try {
-      // 1. Check if there is an existing waiting room in the lobby matching this time control
-      const openRooms = await getOpenRooms();
-      const existingMatch = openRooms.find((r) => {
-        if (r.status !== 'waiting') return false;
-        if (r.timeControlMinutes !== minutes || (r.incrementSeconds || 0) !== increment) return false;
-        const token = getLocalSessionToken(r.id);
-        const isHost =
-          (r.bluePlayer && (r.bluePlayer.id === currentUser.id || r.bluePlayer.sessionToken === token)) ||
-          (r.greenPlayer && (r.greenPlayer.id === currentUser.id || r.greenPlayer.sessionToken === token));
-        return !isHost;
-      });
+      // 1. Direct targeted index lookup for an open waiting room with this time control (O(1) read)
+      const existingMatch = await findOpenWaitingGame(minutes, increment, currentUser.id);
 
       if (existingMatch) {
         const joinRes = await joinGame(existingMatch.id, currentUser);
-        if (joinRes.success) {
+        if (joinRes.success && joinRes.role === 'player') {
           navigate(`/game/${existingMatch.id}`);
           return;
         }
@@ -153,10 +142,19 @@ const MainApp: React.FC = () => {
   };
 
   // Start a Pass and Play / Solo Sandbox game
+  // Start a Pass and Play / Solo Sandbox game
   const handleStartPassAndPlay = () => {
     setActiveMatch({
-      bluePlayer: { id: 'p1', username: 'Player 1 (Blue)', elo: 1200 },
-      greenPlayer: { id: 'p2', username: 'Player 2 (Green)', elo: 1200 },
+      bluePlayer: {
+        id: 'p1',
+        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.passAndPlayBlueName,
+        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
+      },
+      greenPlayer: {
+        id: 'p2',
+        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.passAndPlayGreenName,
+        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
+      },
       timeControlMinutes: 0,
       incrementSeconds: 0,
       isRanked: false,
@@ -178,7 +176,9 @@ const MainApp: React.FC = () => {
     difficultyLevel: number;
     userColor: PieceColor;
   }) => {
-    const botElo = 1000 + difficultyLevel * 80;
+    const botElo =
+      MULTIPLAYER_SCALE_CONFIG.matchmaking.botBaseElo +
+      difficultyLevel * MULTIPLAYER_SCALE_CONFIG.matchmaking.botEloStepPerLevel;
     const botOpponent: ArenaPlayer = {
       id: `bot_level_${difficultyLevel}`,
       username: `SchadaBot (Level ${difficultyLevel})`,
@@ -187,7 +187,11 @@ const MainApp: React.FC = () => {
 
     const currentUserPlayer: ArenaPlayer = user
       ? { id: user.id, username: user.username, elo: user.eloRating }
-      : { id: 'guest', username: 'GuestPlayer', elo: 1200 };
+      : {
+          id: 'guest',
+          username: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
+          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+        };
 
     const bluePlayer = userColor === 'blue' ? currentUserPlayer : botOpponent;
     const greenPlayer = userColor === 'blue' ? botOpponent : currentUserPlayer;
@@ -234,8 +238,10 @@ const MainApp: React.FC = () => {
       ? { id: user.id, username: user.username, elo: user.eloRating }
       : {
           id: guestId,
-          username: localStorage.getItem('schada_guest_name') || 'Guest Host',
-          elo: 1200,
+          username:
+            localStorage.getItem('schada_guest_name') ||
+            MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName,
+          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
         };
 
     const result = await createGame({

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createGame } from '@/services/firebase/gameService';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { useNavigate } from 'react-router-dom';
 
 interface CreateRoomModalProps {
@@ -30,8 +31,10 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
         ? { id: user.id, username: user.username, elo: user.eloRating }
         : {
           id: 'guest_' + Math.random().toString(36).substring(2, 7),
-          username: localStorage.getItem('schada_guest_name') || 'Guest Host',
-          elo: 1200,
+          username:
+            localStorage.getItem('schada_guest_name') ||
+            MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName,
+          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
         };
 
       const result = await createGame({
