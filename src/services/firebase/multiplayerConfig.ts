@@ -217,9 +217,9 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     sessionTtlMs: 60_000,
     heartbeatIntervalMs: 30_000,
     activityThrottleMs: 1_000,
-    statsPollIntervalMs: 45_000,
-    statsPollJitterMs: 15_000,
-    statsInitialFallbackDelayMs: 1_500,
+    statsPollIntervalMs: 12_000,
+    statsPollJitterMs: 3_000,
+    statsInitialFallbackDelayMs: 0,
   }),
   matchmaking: Object.freeze({
     maxOpenRoomsLobbyLimit: 50,

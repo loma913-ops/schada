@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { subscribeToLobbyStats, type LobbyStats } from '@/services/firebase/presenceService';
+import {
+  subscribeToLobbyStats,
+  getCachedLobbyStats,
+  type LobbyStats,
+} from '@/services/firebase/presenceService';
 
 export const OnlinePlayersCount: React.FC = () => {
-  const [stats, setStats] = useState<LobbyStats>({
-    playersOnline: 0,
-    guestsOnline: 0,
-    activeGames: 0,
-  });
+  const [stats, setStats] = useState<LobbyStats>(() => getCachedLobbyStats());
 
   useEffect(() => {
     const unsubscribe = subscribeToLobbyStats((newStats) => {

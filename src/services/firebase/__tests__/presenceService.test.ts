@@ -35,8 +35,11 @@ import {
   recordUserActivity,
   checkIsUserActiveAcrossTabs,
   resetPresenceStateForTesting,
+  getCachedLobbyStats,
+  setCachedLobbyStats,
   ACTIVE_SESSIONS_STORAGE_KEY,
   AUTH_CACHED_UID_KEY,
+  CACHED_LOBBY_STATS_STORAGE_KEY,
   IDLE_TIMEOUT_MS,
   type SessionHeartbeat,
   type LobbyStats,
@@ -308,5 +311,27 @@ describe('User Online & Active Presence Service', () => {
     const reg = isCurrentClientRegistered();
     expect(reg.isRegistered).toBe(true);
     expect(reg.userId).toBe('user_cached_123');
+  });
+
+  it('getCachedLobbyStats defaults to zeros when cache is empty', () => {
+    expect(getCachedLobbyStats()).toEqual({
+      playersOnline: 0,
+      guestsOnline: 0,
+      activeGames: 0,
+    });
+  });
+
+  it('setCachedLobbyStats persists stats and getCachedLobbyStats retrieves them', () => {
+    const stats: LobbyStats = {
+      playersOnline: 5,
+      guestsOnline: 19,
+      activeGames: 3,
+    };
+    setCachedLobbyStats(stats);
+    expect(getCachedLobbyStats()).toEqual(stats);
+
+    const raw = localStorage.getItem(CACHED_LOBBY_STATS_STORAGE_KEY);
+    expect(raw).toBeDefined();
+    expect(JSON.parse(raw!)).toEqual(stats);
   });
 });

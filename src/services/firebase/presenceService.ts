@@ -22,6 +22,7 @@ export const SESSION_STORAGE_ID_KEY = 'schada_client_session_id';
 export const ACTIVE_SESSIONS_STORAGE_KEY = 'schada_active_sessions_v2';
 export const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
 export const AUTH_CACHED_UID_KEY = 'schada_auth_cached_uid';
+export const CACHED_LOBBY_STATS_STORAGE_KEY = 'schada_cached_lobby_stats';
 
 // Timing constants from validated centralized configuration
 export const IDLE_TIMEOUT_MS = MULTIPLAYER_SCALE_CONFIG.presence.idleTimeoutMs;
@@ -436,35 +437,94 @@ let firestoreRegisteredCount: number | null = null;
 let firestoreGuestsCount: number | null = null;
 let firestoreGamesCount: number | null = null;
 
+/**
+ * Retrieves the last-known lobby statistics from localStorage to enable instant
+ * stale-while-revalidate rendering without resetting counts to zero on page reloads.
+ */
+export function getCachedLobbyStats(): LobbyStats {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(CACHED_LOBBY_STATS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          typeof parsed.playersOnline === 'number' &&
+          typeof parsed.guestsOnline === 'number' &&
+          typeof parsed.activeGames === 'number'
+        ) {
+          return {
+            playersOnline: Math.max(0, parsed.playersOnline),
+            guestsOnline: Math.max(0, parsed.guestsOnline),
+            activeGames: Math.max(0, parsed.activeGames),
+          };
+        }
+      }
+    }
+  } catch {
+    // Ignore storage or JSON errors
+  }
+  return {
+    playersOnline: 0,
+    guestsOnline: 0,
+    activeGames: 0,
+  };
+}
+
+/**
+ * Persists the latest lobby statistics to localStorage.
+ */
+export function setCachedLobbyStats(stats: LobbyStats): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CACHED_LOBBY_STATS_STORAGE_KEY, JSON.stringify(stats));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 function getCurrentLobbyStats(): LobbyStats {
   const { registeredUsersCount, guestSessionsCount } = getLocalSessionStats();
+  const cached = getCachedLobbyStats();
 
   let playersOnline = 0;
-  if (isFirebaseConfigured() && firestoreRegisteredCount !== null) {
-    playersOnline = firestoreRegisteredCount;
+  if (isFirebaseConfigured()) {
+    playersOnline = firestoreRegisteredCount !== null ? firestoreRegisteredCount : cached.playersOnline;
   } else {
     playersOnline = registeredUsersCount;
   }
 
   let guestsOnline = 0;
-  if (isFirebaseConfigured() && firestoreGuestsCount !== null) {
-    guestsOnline = firestoreGuestsCount;
+  if (isFirebaseConfigured()) {
+    guestsOnline = firestoreGuestsCount !== null ? firestoreGuestsCount : cached.guestsOnline;
   } else {
     guestsOnline = guestSessionsCount;
   }
 
   let activeGames = 0;
-  if (isFirebaseConfigured() && firestoreGamesCount !== null) {
-    activeGames = firestoreGamesCount;
+  if (isFirebaseConfigured()) {
+    activeGames = firestoreGamesCount !== null ? firestoreGamesCount : cached.activeGames;
   } else {
     activeGames = getLocalActiveGamesCount();
   }
 
-  return {
+  const stats: LobbyStats = {
     playersOnline,
     guestsOnline,
     activeGames,
   };
+
+  // Only persist to cache if live Firestore counts are available or in local mock mode
+  if (
+    !isFirebaseConfigured() ||
+    firestoreRegisteredCount !== null ||
+    firestoreGuestsCount !== null ||
+    firestoreGamesCount !== null
+  ) {
+    setCachedLobbyStats(stats);
+  }
+
+  return stats;
 }
 
 function notifyStatsSubscribers() {
@@ -498,6 +558,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
     if (
       e.key === ACTIVE_SESSIONS_STORAGE_KEY ||
       e.key === MOCK_GAMES_STORAGE_KEY ||
+      e.key === CACHED_LOBBY_STATS_STORAGE_KEY ||
       e.key === 'schada_mock_current_user_id' ||
       e.key === 'schada_mock_users'
     ) {
@@ -581,8 +642,12 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
         MULTIPLAYER_SCALE_CONFIG.presence.statsPollIntervalMs +
         Math.floor(Math.random() * MULTIPLAYER_SCALE_CONFIG.presence.statsPollJitterMs);
       countPollTimer = setInterval(refreshServerCounts, pollDelay);
-      // Run initial count fallback after brief delay if stats/lobby doc isn't present
-      setTimeout(refreshServerCounts, MULTIPLAYER_SCALE_CONFIG.presence.statsInitialFallbackDelayMs);
+      // Run initial count fallback immediately (or after brief delay if specified)
+      if (MULTIPLAYER_SCALE_CONFIG.presence.statsInitialFallbackDelayMs > 0) {
+        setTimeout(refreshServerCounts, MULTIPLAYER_SCALE_CONFIG.presence.statsInitialFallbackDelayMs);
+      } else {
+        refreshServerCounts();
+      }
     } catch (e) {
       console.warn('Could not initialize Firestore lobby stats:', e);
     }
