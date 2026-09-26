@@ -9,7 +9,7 @@ export const PrivacyPolicy: React.FC = () => {
   }, []);
 
   return (
-    <div className="legal-page-container">
+    <main className="legal-page-container">
       <div className="legal-back-nav">
         <Link to="/" className="legal-back-link">
           <ArrowLeft size={16} />
@@ -249,6 +249,6 @@ export const PrivacyPolicy: React.FC = () => {
           </div>
         </footer>
       </article>
-    </div>
+    </main>
   );
 };
