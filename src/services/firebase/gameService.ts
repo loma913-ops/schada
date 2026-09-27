@@ -320,6 +320,12 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
     sessionToken,
   };
 
+  const isGuest =
+    !params.creator?.id ||
+    params.creator.id.startsWith('guest_') ||
+    params.creator.id === 'guest';
+  const isRanked = isGuest ? false : Boolean(params.isRanked);
+
   const initialBoard = createInitialGameState();
 
   const newGame: GameRoom = {
@@ -329,7 +335,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
     createdAt: Date.now(),
     timeControlMinutes: params.timeControlMinutes,
     incrementSeconds: params.incrementSeconds || 0,
-    isRanked: Boolean(params.isRanked),
+    isRanked,
     creatorColorPref: colorPref,
     bluePlayer: creatorColor === 'blue' ? creatorPlayer : null,
     greenPlayer: creatorColor === 'green' ? creatorPlayer : null,
@@ -1041,16 +1047,23 @@ export async function findOpenWaitingGame(
   timeControlMinutes: number,
   incrementSeconds: number,
   excludeUserId?: string,
-  candidateLimit: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.targetedMatchCandidateLimit
+  candidateLimit: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.targetedMatchCandidateLimit,
+  isRanked?: boolean
 ): Promise<GameRoom | null> {
   if (isFirebaseConfigured() && db) {
-    const q = query(
-      collection(db, 'games'),
+    const constraints: import('firebase/firestore').QueryConstraint[] = [
       where('isPrivate', '==', false),
       where('status', '==', 'waiting'),
       where('timeControlMinutes', '==', timeControlMinutes),
       where('incrementSeconds', '==', incrementSeconds),
-      limit(candidateLimit)
+    ];
+    if (typeof isRanked === 'boolean') {
+      constraints.push(where('isRanked', '==', isRanked));
+    }
+    constraints.push(limit(candidateLimit));
+    const q = query(
+      collection(db, 'games'),
+      ...constraints
     );
     const snap = await getDocs(q);
     for (const docSnap of snap.docs) {
@@ -1069,6 +1082,7 @@ export async function findOpenWaitingGame(
   const match = Object.values(all).find((r) => {
     if (r.isPrivate || r.status !== 'waiting') return false;
     if (r.timeControlMinutes !== timeControlMinutes || (r.incrementSeconds || 0) !== incrementSeconds) return false;
+    if (typeof isRanked === 'boolean' && r.isRanked !== isRanked) return false;
     const isHost =
       (r.bluePlayer && r.bluePlayer.id === excludeUserId) ||
       (r.greenPlayer && r.greenPlayer.id === excludeUserId);

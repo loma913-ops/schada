@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Play } from 'lucide-react';
 import type { PieceColor } from '@/core/schada/types';
+import { useAuth } from '@/context/AuthContext';
 
 interface CustomGameModalProps {
   isOpen: boolean;
@@ -13,11 +14,16 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
   onClose,
   onCreateGame,
 }) => {
+  const { user } = useAuth();
+  const isGuest = !user;
+
   const [minutes, setMinutes] = useState(5);
   const [increment, setIncrement] = useState(0);
-  const [isRanked, setIsRanked] = useState(true);
+  const [isRanked, setIsRanked] = useState(!isGuest);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
   const [loading, setLoading] = useState(false);
+
+  const effectiveIsRanked = !isGuest && isRanked;
 
   if (!isOpen) return null;
 
@@ -25,7 +31,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
     setLoading(true);
     try {
       const chosenColor = colorPref === 'random' ? undefined : colorPref;
-      await onCreateGame(minutes, minutes === 0 ? 0 : increment, isRanked, chosenColor);
+      await onCreateGame(minutes, minutes === 0 ? 0 : increment, effectiveIsRanked, chosenColor);
       onClose();
     } finally {
       setLoading(false);
@@ -86,15 +92,21 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
               type="button"
-              className={`action-btn ${isRanked ? 'active' : ''}`}
-              style={{ flex: 1 }}
-              onClick={() => setIsRanked(true)}
+              className={`action-btn ${effectiveIsRanked ? 'active' : ''}`}
+              style={{
+                flex: 1,
+                opacity: isGuest ? 0.55 : 1,
+                cursor: isGuest ? 'not-allowed' : 'pointer',
+              }}
+              disabled={isGuest}
+              title={isGuest ? 'Sign in to play Ranked matches' : undefined}
+              onClick={() => !isGuest && setIsRanked(true)}
             >
-              Ranked (Elo)
+              Ranked (Elo) {isGuest && <span className="auth-required-badge">(Account required)</span>}
             </button>
             <button
               type="button"
-              className={`action-btn ${!isRanked ? 'active' : ''}`}
+              className={`action-btn ${!effectiveIsRanked ? 'active' : ''}`}
               style={{ flex: 1 }}
               onClick={() => setIsRanked(false)}
             >

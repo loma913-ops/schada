@@ -512,6 +512,37 @@ body {
   border-color: var(--accent-red);
 }
 
+.action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.action-btn:disabled:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+.auth-required-badge {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.85;
+  margin-left: 0.35rem;
+}
+
+[data-theme='light'] .action-btn:disabled {
+  opacity: 0.55;
+  background-color: var(--bg-tertiary);
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+}
+
+[data-theme='light'] .action-btn:disabled:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+
 /* Quick Pairing Grid */
 .pairing-grid {
   display: grid;

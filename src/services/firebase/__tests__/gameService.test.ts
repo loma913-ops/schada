@@ -553,5 +553,73 @@ describe('GameService Multiplayer Sync', () => {
       timedOut: false,
     });
   });
+
+  it('strictly coerces isRanked to false when creator is a guest', async () => {
+    // Guest with guest_ prefix
+    const guestCreator = { id: 'guest_abc12', username: 'GuestHost', elo: 1200 };
+    const { gameId: guestGameId } = await createGame({
+      timeControlMinutes: 5,
+      isRanked: true, // Attempted to create ranked game
+      creator: guestCreator,
+    });
+
+    const openRooms = await getOpenRooms();
+    const guestRoom = openRooms.find((r) => r.id === guestGameId);
+    expect(guestRoom).toBeDefined();
+    expect(guestRoom?.isRanked).toBe(false);
+
+    // Guest with 'guest' id
+    const anonCreator = { id: 'guest', username: 'Anonymous', elo: 1200 };
+    const { gameId: anonGameId } = await createGame({
+      timeControlMinutes: 5,
+      isRanked: true,
+      creator: anonCreator,
+    });
+    const anonRoom = (await getOpenRooms()).find((r) => r.id === anonGameId);
+    expect(anonRoom?.isRanked).toBe(false);
+
+    // Registered user CAN create ranked game
+    const regCreator = { id: 'user_registered_99', username: 'RatedPlayer', elo: 1450 };
+    const { gameId: regGameId } = await createGame({
+      timeControlMinutes: 5,
+      isRanked: true,
+      creator: regCreator,
+    });
+    const regRoom = (await getOpenRooms()).find((r) => r.id === regGameId);
+    expect(regRoom?.isRanked).toBe(true);
+  });
+
+  it('filters by isRanked in findOpenWaitingGame', async () => {
+    const casualHost = { id: 'user_casual', username: 'CasualHost', elo: 1200 };
+    const { gameId: casualGameId } = await createGame({
+      timeControlMinutes: 10,
+      incrementSeconds: 0,
+      isRanked: false,
+      isPrivate: false,
+      creator: casualHost,
+    });
+
+    const rankedHost = { id: 'user_ranked', username: 'RankedHost', elo: 1300 };
+    const { gameId: rankedGameId } = await createGame({
+      timeControlMinutes: 10,
+      incrementSeconds: 0,
+      isRanked: true,
+      isPrivate: false,
+      creator: rankedHost,
+    });
+
+    // Seeker looking strictly for casual game
+    const casualFound = await findOpenWaitingGame(10, 0, 'seeker_p1', 10, false);
+    expect(casualFound).not.toBeNull();
+    expect(casualFound?.id).toBe(casualGameId);
+    expect(casualFound?.isRanked).toBe(false);
+
+    // Seeker looking strictly for ranked game
+    const rankedFound = await findOpenWaitingGame(10, 0, 'seeker_p2', 10, true);
+    expect(rankedFound).not.toBeNull();
+    expect(rankedFound?.id).toBe(rankedGameId);
+    expect(rankedFound?.isRanked).toBe(true);
+  });
 });
+
 

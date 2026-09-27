@@ -13,13 +13,16 @@ interface CreateRoomModalProps {
 export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isGuest = !user;
 
   const [timeControl, setTimeControl] = useState<number>(5);
   const [increment, setIncrement] = useState<number>(0);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
   const [isPrivate, setIsPrivate] = useState<boolean>(false);
-  const [isRanked, setIsRanked] = useState<boolean>(true);
+  const [isRanked, setIsRanked] = useState<boolean>(!isGuest);
   const [loading, setLoading] = useState(false);
+
+  const effectiveIsRanked = !isGuest && isRanked;
 
 
   if (!isOpen) return null;
@@ -40,7 +43,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
       const result = await createGame({
         timeControlMinutes: timeControl,
         incrementSeconds: increment,
-        isRanked: isRanked && Boolean(user),
+        isRanked: effectiveIsRanked,
         colorPref,
         isPrivate,
         creator,
@@ -136,15 +139,21 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   type="button"
-                  className={`action-btn ${isRanked ? 'active' : ''}`}
-                  style={{ flex: 1 }}
-                  onClick={() => setIsRanked(true)}
+                  className={`action-btn ${effectiveIsRanked ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    opacity: isGuest ? 0.55 : 1,
+                    cursor: isGuest ? 'not-allowed' : 'pointer',
+                  }}
+                  disabled={isGuest}
+                  title={isGuest ? 'Sign in to play Ranked matches' : undefined}
+                  onClick={() => !isGuest && setIsRanked(true)}
                 >
-                  Ranked (Elo)
+                  Ranked (Elo) {isGuest && <span className="auth-required-badge">(Account required)</span>}
                 </button>
                 <button
                   type="button"
-                  className={`action-btn ${!isRanked ? 'active' : ''}`}
+                  className={`action-btn ${!effectiveIsRanked ? 'active' : ''}`}
                   style={{ flex: 1 }}
                   onClick={() => setIsRanked(false)}
                 >

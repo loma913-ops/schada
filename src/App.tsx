@@ -120,7 +120,13 @@ const MainApp: React.FC = () => {
 
     try {
       // 1. Direct targeted index lookup for an open waiting room with this time control (O(1) read)
-      const existingMatch = await findOpenWaitingGame(minutes, increment, currentUser.id);
+      const existingMatch = await findOpenWaitingGame(
+        minutes,
+        increment,
+        currentUser.id,
+        undefined,
+        user ? undefined : false
+      );
 
       if (existingMatch) {
         const joinRes = await joinGame(existingMatch.id, currentUser);
