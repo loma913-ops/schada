@@ -1,4 +1,18 @@
-import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, deleteDoc, serverTimestamp, getCountFromServer } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  updateDoc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+  getCountFromServer,
+  Timestamp,
+  getDocs,
+  limit,
+} from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { mockBackend } from './mockProvider';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
@@ -292,6 +306,12 @@ export function cleanupCurrentTabSession(): void {
   // Clean up guest session in Firestore if client was a guest
   if (isFirebaseConfigured() && db && !isRegistered) {
     try {
+      // Send keepalive fetch to Firestore REST API for reliable tab-close deletion in modern browsers
+      const projectId = import.meta.env?.VITE_FIREBASE_PROJECT_ID;
+      if (projectId && typeof fetch !== 'undefined') {
+        const restUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/guest_sessions/${sessionId}`;
+        fetch(restUrl, { method: 'DELETE', keepalive: true }).catch(() => {});
+      }
       deleteDoc(doc(db, 'guest_sessions', sessionId)).catch(() => {});
     } catch {
       // Ignore
@@ -539,6 +559,35 @@ function notifyStatsSubscribers() {
   }
 }
 
+let lastStaleGuestPruneTime = 0;
+const STALE_GUEST_PRUNE_INTERVAL_MS = 5 * 60 * 1000; // Run at most once every 5 minutes per client
+const STALE_GUEST_CUTOFF_MS = 15 * 60 * 1000; // Sessions older than 15 minutes are stale
+
+/**
+ * Opportunistically purges orphan guest sessions older than 15 minutes to keep Firestore clean.
+ */
+async function pruneStaleGuestSessions(): Promise<void> {
+  if (!db || !isFirebaseConfigured()) return;
+  const now = Date.now();
+  if (now - lastStaleGuestPruneTime < STALE_GUEST_PRUNE_INTERVAL_MS) return;
+  lastStaleGuestPruneTime = now;
+
+  try {
+    const cutoff = new Date(now - STALE_GUEST_CUTOFF_MS);
+    const staleQuery = query(
+      collection(db, 'guest_sessions'),
+      where('lastSeen', '<', Timestamp.fromDate(cutoff)),
+      limit(25)
+    );
+    const snap = await getDocs(staleQuery);
+    if (!snap.empty) {
+      await Promise.all(snap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+    }
+  } catch {
+    // Non-critical background cleanup
+  }
+}
+
 /**
  * Subscribes to real-time lobby statistics with 100% accuracy:
  * - players online: strictly players who registered, signed in, and are currently active
@@ -605,8 +654,12 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
       const refreshServerCounts = async () => {
         if (!db) return;
         try {
+          const thresholdDate = new Date(Date.now() - SESSION_TTL_MS);
           const qUsers = query(collection(db, 'users'), where('status', 'in', ['online', 'in-game']));
-          const qGuests = collection(db, 'guest_sessions');
+          const qGuests = query(
+            collection(db, 'guest_sessions'),
+            where('lastSeen', '>=', Timestamp.fromDate(thresholdDate))
+          );
           const qGames = query(collection(db, 'games'), where('status', 'in', ['waiting', 'in_progress']));
 
           const [usersSnap, guestsSnap, gamesSnap] = await Promise.all([
@@ -632,6 +685,9 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
           if (changed) {
             notifyStatsSubscribers();
           }
+
+          // Opportunistic background pruning of dead guest sessions
+          pruneStaleGuestSessions().catch(() => {});
         } catch {
           // Graceful fallback to local session stats
         }

@@ -41,6 +41,8 @@ import {
   AUTH_CACHED_UID_KEY,
   CACHED_LOBBY_STATS_STORAGE_KEY,
   IDLE_TIMEOUT_MS,
+  SESSION_TTL_MS,
+  getLocalSessionStats,
   type SessionHeartbeat,
   type LobbyStats,
 } from '../presenceService';
@@ -333,5 +335,34 @@ describe('User Online & Active Presence Service', () => {
     const raw = localStorage.getItem(CACHED_LOBBY_STATS_STORAGE_KEY);
     expect(raw).toBeDefined();
     expect(JSON.parse(raw!)).toEqual(stats);
+  });
+
+  it('getLocalSessionStats excludes inactive and expired guest sessions', () => {
+    const now = Date.now();
+    const sessions: Record<string, SessionHeartbeat> = {
+      active_guest: {
+        lastSeen: now,
+        isRegistered: false,
+        userId: null,
+        isActive: true,
+      },
+      inactive_guest: {
+        lastSeen: now,
+        isRegistered: false,
+        userId: null,
+        isActive: false,
+      },
+      expired_guest: {
+        lastSeen: now - (SESSION_TTL_MS + 5000),
+        isRegistered: false,
+        userId: null,
+        isActive: true,
+      },
+    };
+    localStorage.setItem(ACTIVE_SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+
+    const stats = getLocalSessionStats();
+    expect(stats.guestSessionsCount).toBe(1);
+    expect(stats.registeredUsersCount).toBe(0);
   });
 });
