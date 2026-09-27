@@ -100,10 +100,10 @@ const BOOGERD_INVENTIONS: readonly OtherInvention[] = Object.freeze([
       'A football/soccer adaptation of Schada published by Homas, featuring a green pitch where player pieces move according to directional arrows and circles.',
   },
   {
-    name: 'Roldice',
+    name: 'The Rolling Dice ("Roldice")',
     type: 'Dice Thinking Game',
     description:
-      'A rolling dice mind game combining tactical path planning with dice face values ("The rolling dice").',
+      'A rolling dice mind game combining tactical path planning with dice face values.',
   },
   {
     name: 'Flying Bird ("Vliegende Vogel")',
@@ -132,7 +132,7 @@ export const HistoryGuide: React.FC = () => {
         </div>
         <h1 className="rules-title">The History of Schada</h1>
         <p className="rules-subtitle">
-          From 1936 Rotterdam to the Modern Era<br />The Incredible Journey of{' '}
+          From 1936 Rotterdam to Now<br />The Incredible Journey of{' '}
           <em>"De Grootste Denkmeter ter Wereld"</em>
         </p>
 

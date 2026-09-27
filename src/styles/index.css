@@ -3,6 +3,7 @@
 @import './rules.css';
 @import './legal.css';
 @import './leaderboard.css';
+@import './orientation.css';
 
 *, *::before, *::after {
   box-sizing: border-box;

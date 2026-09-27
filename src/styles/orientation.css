@@ -1,0 +1,193 @@
+/* ------------------------------------------------------------------ */
+/* Mobile Portrait Orientation Lock & Landscape Blocker Styles        */
+/* ------------------------------------------------------------------ */
+
+.orientation-lock-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 999999;
+  background-color: var(--bg-primary);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  box-sizing: border-box;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+/* Active state displayed via React hook or CSS fallback */
+.orientation-lock-overlay.is-active {
+  display: flex !important;
+}
+
+/* Pure CSS safeguard for immediate blocking on mobile devices in landscape */
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 600px) {
+  .orientation-lock-overlay {
+    display: flex !important;
+  }
+}
+
+.orientation-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 1.75rem 1.5rem;
+  max-width: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
+  animation: orientationCardPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes orientationCardPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Animated Device Graphic */
+.orientation-device-visual {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.orientation-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent-gold);
+  opacity: 0.3;
+  animation: orientationPulse 2.4s ease-out infinite;
+}
+
+@keyframes orientationPulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+.orientation-phone-icon {
+  width: 60px;
+  height: 60px;
+  color: var(--accent-gold);
+  transform-origin: center center;
+  animation: rotateDeviceLoop 3s ease-in-out infinite;
+  filter: drop-shadow(0 4px 10px rgba(229, 183, 88, 0.35));
+}
+
+@keyframes rotateDeviceLoop {
+  0%, 15% {
+    transform: rotate(-90deg);
+  }
+  50%, 75% {
+    transform: rotate(0deg);
+  }
+  90%, 100% {
+    transform: rotate(-90deg);
+  }
+}
+
+/* Badge Pill */
+.orientation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  background-color: rgba(229, 183, 88, 0.12);
+  border: 1px solid rgba(229, 183, 88, 0.35);
+  border-radius: 9999px;
+  color: var(--accent-gold);
+  font-size: 0.725rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.85rem;
+}
+
+.orientation-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Heading & Content */
+.orientation-title {
+  color: var(--text-primary);
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
+}
+
+.orientation-desc {
+  color: var(--text-secondary);
+  font-size: 0.885rem;
+  line-height: 1.5;
+  margin: 0 0 1.25rem 0;
+}
+
+/* Status comparison pill */
+.orientation-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.775rem;
+}
+
+.orientation-pill {
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.orientation-pill.current {
+  background-color: rgba(204, 51, 51, 0.15);
+  color: var(--accent-red);
+  border: 1px solid rgba(204, 51, 51, 0.35);
+}
+
+.orientation-pill.target {
+  background-color: rgba(98, 153, 36, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(98, 153, 36, 0.35);
+}
+
+.orientation-status-arrow {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}

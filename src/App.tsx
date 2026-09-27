@@ -7,6 +7,7 @@ import { Navbar } from './components/layout/Navbar';
 import { BottomNav } from './components/layout/BottomNav';
 import { Footer } from './components/layout/Footer';
 import { OfflineBanner } from './components/layout/OfflineBanner';
+import { OrientationLockOverlay } from './components/layout/OrientationLockOverlay';
 import { InstallModal } from './components/pwa/InstallModal';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
 import { LobbyTable } from './components/lobby/LobbyTable';
@@ -416,6 +417,9 @@ const MainApp: React.FC = () => {
 
       {/* PWA Install Guide Modal */}
       <InstallModal />
+
+      {/* Mobile Orientation Lock (Locks portrait, blocks landscape) */}
+      <OrientationLockOverlay />
 
       {/* Modals & Drawers - Loaded on-demand only when opened */}
       <Suspense fallback={null}>

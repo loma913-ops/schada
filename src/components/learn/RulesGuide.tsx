@@ -20,7 +20,7 @@ import {
   AlertTriangle,
   Navigation,
 } from 'lucide-react';
-import type { BoardState, Move, Square, Piece, PieceType } from '@/core/schada/types';
+import type { BoardState, Move, Square, Piece, PieceType, MoveVector } from '@/core/schada/types';
 import { createInitialGameState, executeMove, getLegalMovesForSquare } from '@/core/schada/engine';
 import { SCHADA_VECTORS, squareToColRow, colRowToSquare } from '@/core/schada/vectors';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
@@ -72,6 +72,8 @@ const NOTABLE_SQUARES: readonly NotableSquare[] = Object.freeze([
   },
 ]);
 
+const EMPTY_VECTORS: readonly MoveVector[] = Object.freeze([]);
+
 export const RulesGuide: React.FC = () => {
   const { gameMetadata, army, scoring, board } = SCHADA_RULES_CONFIG;
 
@@ -81,15 +83,16 @@ export const RulesGuide: React.FC = () => {
 
   const [vCol, vRow] = squareToColRow(selectedVectorSquare);
   const isVectorSquareLight = (vCol + vRow) % 2 === 1;
-  const activeVectors = SCHADA_VECTORS[selectedVectorSquare] || [];
+  const activeVectors = SCHADA_VECTORS[selectedVectorSquare] ?? EMPTY_VECTORS;
   const notableSquare = NOTABLE_SQUARES.find((n) => n.square === selectedVectorSquare);
 
   // Precomputed destination and waypoint squares for the selected vector square (O(1))
   const { targetSquares, pathSquares } = useMemo(() => {
+    const vectors = SCHADA_VECTORS[selectedVectorSquare] ?? EMPTY_VECTORS;
     const targets = new Set<Square>();
     const paths = new Set<Square>();
     const [c, r] = squareToColRow(selectedVectorSquare);
-    for (const vec of activeVectors) {
+    for (const vec of vectors) {
       const dest = colRowToSquare(c + vec.target[0], r + vec.target[1]);
       if (dest) targets.add(dest);
       for (const [dc, dr] of vec.path) {
@@ -98,7 +101,7 @@ export const RulesGuide: React.FC = () => {
       }
     }
     return { targetSquares: targets, pathSquares: paths };
-  }, [selectedVectorSquare, activeVectors]);
+  }, [selectedVectorSquare]);
 
   // --- State for Leap Simulator ---
   const [selectedPieceType, setSelectedPieceType] = useState<PieceType>('field_officer');
@@ -421,18 +424,17 @@ export const RulesGuide: React.FC = () => {
                       <button
                         key={sq}
                         type="button"
-                        className={`rules-picker-cell ${isLight ? 'light' : 'dark'} ${
-                          isCurrent ? 'active' : isTarget ? 'is-target' : isPath ? 'is-path' : ''
-                        }`}
+                        className={`rules-picker-cell ${isLight ? 'light' : 'dark'} ${isCurrent ? 'active' : isTarget ? 'is-target' : isPath ? 'is-path' : ''
+                          }`}
                         onClick={() => setSelectedVectorSquare(sq)}
                         title={
                           isCurrent
                             ? `Selected origin square ${sq}`
                             : isTarget
-                            ? `Possible move destination from ${selectedVectorSquare}: ${sq}`
-                            : isPath
-                            ? `Intermediate path waypoint for vector from ${selectedVectorSquare}`
-                            : `Inspect square ${sq}`
+                              ? `Possible move destination from ${selectedVectorSquare}: ${sq}`
+                              : isPath
+                                ? `Intermediate path waypoint for vector from ${selectedVectorSquare}`
+                                : `Inspect square ${sq}`
                         }
                       >
                         {sq}
@@ -683,7 +685,7 @@ export const RulesGuide: React.FC = () => {
             <div className="leap-demo-controls">
               <div className="leap-control-group">
                 <span className="leap-control-label">
-                  Moving Piece on a1:
+                  Moving Piece:
                 </span>
                 <div className="leap-btn-group">
                   <button
@@ -712,7 +714,7 @@ export const RulesGuide: React.FC = () => {
 
               <div className="leap-control-group">
                 <span className="leap-control-label">
-                  Obstacle on a2:
+                  Blocking Piece:
                 </span>
                 <div className="leap-btn-group">
                   <button
@@ -720,14 +722,14 @@ export const RulesGuide: React.FC = () => {
                     className={`leap-btn ${obstacleType === 'friendly' ? 'active' : ''}`}
                     onClick={() => setObstacleType('friendly')}
                   >
-                    Friendly Pawn (Blue)
+                    Friendly Piece
                   </button>
                   <button
                     type="button"
                     className={`leap-btn ${obstacleType === 'enemy' ? 'active' : ''}`}
                     onClick={() => setObstacleType('enemy')}
                   >
-                    Enemy Piece (Green)
+                    Enemy Piece
                   </button>
                 </div>
               </div>
