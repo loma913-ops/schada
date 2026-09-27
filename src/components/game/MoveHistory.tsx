@@ -1,23 +1,39 @@
 import React, { useEffect, useRef, useMemo, memo } from 'react';
 import type { Move } from '@/core/schada/types';
-import { ChevronFirst, ChevronLeft, ChevronRight, ChevronLast } from 'lucide-react';
+import { MoveNavigator } from './MoveNavigator';
+import {
+  type MoveNavigatorConfig,
+  CANONICAL_MOVE_NAVIGATOR_CONFIG,
+  validateMoveNavigatorConfig,
+} from './moveNavigatorConfig';
 
-interface MoveHistoryProps {
-  history: Move[];
-  currentMoveIndex?: number;
-  onNavigateMove?: (index: number) => void;
+export interface MoveHistoryProps {
+  readonly history: readonly Move[];
+  readonly currentMoveIndex?: number;
+  readonly onNavigateMove?: (index: number) => void;
+  readonly config?: MoveNavigatorConfig;
+}
+
+interface MoveRowPair {
+  readonly num: number;
+  readonly blue?: Move;
+  readonly green?: Move;
 }
 
 export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory({
   history,
-  currentMoveIndex = history.length - 1,
+  currentMoveIndex = history.length > 0
+    ? history.length - 1
+    : CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex,
   onNavigateMove,
+  config = CANONICAL_MOVE_NAVIGATOR_CONFIG,
 }) {
+  validateMoveNavigatorConfig(config);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Group moves into pairs (Blue, Green) - only recompute when history grows
-  const movePairs: { num: number; blue?: Move; green?: Move }[] = useMemo(() => {
-    const pairs: { num: number; blue?: Move; green?: Move }[] = [];
+  const movePairs: readonly MoveRowPair[] = useMemo(() => {
+    const pairs: MoveRowPair[] = [];
     for (let i = 0; i < history.length; i += 2) {
       pairs.push({
         num: Math.floor(i / 2) + 1,
@@ -28,20 +44,36 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
     return pairs;
   }, [history]);
 
-  // Auto-scroll to bottom on new moves
+  // Auto-scroll list when new moves are appended
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [history.length]);
 
+  // Keep the active move visible in view when stepping through history
+  useEffect(() => {
+    if (listRef.current && currentMoveIndex !== undefined && currentMoveIndex >= 0) {
+      const activeEl = listRef.current.querySelector<HTMLElement>('.move-cell.active');
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [currentMoveIndex]);
+
   return (
     <div className="move-history-container">
-      <div className="move-history-header">Moves Notation</div>
+      <MoveNavigator
+        currentIndex={currentMoveIndex}
+        totalMoves={history.length}
+        onNavigate={onNavigateMove}
+        config={config}
+      />
+      <div className="move-history-header">{config.historyCopy.headerTitle}</div>
       <div className="move-history-list" ref={listRef}>
         {movePairs.length === 0 ? (
           <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            No moves made yet
+            {config.historyCopy.emptyHistoryMessage}
           </div>
         ) : (
           movePairs.map((pair) => (
@@ -67,53 +99,6 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
           ))
         )}
       </div>
-
-      {/* Move Navigation Controls */}
-      {onNavigateMove && history.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            padding: '0.35rem',
-            borderTop: '1px solid var(--border-subtle)',
-            backgroundColor: 'var(--bg-secondary)',
-          }}
-        >
-          <button
-            className="action-btn"
-            style={{ padding: '0.2rem 0.5rem' }}
-            onClick={() => onNavigateMove(-1)}
-            title="Start"
-          >
-            <ChevronFirst size={16} />
-          </button>
-          <button
-            className="action-btn"
-            style={{ padding: '0.2rem 0.5rem' }}
-            onClick={() => onNavigateMove(Math.max(-1, currentMoveIndex - 1))}
-            title="Previous"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            className="action-btn"
-            style={{ padding: '0.2rem 0.5rem' }}
-            onClick={() => onNavigateMove(Math.min(history.length - 1, currentMoveIndex + 1))}
-            title="Next"
-          >
-            <ChevronRight size={16} />
-          </button>
-          <button
-            className="action-btn"
-            style={{ padding: '0.2rem 0.5rem' }}
-            onClick={() => onNavigateMove(history.length - 1)}
-            title="Current"
-          >
-            <ChevronLast size={16} />
-          </button>
-        </div>
-      )}
     </div>
   );
 });

@@ -384,6 +384,61 @@ body {
   overflow: hidden;
 }
 
+/* Move Navigator Bar */
+.move-navigator-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0.35rem 0.5rem;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  user-select: none;
+}
+
+.move-navigator-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  max-width: 4rem;
+  height: 2rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.move-navigator-btn:not(:disabled):hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+[data-theme='light'] .move-navigator-btn:not(:disabled):hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.move-navigator-btn:not(:disabled):active {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme='light'] .move-navigator-btn:not(:disabled):active {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.move-navigator-btn:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+.move-navigator-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 .move-history-header {
   padding: 0.5rem 0.8rem;
   font-size: 0.85rem;

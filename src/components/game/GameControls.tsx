@@ -49,7 +49,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
               style={{ padding: '0.3rem 0.8rem' }}
               onClick={confirmResign}
             >
-              Yes, Resign
+              Resign
             </button>
             <button
               className="action-btn"

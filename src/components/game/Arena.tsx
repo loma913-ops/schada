@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { BoardState, Move, Piece, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
+import { computeCumulativeGameStates } from '@/core/schada/replay';
+import { CANONICAL_MOVE_NAVIGATOR_CONFIG } from './moveNavigatorConfig';
 import { selectBotMove, getBotThinkingDelayMs } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
@@ -70,6 +72,10 @@ export const Arena: React.FC<ArenaProps> = ({
   onExit,
 }) => {
   const [gameState, setGameState] = useState<BoardState>(syncedGameState || initialState);
+  const [viewMoveIndex, setViewMoveIndex] = useState<number>(() => {
+    const historyLen = (syncedGameState || initialState).moveHistory.length;
+    return historyLen > 0 ? historyLen - 1 : CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex;
+  });
   const [isBotThinking, setIsBotThinking] = useState(false);
 
   const [orientation, setOrientation] = useState<'blue' | 'green'>(() => {
@@ -108,6 +114,51 @@ export const Arena: React.FC<ArenaProps> = ({
       setGameState(syncedGameState);
     }
   }, [syncedGameState]);
+
+  const prevHistoryLenRef = useRef<number>(gameState.moveHistory.length);
+  useEffect(() => {
+    const currentLen = gameState.moveHistory.length;
+    const prevLen = prevHistoryLenRef.current;
+    if (currentLen > prevLen) {
+      setViewMoveIndex((prev) => (prev === prevLen - 1 ? currentLen - 1 : prev));
+    } else if (currentLen < prevLen) {
+      setViewMoveIndex(
+        currentLen > 0 ? currentLen - 1 : CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex
+      );
+    }
+    prevHistoryLenRef.current = currentLen;
+  }, [gameState.moveHistory.length]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const { keyboardShortcuts, startMoveIndex } = CANONICAL_MOVE_NAVIGATOR_CONFIG;
+
+      if (keyboardShortcuts.previous.includes(e.key)) {
+        e.preventDefault();
+        setViewMoveIndex((prev) => Math.max(startMoveIndex, prev - 1));
+      } else if (keyboardShortcuts.next.includes(e.key)) {
+        e.preventDefault();
+        setViewMoveIndex((prev) => Math.min(gameState.moveHistory.length - 1, prev + 1));
+      } else if (keyboardShortcuts.start.includes(e.key)) {
+        e.preventDefault();
+        setViewMoveIndex(startMoveIndex);
+      } else if (keyboardShortcuts.end.includes(e.key)) {
+        e.preventDefault();
+        setViewMoveIndex(gameState.moveHistory.length - 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState.moveHistory.length]);
 
   const computerColor: PieceColor | undefined =
     isComputer && userColor ? (userColor === 'blue' ? 'green' : 'blue') : undefined;
@@ -279,7 +330,26 @@ export const Arena: React.FC<ArenaProps> = ({
     setOrientation((prev) => (prev === 'blue' ? 'green' : 'blue'));
   };
 
-  const lastMove = gameState.moveHistory[gameState.moveHistory.length - 1] || null;
+  // Algorithmic Complexity:
+  // - Cumulative states computed once per move addition: O(N) linear time with game move count.
+  // - Random-access history scrubbing for UI renders: O(1) constant time array lookup.
+  const cumulativeGameStates = useMemo(() => {
+    return computeCumulativeGameStates(gameState.moveHistory, gameState);
+  }, [gameState]);
+
+  const isViewingHistory =
+    gameState.moveHistory.length > 0 && viewMoveIndex < gameState.moveHistory.length - 1;
+
+  const displayedGameState = useMemo(() => {
+    if (!isViewingHistory) return gameState;
+    const stateOffset = viewMoveIndex - CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex;
+    return cumulativeGameStates[stateOffset] ?? gameState;
+  }, [isViewingHistory, gameState, viewMoveIndex, cumulativeGameStates]);
+
+  const displayedLastMove = useMemo(() => {
+    if (viewMoveIndex < 0) return null;
+    return gameState.moveHistory[viewMoveIndex] || null;
+  }, [gameState.moveHistory, viewMoveIndex]);
 
   const topColor: PieceColor = orientation === 'blue' ? 'green' : 'blue';
   const bottomColor: PieceColor = orientation === 'blue' ? 'blue' : 'green';
@@ -290,8 +360,8 @@ export const Arena: React.FC<ArenaProps> = ({
   const topTime = topColor === 'blue' ? blueTime : greenTime;
   const bottomTime = bottomColor === 'blue' ? blueTime : greenTime;
 
-  const topCaptured = gameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue'];
-  const bottomCaptured = gameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue'];
+  const topCaptured = displayedGameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue'];
+  const bottomCaptured = displayedGameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue'];
 
   const materialScores = useMemo(() => {
     const topScore = getMaterialValue(topCaptured);
@@ -311,23 +381,24 @@ export const Arena: React.FC<ArenaProps> = ({
           username={topPlayer.username}
           elo={topPlayer.elo}
           color={topColor}
-          isTurn={gameState.currentTurn === topColor && !gameState.isGameOver}
+          isTurn={displayedGameState.currentTurn === topColor && !gameState.isGameOver}
           remainingMs={topTime}
           capturedPieces={topCaptured}
           materialAdvantage={materialScores.topAdvantage > 0 ? materialScores.topAdvantage : undefined}
           isUser={userColor === topColor}
-          isThinking={isBotThinking && gameState.currentTurn === topColor}
+          isThinking={isBotThinking && displayedGameState.currentTurn === topColor}
         />
 
         {/* Board Component */}
         <SchadaBoard
-          board={gameState.board}
-          currentTurn={gameState.currentTurn}
+          board={displayedGameState.board}
+          currentTurn={displayedGameState.currentTurn}
           playerColor={userColor}
           orientation={orientation}
-          lastMove={lastMove}
+          lastMove={displayedLastMove}
           onMakeMove={handleMakeMove}
           disabled={
+            isViewingHistory ||
             gameState.isGameOver ||
             isSpectator ||
             (isComputer && gameState.currentTurn === computerColor) ||
@@ -340,12 +411,12 @@ export const Arena: React.FC<ArenaProps> = ({
           username={bottomPlayer.username}
           elo={bottomPlayer.elo}
           color={bottomColor}
-          isTurn={gameState.currentTurn === bottomColor && !gameState.isGameOver}
+          isTurn={displayedGameState.currentTurn === bottomColor && !gameState.isGameOver}
           remainingMs={bottomTime}
           capturedPieces={bottomCaptured}
           materialAdvantage={materialScores.bottomAdvantage > 0 ? materialScores.bottomAdvantage : undefined}
           isUser={userColor === bottomColor}
-          isThinking={isBotThinking && gameState.currentTurn === bottomColor}
+          isThinking={isBotThinking && displayedGameState.currentTurn === bottomColor}
         />
 
         {/* Mobile In-Game Action Bar */}
@@ -407,12 +478,16 @@ export const Arena: React.FC<ArenaProps> = ({
             </span>
           </div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Turn: <strong style={{ color: gameState.currentTurn === 'blue' ? 'var(--piece-blue)' : 'var(--piece-green)' }}>{gameState.currentTurn.toUpperCase()}</strong>
+            Turn: <strong style={{ color: displayedGameState.currentTurn === 'blue' ? 'var(--piece-blue)' : 'var(--piece-green)' }}>{displayedGameState.currentTurn.toUpperCase()}</strong>
           </div>
         </div>
 
         {/* Move History Table */}
-        <MoveHistory history={gameState.moveHistory} />
+        <MoveHistory
+          history={gameState.moveHistory}
+          currentMoveIndex={viewMoveIndex}
+          onNavigateMove={setViewMoveIndex}
+        />
 
         {/* Action Controls */}
         <GameControls
@@ -441,7 +516,11 @@ export const Arena: React.FC<ArenaProps> = ({
               </button>
             </div>
             <div className="mobile-sheet-body">
-              <MoveHistory history={gameState.moveHistory} />
+              <MoveHistory
+                history={gameState.moveHistory}
+                currentMoveIndex={viewMoveIndex}
+                onNavigateMove={setViewMoveIndex}
+              />
             </div>
           </div>
         </div>
