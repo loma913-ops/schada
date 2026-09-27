@@ -349,46 +349,48 @@ export const Arena: React.FC<ArenaProps> = ({
 
         {/* Mobile In-Game Action Bar */}
         <div className="mobile-arena-actions">
-          <button
-            className="mobile-action-btn"
-            onClick={handleFlipBoard}
-            title="Flip Board"
-            aria-label="Flip Board"
-          >
-            <RotateCcw size={17} />
-            <span>Flip</span>
-          </button>
+          <div className="mobile-arena-actions-row">
+            <button
+              className="mobile-action-btn"
+              onClick={handleFlipBoard}
+              title="Flip Board"
+              aria-label="Flip Board"
+            >
+              <RotateCcw size={17} />
+              <span>Flip</span>
+            </button>
+
+            {!isSpectator && !gameState.isGameOver && (
+              <button
+                className="mobile-action-btn danger"
+                onClick={handleResign}
+                title="Resign"
+                aria-label="Resign"
+              >
+                <Flag size={17} />
+                <span>Resign</span>
+              </button>
+            )}
+
+            <button
+              className="mobile-action-btn"
+              onClick={onExit}
+              title="Exit to Lobby"
+              aria-label="Exit"
+            >
+              <ArrowLeft size={17} />
+              <span>Exit</span>
+            </button>
+          </div>
 
           <button
-            className={`mobile-action-btn ${mobileHistoryOpen ? 'active' : ''}`}
+            className={`mobile-action-btn mobile-action-btn-moves ${mobileHistoryOpen ? 'active' : ''}`}
             onClick={() => setMobileHistoryOpen(true)}
             title="Move Notation"
             aria-label="Move Notation"
           >
             <ListOrdered size={17} />
             <span>Moves ({gameState.moveHistory.length})</span>
-          </button>
-
-          {!isSpectator && !gameState.isGameOver && (
-            <button
-              className="mobile-action-btn danger"
-              onClick={handleResign}
-              title="Resign"
-              aria-label="Resign"
-            >
-              <Flag size={17} />
-              <span>Resign</span>
-            </button>
-          )}
-
-          <button
-            className="mobile-action-btn"
-            onClick={onExit}
-            title="Exit to Lobby"
-            aria-label="Exit"
-          >
-            <ArrowLeft size={17} />
-            <span>Exit</span>
           </button>
         </div>
       </div>

@@ -1714,10 +1714,18 @@ body {
   display: none;
   width: min(calc(100vw - 24px), min(calc(100dvh - 210px), 520px));
   max-width: 100%;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  box-sizing: border-box;
+}
+
+.mobile-arena-actions-row {
+  display: flex;
+  width: 100%;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.25rem;
   box-sizing: border-box;
 }
 
@@ -1776,6 +1784,11 @@ body {
 .mobile-action-btn.danger:hover {
   background-color: rgba(204, 51, 51, 0.12);
   border-color: var(--accent-red);
+}
+
+.mobile-action-btn-moves {
+  width: 100%;
+  flex: none;
 }
 
 .mobile-sheet-backdrop {
