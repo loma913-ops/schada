@@ -30,6 +30,7 @@ const CustomGameModal = lazy(() => import('./components/lobby/CustomGameModal').
 
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
+import { ELO_CONFIG } from './core/elo/eloConfig';
 import { mockBackend, type UserProfile } from './services/firebase/mockProvider';
 import {
   createGame,
@@ -229,8 +230,8 @@ const MainApp: React.FC = () => {
     setFriendsOpen(false);
 
     setActiveMatch({
-      bluePlayer: { id: user.id, username: user.username, elo: user.eloRating },
-      greenPlayer: { id: friend.id, username: friend.username, elo: friend.eloRating },
+      bluePlayer: { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed || 0 },
+      greenPlayer: { id: friend.id, username: friend.username, elo: friend.eloRating, gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed },
       timeControlMinutes: 5,
       incrementSeconds: 0,
       isRanked: true,
@@ -281,7 +282,7 @@ const MainApp: React.FC = () => {
     // Calculate Elo update
     const eloResult = calculateEloUpdate(
       { rating: activeMatch.bluePlayer.elo, gamesPlayed: user?.gamesPlayed || 0 },
-      { rating: activeMatch.greenPlayer.elo, gamesPlayed: 20 },
+      { rating: activeMatch.greenPlayer.elo, gamesPlayed: activeMatch.greenPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed },
       outcome
     );
 

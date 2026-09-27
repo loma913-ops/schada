@@ -23,6 +23,7 @@ export interface ArenaPlayer {
   id: string;
   username: string;
   elo: number;
+  gamesPlayed?: number;
 }
 
 interface ArenaProps {
@@ -451,6 +452,9 @@ export const Arena: React.FC<ArenaProps> = ({
         <GameOverModal
           result={gameState.result}
           userColor={userColor}
+          isRanked={isRanked}
+          bluePlayer={bluePlayer}
+          greenPlayer={greenPlayer}
           onHome={onExit}
         />
       )}

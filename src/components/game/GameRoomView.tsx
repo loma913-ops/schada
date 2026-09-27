@@ -18,6 +18,7 @@ import { Arena, type ArenaPlayer } from './Arena';
 import type { Move, PieceColor } from '@/core/schada/types';
 import { Copy, Check, Share2, ArrowLeft, Loader2, UserCheck, Eye, Cpu } from 'lucide-react';
 import { calculateEloUpdate } from '@/core/elo/eloService';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { mockBackend } from '@/services/firebase/mockProvider';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
@@ -206,8 +207,14 @@ export const GameRoomView: React.FC = () => {
     eloUpdatedRef.current = true;
 
     const eloResult = calculateEloUpdate(
-      { rating: game.bluePlayer.elo, gamesPlayed: user.gamesPlayed || 0 },
-      { rating: game.greenPlayer.elo, gamesPlayed: 20 },
+      {
+        rating: game.bluePlayer.elo,
+        gamesPlayed: game.bluePlayer.id === user.id ? (user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed) : ELO_CONFIG.defaultAssumedGamesPlayed,
+      },
+      {
+        rating: game.greenPlayer.elo,
+        gamesPlayed: game.greenPlayer.id === user.id ? (user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed) : ELO_CONFIG.defaultAssumedGamesPlayed,
+      },
       outcome
     );
 
@@ -301,11 +308,21 @@ export const GameRoomView: React.FC = () => {
       : game.greenTimeMs;
 
   const bluePlayer: ArenaPlayer = game.bluePlayer
-    ? { id: game.bluePlayer.id, username: game.bluePlayer.username, elo: game.bluePlayer.elo }
+    ? {
+        id: game.bluePlayer.id,
+        username: game.bluePlayer.username,
+        elo: game.bluePlayer.elo,
+        gamesPlayed: game.bluePlayer.id === user?.id ? (user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed) : ELO_CONFIG.defaultAssumedGamesPlayed,
+      }
     : { id: 'blue', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
 
   const greenPlayer: ArenaPlayer = game.greenPlayer
-    ? { id: game.greenPlayer.id, username: game.greenPlayer.username, elo: game.greenPlayer.elo }
+    ? {
+        id: game.greenPlayer.id,
+        username: game.greenPlayer.username,
+        elo: game.greenPlayer.elo,
+        gamesPlayed: game.greenPlayer.id === user?.id ? (user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed) : ELO_CONFIG.defaultAssumedGamesPlayed,
+      }
     : { id: 'green', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
 
   return (

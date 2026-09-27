@@ -1,27 +1,98 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import type { GameResult, PieceColor } from '@/core/schada/types';
 import confetti from 'canvas-confetti';
 import { soundService } from '@/services/audio/soundService';
 import { haptics } from '@/services/device/haptics';
 import { Trophy, Award, RefreshCw, Home } from 'lucide-react';
+import { calculateEloUpdate } from '@/core/elo/eloService';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
+import {
+  GAME_OVER_MODAL_CONFIG,
+  validateGameOverModalConfig,
+  type GameOverModalConfig,
+} from './gameOverConfig';
 
-interface GameOverModalProps {
-  result: GameResult;
-  userColor?: PieceColor;
-  eloDelta?: number;
-  onRematch?: () => void;
-  onHome: () => void;
+export interface GameOverPlayerInfo {
+  readonly elo: number;
+  readonly gamesPlayed?: number;
 }
 
+export interface PlayerEloUpdate {
+  readonly newElo: number;
+  readonly delta: number;
+}
+
+export interface GameOverModalProps {
+  readonly result: GameResult;
+  readonly userColor?: PieceColor;
+  readonly isRanked?: boolean;
+  readonly bluePlayer?: GameOverPlayerInfo;
+  readonly greenPlayer?: GameOverPlayerInfo;
+  readonly blueElo?: PlayerEloUpdate;
+  readonly greenElo?: PlayerEloUpdate;
+  readonly eloDelta?: number;
+  readonly config?: GameOverModalConfig;
+  readonly onRematch?: () => void;
+  readonly onHome: () => void;
+}
+
+/**
+ * Game Over Modal Component.
+ *
+ * Displays match outcome, win reason, and scoring breakdown.
+ * For rated matches, calculates and displays both players' updated Elo ratings
+ * and delta changes formatted as ELO (GAIN/LOSS) directly underneath their respective colors.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time, rendering static elements and running O(1) Elo calculation.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant time and space complexity.
+ */
 export const GameOverModal: React.FC<GameOverModalProps> = ({
   result,
   userColor,
+  isRanked = false,
+  bluePlayer,
+  greenPlayer,
+  blueElo,
+  greenElo,
   eloDelta,
+  config = GAME_OVER_MODAL_CONFIG,
   onRematch,
   onHome,
 }) => {
+  validateGameOverModalConfig(config);
+
   const isWinner = userColor && result.winner === userColor;
   const isDraw = result.winner === 'draw';
+
+  const eloInfo = useMemo(() => {
+    if (!isRanked) return null;
+    if (blueElo && greenElo) {
+      return { blue: blueElo, green: greenElo };
+    }
+    if (bluePlayer && greenPlayer && result.winner) {
+      const outcome = result.winner;
+      const calculation = calculateEloUpdate(
+        {
+          rating: bluePlayer.elo,
+          gamesPlayed: bluePlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        },
+        {
+          rating: greenPlayer.elo,
+          gamesPlayed: greenPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        },
+        outcome
+      );
+      return {
+        blue: { newElo: calculation.newBlueRating, delta: calculation.blueDelta },
+        green: { newElo: calculation.newGreenRating, delta: calculation.greenDelta },
+      };
+    }
+    return null;
+  }, [isRanked, blueElo, greenElo, bluePlayer, greenPlayer, result.winner]);
 
   useEffect(() => {
     haptics.gameOver();
@@ -35,26 +106,25 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     }
   }, [isWinner]);
 
-  const getReasonText = () => {
-    switch (result.winReason) {
-      case 'goal_reached':
-        return 'All remaining high pieces reached the goal line';
-      case 'timeout':
-        return 'Victory on time';
-      case 'resignation':
-        return 'Opponent resigned';
-      case 'repetition':
-        return 'Draw by 3-fold repetition';
-      case 'blocked':
-        return 'Game ended: High pieces blocked by opponent';
-      case 'mutual_shuffle':
-        return 'Game ended: Mutual consecutive shuffling';
-      case 'agreement':
-        return 'Draw agreed';
-      default:
-        return 'Game completed';
+  const getReasonText = (): string => {
+    if (result.winReason && config.copy.winReasons[result.winReason]) {
+      return config.copy.winReasons[result.winReason];
     }
+    return config.copy.defaultGameCompletedText;
   };
+
+  const modalTitle = isWinner
+    ? config.copy.victoryTitle
+    : isDraw
+      ? config.copy.drawTitle
+      : result.winner
+        ? `${result.winner.toUpperCase()} Won`
+        : config.copy.defaultGameOverTitle;
+
+  const gridColumns =
+    isRanked && eloInfo
+      ? config.layout.gridColumnsRanked
+      : config.layout.gridColumnsUnranked;
 
   return (
     <div className="modal-overlay">
@@ -70,7 +140,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         </div>
 
         <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>
-          {isWinner ? 'Victory!' : isDraw ? 'Draw Game' : result.winner ? `${result.winner.toUpperCase()} Won` : 'Game Over'}
+          {modalTitle}
         </h2>
 
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '1.25rem' }}>
@@ -90,21 +160,79 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr 1fr',
+              gridTemplateColumns: gridColumns,
               fontWeight: 700,
               paddingBottom: '0.4rem',
               borderBottom: '1px solid var(--border-subtle)',
+              alignItems: 'center',
             }}
           >
             <span>Category</span>
-            <span style={{ color: 'var(--piece-blue)' }}>Blue</span>
-            <span style={{ color: 'var(--piece-green)' }}>Green</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ color: 'var(--piece-blue)' }}>Blue</span>
+              {isRanked && eloInfo && (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    marginTop: '0.15rem',
+                  }}
+                >
+                  <span style={{ color: 'var(--text-primary)' }}>{eloInfo.blue.newElo}</span>{' '}
+                  <span
+                    style={{
+                      color:
+                        eloInfo.blue.delta > 0
+                          ? 'var(--accent-green)'
+                          : eloInfo.blue.delta < 0
+                            ? 'var(--accent-red)'
+                            : 'var(--text-muted)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ({eloInfo.blue.delta >= 0 ? `+${eloInfo.blue.delta}` : eloInfo.blue.delta})
+                  </span>
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ color: 'var(--piece-green)' }}>Green</span>
+              {isRanked && eloInfo && (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    marginTop: '0.15rem',
+                  }}
+                >
+                  <span style={{ color: 'var(--text-primary)' }}>{eloInfo.green.newElo}</span>{' '}
+                  <span
+                    style={{
+                      color:
+                        eloInfo.green.delta > 0
+                          ? 'var(--accent-green)'
+                          : eloInfo.green.delta < 0
+                            ? 'var(--accent-red)'
+                            : 'var(--text-muted)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ({eloInfo.green.delta >= 0 ? `+${eloInfo.green.delta}` : eloInfo.green.delta})
+                  </span>
+                </span>
+              )}
+            </div>
           </div>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr 1fr',
+              gridTemplateColumns: gridColumns,
               padding: '0.3rem 0',
+              alignItems: 'center',
             }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>Goal Line Points</span>
@@ -114,8 +242,9 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr 1fr',
+              gridTemplateColumns: gridColumns,
               padding: '0.3rem 0',
+              alignItems: 'center',
             }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>Outside High Pieces</span>
@@ -125,8 +254,9 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr 1fr',
+              gridTemplateColumns: gridColumns,
               padding: '0.3rem 0',
+              alignItems: 'center',
             }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>Rank Distance</span>
@@ -135,11 +265,11 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           </div>
         </div>
 
-        {/* Elo Delta Badge */}
-        {eloDelta !== undefined && (
+        {/* Elo Delta Badge (fallback when eloInfo is not available) */}
+        {!eloInfo && eloDelta !== undefined && (
           <div style={{ marginBottom: '1.5rem', fontFamily: 'var(--font-mono)' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
-              Rating change:
+              {config.copy.ratingChangeLabel}
             </span>
             <span
               style={{
@@ -155,9 +285,13 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           {onRematch && (
-            <button className="btn-primary" onClick={onRematch} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+            <button
+              className="btn-primary"
+              onClick={onRematch}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+            >
               <RefreshCw size={16} />
-              <span>Rematch</span>
+              <span>{config.copy.rematchButtonText}</span>
             </button>
           )}
           <button
@@ -166,7 +300,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             onClick={onHome}
           >
             <Home size={16} />
-            <span>Lobby</span>
+            <span>{config.copy.lobbyButtonText}</span>
           </button>
         </div>
       </div>
