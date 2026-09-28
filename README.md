@@ -402,8 +402,9 @@ Set the graphify API key as a persistent user environment variable (do **not** p
 ### Build the graph
 
 ```powershell
-# From the repo root:
-$env:GEMINI_API_KEY = API_KEY graphify .
+# From the repo root (set key for the session first):
+$env:GEMINI_API_KEY = "<your-graphify-key>"
+graphify .
 ```
 
 This produces `graphify-out/` containing:
@@ -421,11 +422,26 @@ This produces `graphify-out/` containing:
 graphify query "how does the Firebase mock switching work?"
 
 # Trace the shortest path between two concepts:
-graphify path "mockBackend" "isFirebaseConfigured"
+graphify path "localBackend" "isFirebaseConfigured"
 
 # Explain a specific node:
 graphify explain "isFirebaseConfigured"
 
 # Incremental update after code changes (only re-extracts changed files):
-graphify . --update
+graphify .
 ```
+
+### Refresh the report after an update
+
+`graphify .` updates `graph.json` and `graph.html` but **does not automatically regenerate `GRAPH_REPORT.md`**.
+Run this after any update to keep the report in sync:
+
+```powershell
+graphify cluster-only .
+```
+
+### Key findings (last run)
+
+- **`isFirebaseConfigured()`** is the offline-mode gate — called by every Firebase service before any network I/O, enabling full offline/guest play with no config.
+- **`localBackend`** is the offline auth and stat provider; it bridges the Firebase, Auth, and App Routing communities.
+- The graph covers **668 nodes and 1,564 edges** across **49 communities** extracted from 122 source files.
