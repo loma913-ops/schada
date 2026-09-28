@@ -58,4 +58,30 @@ describe('GAME_OVER_MODAL_CONFIG validation and configuration', () => {
       'GameOverModalConfigError: Invalid copy.winReasons.resignation: expected non-empty string.'
     );
   });
+
+  it('throws GameOverModalConfigError if reviewButtonText is missing or empty', () => {
+    const invalidConfig: GameOverModalConfig = {
+      ...GAME_OVER_MODAL_CONFIG,
+      copy: {
+        ...GAME_OVER_MODAL_CONFIG.copy,
+        reviewButtonText: '   ',
+      },
+    };
+    expect(() => validateGameOverModalConfig(invalidConfig)).toThrowError(
+      'GameOverModalConfigError: Invalid copy.reviewButtonText: expected non-empty string.'
+    );
+  });
+
+  it('throws GameOverModalConfigError if closeButtonAriaLabel is missing or empty', () => {
+    const invalidConfig: GameOverModalConfig = {
+      ...GAME_OVER_MODAL_CONFIG,
+      copy: {
+        ...GAME_OVER_MODAL_CONFIG.copy,
+        closeButtonAriaLabel: '',
+      },
+    };
+    expect(() => validateGameOverModalConfig(invalidConfig)).toThrowError(
+      'GameOverModalConfigError: Invalid copy.closeButtonAriaLabel: expected non-empty string.'
+    );
+  });
 });

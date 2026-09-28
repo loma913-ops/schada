@@ -6,7 +6,7 @@ import { CANONICAL_MOVE_NAVIGATOR_CONFIG } from './moveNavigatorConfig';
 import { getBotThinkingDelayMs, getBotTier, botWorkerClient, BOT_ENGINE_CONFIG } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
-import { RotateCcw, Flag, ListOrdered, X, ArrowLeft } from 'lucide-react';
+import { RotateCcw, Flag, ListOrdered, X, ArrowLeft, Trophy } from 'lucide-react';
 import { SchadaBoard } from '../board/SchadaBoard';
 import { PlayerCard } from './PlayerCard';
 import { MoveHistory } from './MoveHistory';
@@ -93,6 +93,17 @@ export const Arena: React.FC<ArenaProps> = ({
     }
   }, [userColor, isSpectator, gameState.currentTurn]);
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+  const [showGameOverModal, setShowGameOverModal] = useState(true);
+  const [gameOverEffectsPlayed, setGameOverEffectsPlayed] = useState(false);
+
+  const prevIsGameOverRef = useRef(gameState.isGameOver);
+  useEffect(() => {
+    if (!prevIsGameOverRef.current && gameState.isGameOver) {
+      setShowGameOverModal(true);
+      setGameOverEffectsPlayed(false);
+    }
+    prevIsGameOverRef.current = gameState.isGameOver;
+  }, [gameState.isGameOver]);
 
   const gameStateRef = useRef<BoardState>(gameState);
   gameStateRef.current = gameState;
@@ -459,6 +470,18 @@ export const Arena: React.FC<ArenaProps> = ({
               </button>
             )}
 
+            {gameState.isGameOver && (
+              <button
+                className="mobile-action-btn"
+                onClick={() => setShowGameOverModal(true)}
+                title="View Match Results"
+                aria-label="Results"
+              >
+                <Trophy size={17} />
+                <span>Results</span>
+              </button>
+            )}
+
             <button
               className="mobile-action-btn"
               onClick={onExit}
@@ -493,7 +516,11 @@ export const Arena: React.FC<ArenaProps> = ({
             </span>
           </div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Turn: <strong style={{ color: displayedGameState.currentTurn === 'blue' ? 'var(--piece-blue)' : 'var(--piece-green)' }}>{displayedGameState.currentTurn.toUpperCase()}</strong>
+            {gameState.isGameOver ? (
+              <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>GAME OVER</span>
+            ) : (
+              <>Turn: <strong style={{ color: displayedGameState.currentTurn === 'blue' ? 'var(--piece-blue)' : 'var(--piece-green)' }}>{displayedGameState.currentTurn.toUpperCase()}</strong></>
+            )}
           </div>
         </div>
 
@@ -509,6 +536,9 @@ export const Arena: React.FC<ArenaProps> = ({
           onResign={handleResign}
           onFlipBoard={handleFlipBoard}
           disabled={gameState.isGameOver || isSpectator}
+          isGameOver={gameState.isGameOver}
+          onShowResult={() => setShowGameOverModal(true)}
+          onExit={onExit}
         />
       </div>
 
@@ -542,14 +572,20 @@ export const Arena: React.FC<ArenaProps> = ({
       )}
 
       {/* Game Over Modal */}
-      {gameState.isGameOver && gameState.result && (
+      {gameState.isGameOver && gameState.result && showGameOverModal && (
         <GameOverModal
           result={gameState.result}
           userColor={userColor}
           isRanked={isRanked}
           bluePlayer={bluePlayer}
           greenPlayer={greenPlayer}
+          triggerEffects={!gameOverEffectsPlayed}
+          onEffectsPlayed={() => setGameOverEffectsPlayed(true)}
           onHome={onExit}
+          onClose={() => {
+            setShowGameOverModal(false);
+            setGameOverEffectsPlayed(true);
+          }}
         />
       )}
     </div>

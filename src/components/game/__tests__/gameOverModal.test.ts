@@ -172,6 +172,37 @@ describe('GameOverModal - Rated Games Elo Display', () => {
       expect(html).toContain('var(--font-mono)');
     });
 
+    it('renders close button and Review button when onClose is provided', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          result: mockResult,
+          onHome: vi.fn(),
+          onClose: vi.fn(),
+        })
+      );
+
+      expect(html).toContain('modal-close-btn');
+      expect(html).toContain('aria-label="Close game over modal"');
+      expect(html).toContain('Review');
+      expect(html).toContain('role="dialog"');
+      expect(html).toContain('aria-modal="true"');
+      expect(html).toContain('id="game-over-title"');
+    });
+
+    it('does not render close button or Review button when onClose is omitted', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          result: mockResult,
+          onHome: vi.fn(),
+        })
+      );
+
+      expect(html).not.toContain('modal-close-btn');
+      expect(html).not.toContain('aria-label="Close game over modal"');
+      expect(html).not.toContain('Review');
+      expect(html).toContain('Lobby');
+    });
+
     it('throws GameOverModalConfigError if invalid config is provided', () => {
       expect(() => {
         renderToStaticMarkup(

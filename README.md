@@ -43,7 +43,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 
 - **8-Tier AI Bot Engine**: Play against computer opponents ranging from **Novice (100 Elo)** to **Master (2400 Elo)**. The engine features Alpha-Beta minimax with iterative deepening, Zobrist transposition tables, quiescence search, move ordering heuristics, distance-to-goal tables, and opening books—all offloaded to background **Web Workers** for 60fps UI responsiveness.
 - **Move History Navigator & Replay Controls**: Interactive move stepping (`|<<`, `<`, `>`, `>>|`) and keyboard shortcuts (`ArrowLeft`, `ArrowRight`, `Home`, `End`) allowing players to review any board position during or after a match without disrupting live game state.
-- **Dynamic Post-Game Elo Summary**: Detailed game-over modal presenting rating point changes (+/- deltas), updated ratings, provisional badges, and game resolution reasons for rated matches.
+- **Dynamic Post-Game Elo Summary & Match Review**: Detailed game-over modal presenting rating point changes (+/- deltas), updated ratings, provisional badges, and game resolution reasons. The modal can be closed via a dedicated 'Review' button, close button (`X`), backdrop click, or `Escape` key so players can freely review the board and move notation, with controls to reopen match results or return to the lobby.
 - **Competitive Integrity & Guest Mode**: Guest accounts can create and join casual rooms freely, while rated matchmaking and leaderboard ranking are reserved for authenticated accounts to prevent ladder inflation.
 - **Lichess-Inspired Minimalist UX**: Two-column responsive arena, digital countdown clocks with low-time warnings, algebraic move notation, and complete dark/light theme support.
 - **Mobile Portrait Orientation Lock**: Automatic orientation detection and an interactive lock overlay ensuring an optimal vertical board aspect ratio without coordinate clipping on mobile devices.
@@ -98,6 +98,7 @@ Schada includes a non-destructive move navigation engine (`src/core/schada/repla
   - `Home`: Jump to starting position.
   - `End`: Jump to live position.
 - **Non-Destructive Inspection**: Navigating historical plies allows full inspection of captured pieces, board coordinates, and move annotations. Once a player is ready to make a move, navigating back to live mode immediately re-enables interactive piece movement.
+- **Post-Game Game Review**: Following match completion, the Game Over modal can be closed via the 'Review' action, 'X' button, backdrop click, or `Escape` key, permitting full board inspection, move navigation, and board flipping. Players can reopen match results at any time via the 'Results' button or exit to the lobby via 'Lobby'.
 
 ---
 
