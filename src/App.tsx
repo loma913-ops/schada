@@ -36,7 +36,6 @@ import {
   createGame,
   joinGame,
   findOpenWaitingGame,
-  startAbandonedGamesCleanupWatcher,
 } from './services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
 import { getBotTier } from './core/bot/botTiers';
@@ -83,7 +82,7 @@ const MainApp: React.FC = () => {
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
 
   // Check if routed with request to open Computer Modal
-  React.useEffect(() => {
+  useEffect(() => {
     const state = location.state as ComputerModalNavState | null;
     if (state && state.openComputerModal) {
       setComputerModalSettings({
@@ -96,11 +95,8 @@ const MainApp: React.FC = () => {
     }
   }, [location.state, navigate, location.pathname]);
 
-  // Periodic background cleanup of abandoned / timed-out games
-  useEffect(() => {
-    const stopWatcher = startAbandonedGamesCleanupWatcher();
-    return () => stopWatcher();
-  }, []);
+  // Note: Stale/abandoned room cleanup is handled passively on-demand or via backend TTL policies,
+  // preventing tens of thousands of redundant client sweep queries across active browser tabs.
 
   // Start a Quick Pair game (Player vs Player) - checks lobby for open game or creates new open room
   const handleStartQuickPair = async (minutes: number, increment: number, isRanked: boolean) => {

@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { mockBackend } from './mockProvider';
+import { MOCK_CONFIG } from './mockConfig';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { isGameTimedOut, type GameRoom } from './gameService';
 
@@ -32,11 +33,11 @@ export interface SessionHeartbeat {
   context?: 'online' | 'in-game';
 }
 
-export const SESSION_STORAGE_ID_KEY = 'schada_client_session_id';
-export const ACTIVE_SESSIONS_STORAGE_KEY = 'schada_active_sessions_v2';
-export const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
-export const AUTH_CACHED_UID_KEY = 'schada_auth_cached_uid';
-export const CACHED_LOBBY_STATS_STORAGE_KEY = 'schada_cached_lobby_stats';
+export const SESSION_STORAGE_ID_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.sessionStorageId;
+export const ACTIVE_SESSIONS_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.activeSessions;
+export const MOCK_GAMES_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.mockGames;
+export const AUTH_CACHED_UID_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedUid;
+export const CACHED_LOBBY_STATS_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.cachedLobbyStats;
 
 // Timing constants from validated centralized configuration
 export const IDLE_TIMEOUT_MS = MULTIPLAYER_SCALE_CONFIG.presence.idleTimeoutMs;
@@ -80,7 +81,7 @@ export function isCurrentClientRegistered(): { isRegistered: boolean; userId: st
       return { isRegistered: true, userId: cachedUid };
     }
   }
-  const uid = typeof localStorage !== 'undefined' ? localStorage.getItem('schada_mock_current_user_id') : null;
+  const uid = typeof localStorage !== 'undefined' ? localStorage.getItem(MOCK_CONFIG.storageKeys.currentUserId) : null;
   if (uid) {
     return { isRegistered: true, userId: uid };
   }
@@ -135,16 +136,12 @@ export function checkIsUserActiveAcrossTabs(userId: string): boolean {
 }
 
 /**
- * Updates the user's status in mockBackend and Firestore.
+ * Dispatches an asynchronous status and lastSeen update to Firestore for authenticated users.
  */
-function updateUserStatusSync(userId: string, status: 'online' | 'in-game' | 'offline') {
-  // Update mock store
-  mockBackend.setUserStatus(userId, status);
-
-  // Update live Firebase if configured
+function writeFirestoreUserStatus(userId: string, status: 'online' | 'in-game' | 'offline'): void {
   if (isFirebaseConfigured() && db && auth?.currentUser?.uid === userId) {
     try {
-      updateDoc(doc(db, 'users', userId), {
+      updateDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId), {
         status,
         lastSeen: serverTimestamp(),
       }).catch((e) => {
@@ -157,14 +154,24 @@ function updateUserStatusSync(userId: string, status: 'online' | 'in-game' | 'of
 }
 
 /**
- * Records user activity (mouse, key, touch, click, scroll).
- * If previously idle or hidden, wakes up immediately.
+ * Synchronously sets user status in local mockBackend and writes to Firestore.
  */
+function updateUserStatusSync(userId: string, status: 'online' | 'in-game' | 'offline'): void {
+  mockBackend.setUserStatus(userId, status);
+  writeFirestoreUserStatus(userId, status);
+}
+// In-memory tab activity and remote sync state
+let lastRemoteHeartbeatTime = 0;
+let lastKnownRemoteStatus: 'online' | 'in-game' | 'offline' | null = null;
+let lastKnownRemoteActive: boolean | null = null;
 let lastThrottleRecord = 0;
 
 export function resetPresenceStateForTesting(): void {
   lastUserActivityTime = Date.now();
   lastThrottleRecord = 0;
+  lastRemoteHeartbeatTime = 0;
+  lastKnownRemoteStatus = null;
+  lastKnownRemoteActive = null;
   hiddenSince = null;
   currentActivityContext = 'online';
   firestoreRegisteredCount = null;
@@ -176,27 +183,40 @@ export function recordUserActivity(): void {
   const now = Date.now();
   if (now >= lastThrottleRecord && now - lastThrottleRecord < MULTIPLAYER_SCALE_CONFIG.presence.activityThrottleMs) return;
   lastThrottleRecord = now;
+  const wasActive = isCurrentClientActive();
   lastUserActivityTime = now;
 
   if (hiddenSince !== null && typeof document !== 'undefined' && !document.hidden) {
     hiddenSince = null;
   }
 
-  syncPresenceHeartbeat();
+  const nowActive = isCurrentClientActive();
+  // State transition from idle -> active forces remote sync so status updates immediately
+  const stateTransition = wasActive !== nowActive;
+  syncPresenceHeartbeat(stateTransition);
 }
 
 /**
  * Sets current activity context ('online' vs 'in-game')
  */
 export function setActivityContext(context: 'online' | 'in-game') {
-  currentActivityContext = context;
-  syncPresenceHeartbeat();
+  if (currentActivityContext !== context) {
+    currentActivityContext = context;
+    syncPresenceHeartbeat(true);
+  }
 }
 
 /**
  * Synchronizes the tab session heartbeat to localStorage and updates user status.
+ * Firestore network writes are throttled to HEARTBEAT_INTERVAL_MS unless an explicit state transition occurs.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(T) where T is the number of active browser tabs open on this client machine (T <= 20).
+ * - Auxiliary Space Complexity: O(T) for session map serialization.
+ * - Network / Database Complexity: O(1) conditional write, strictly throttled to at most 1 write per
+ *   HEARTBEAT_INTERVAL_MS or on discrete state transitions, achieving a sub-linear write rate independent of UI input frequency.
  */
-export function syncPresenceHeartbeat(): void {
+export function syncPresenceHeartbeat(forceRemote: boolean = false): void {
   const sessionId = getClientSessionId();
   const now = Date.now();
   const active = isCurrentClientActive();
@@ -236,11 +256,31 @@ export function syncPresenceHeartbeat(): void {
     // Ignore storage errors
   }
 
-  // Live Firebase guest presence synchronization
-  if (isFirebaseConfigured() && db) {
-    try {
-      const guestDocRef = doc(db, 'guest_sessions', sessionId);
-      if (!isRegistered) {
+  // Compute registered user target status
+  let targetStatus: 'online' | 'in-game' | 'offline' = 'offline';
+  if (isRegistered && userId) {
+    const hasActiveSession = checkIsUserActiveAcrossTabs(userId);
+    targetStatus = hasActiveSession
+      ? (currentActivityContext === 'in-game' ? 'in-game' : 'online')
+      : 'offline';
+
+    mockBackend.setUserStatus(userId, targetStatus);
+  }
+
+  // Throttle live Firestore writes: only execute if forced, if heartbeat interval has elapsed, or if status transitioned
+  const isHeartbeatDue = now - lastRemoteHeartbeatTime >= HEARTBEAT_INTERVAL_MS;
+  const guestActiveChanged = lastKnownRemoteActive !== active;
+  const userStatusChanged = lastKnownRemoteStatus !== targetStatus;
+  const shouldWriteRemote = forceRemote || isHeartbeatDue || (!isRegistered && guestActiveChanged) || (isRegistered && userStatusChanged);
+
+  if (shouldWriteRemote && isFirebaseConfigured() && db) {
+    lastRemoteHeartbeatTime = now;
+    lastKnownRemoteActive = active;
+    lastKnownRemoteStatus = targetStatus;
+
+    if (!isRegistered) {
+      try {
+        const guestDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId);
         if (active) {
           setDoc(guestDocRef, {
             lastSeen: serverTimestamp(),
@@ -249,23 +289,12 @@ export function syncPresenceHeartbeat(): void {
         } else {
           deleteDoc(guestDocRef).catch(() => {});
         }
-      } else {
-        // If client is registered, ensure it is not tracked in guest_sessions
-        deleteDoc(guestDocRef).catch(() => {});
+      } catch {
+        // Ignore
       }
-    } catch {
-      // Ignore
+    } else if (userId && auth?.currentUser?.uid === userId) {
+      writeFirestoreUserStatus(userId, targetStatus);
     }
-  }
-
-  // Update registered user's status based on cross-tab activity
-  if (isRegistered && userId) {
-    const hasActiveSession = checkIsUserActiveAcrossTabs(userId);
-    const targetStatus: 'online' | 'in-game' | 'offline' = hasActiveSession
-      ? (currentActivityContext === 'in-game' ? 'in-game' : 'online')
-      : 'offline';
-
-    updateUserStatusSync(userId, targetStatus);
   }
 
   // Notify any active stats subscribers
@@ -309,10 +338,11 @@ export function cleanupCurrentTabSession(): void {
       // Send keepalive fetch to Firestore REST API for reliable tab-close deletion in modern browsers
       const projectId = import.meta.env?.VITE_FIREBASE_PROJECT_ID;
       if (projectId && typeof fetch !== 'undefined') {
-        const restUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/guest_sessions/${sessionId}`;
+        const guestCollection = MULTIPLAYER_SCALE_CONFIG.collections.guestSessions;
+        const restUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${guestCollection}/${sessionId}`;
         fetch(restUrl, { method: 'DELETE', keepalive: true }).catch(() => {});
       }
-      deleteDoc(doc(db, 'guest_sessions', sessionId)).catch(() => {});
+      deleteDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId)).catch(() => {});
     } catch {
       // Ignore
     }
@@ -560,13 +590,19 @@ function notifyStatsSubscribers() {
 }
 
 let lastStaleGuestPruneTime = 0;
-const STALE_GUEST_PRUNE_INTERVAL_MS = 5 * 60 * 1000; // Run at most once every 5 minutes per client
-const STALE_GUEST_CUTOFF_MS = 15 * 60 * 1000; // Sessions older than 15 minutes are stale
+const STALE_GUEST_PRUNE_INTERVAL_MS = MULTIPLAYER_SCALE_CONFIG.presence.staleGuestPruneIntervalMs;
+const STALE_GUEST_CUTOFF_MS = MULTIPLAYER_SCALE_CONFIG.presence.staleGuestCutoffMs;
 
 /**
  * Opportunistically purges orphan guest sessions older than 15 minutes to keep Firestore clean.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(B) where B <= maxCleanupBatchSize (B <= 50) for batch retrieval and deletion.
+ * - Auxiliary Space Complexity: O(B) for document snapshot handles.
+ * - Network / Database Complexity: O(1) query read plus at most B deletion writes, strictly gated to
+ *   at most once per staleGuestPruneIntervalMs.
  */
-async function pruneStaleGuestSessions(): Promise<void> {
+export async function pruneStaleGuestSessions(): Promise<void> {
   if (!db || !isFirebaseConfigured()) return;
   const now = Date.now();
   if (now - lastStaleGuestPruneTime < STALE_GUEST_PRUNE_INTERVAL_MS) return;
@@ -575,9 +611,9 @@ async function pruneStaleGuestSessions(): Promise<void> {
   try {
     const cutoff = new Date(now - STALE_GUEST_CUTOFF_MS);
     const staleQuery = query(
-      collection(db, 'guest_sessions'),
+      collection(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions),
       where('lastSeen', '<', Timestamp.fromDate(cutoff)),
-      limit(25)
+      limit(MULTIPLAYER_SCALE_CONFIG.matchmaking.maxCleanupBatchSize)
     );
     const snap = await getDocs(staleQuery);
     if (!snap.empty) {
@@ -593,6 +629,12 @@ async function pruneStaleGuestSessions(): Promise<void> {
  * - players online: strictly players who registered, signed in, and are currently active
  * - guests online: anonymous visitors currently active
  * - active games: games waiting in lobby or in progress
+ *
+ * Algorithmic Complexity (Big O):
+ * - Listener Time Complexity: O(1) constant time invocation on document change events.
+ * - Auxiliary Space Complexity: O(1) constant space for observer handles.
+ * - Network / Database Complexity: O(1) single-document listener (stats/lobby). Fallback count queries
+ *   are gated strictly to connection failures, scaling at O(1) interval rate (statsFallbackPollIntervalMs).
  */
 export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): () => void {
   // Ensure tab tracking is running
@@ -608,8 +650,8 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
       e.key === ACTIVE_SESSIONS_STORAGE_KEY ||
       e.key === MOCK_GAMES_STORAGE_KEY ||
       e.key === CACHED_LOBBY_STATS_STORAGE_KEY ||
-      e.key === 'schada_mock_current_user_id' ||
-      e.key === 'schada_mock_users'
+      e.key === MOCK_CONFIG.storageKeys.currentUserId ||
+      e.key === MOCK_CONFIG.storageKeys.users
     ) {
       notifyStatsSubscribers();
     }
@@ -621,46 +663,38 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
 
   if (typeof window !== 'undefined') {
     window.addEventListener('storage', handleStorage);
-    window.addEventListener('schada_user_status_changed', handleCustomStatus);
+    window.addEventListener(MOCK_CONFIG.events.userStatusChanged, handleCustomStatus);
   }
 
   // Firestore real-time listener for aggregated platform stats
   // Rather than downloading full collections of tens of thousands of users/games,
   // we listen to a single aggregate document 'stats/lobby' (O(1) read).
-  // Fallback: throttled server-side count queries (getCountFromServer) without downloading document bodies.
+  // Fallback: server-side count queries (getCountFromServer) ONLY if the stats doc is missing or listener errors.
   let unsubscribeStatsDoc: (() => void) | null = null;
   let countPollTimer: ReturnType<typeof setInterval> | null = null;
+  let fallbackInitTimeout: ReturnType<typeof setTimeout> | null = null;
 
   if (isFirebaseConfigured() && db) {
     try {
-      const statsDocRef = doc(db, 'stats', 'lobby');
-      unsubscribeStatsDoc = onSnapshot(
-        statsDocRef,
-        (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.data();
-            if (typeof data.playersOnline === 'number') firestoreRegisteredCount = data.playersOnline;
-            if (typeof data.guestsOnline === 'number') firestoreGuestsCount = data.guestsOnline;
-            if (typeof data.activeGames === 'number') firestoreGamesCount = data.activeGames;
-            notifyStatsSubscribers();
-          }
-        },
-        (err) => {
-          console.warn('Stats document listener notice:', err);
-        }
-      );
+      const statsDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.lobbyStats, 'lobby');
 
-      // Throttled server-side count fallback: refreshes server counts with getCountFromServer
+      // Server-side count fallback: refreshes server counts with getCountFromServer if needed
       const refreshServerCounts = async () => {
         if (!db) return;
         try {
           const thresholdDate = new Date(Date.now() - SESSION_TTL_MS);
-          const qUsers = query(collection(db, 'users'), where('status', 'in', ['online', 'in-game']));
+          const qUsers = query(
+            collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
+            where('status', 'in', ['online', 'in-game'])
+          );
           const qGuests = query(
-            collection(db, 'guest_sessions'),
+            collection(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions),
             where('lastSeen', '>=', Timestamp.fromDate(thresholdDate))
           );
-          const qGames = query(collection(db, 'games'), where('status', 'in', ['waiting', 'in_progress']));
+          const qGames = query(
+            collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
+            where('status', 'in', ['waiting', 'in_progress'])
+          );
 
           const [usersSnap, guestsSnap, gamesSnap] = await Promise.all([
             getCountFromServer(qUsers).catch(() => null),
@@ -685,24 +719,58 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
           if (changed) {
             notifyStatsSubscribers();
           }
-
-          // Opportunistic background pruning of dead guest sessions
-          pruneStaleGuestSessions().catch(() => {});
         } catch {
           // Graceful fallback to local session stats
         }
       };
 
-      // Periodic count fallback with random jitter so thousands of clients don't poll at the same second
-      const pollDelay =
-        MULTIPLAYER_SCALE_CONFIG.presence.statsPollIntervalMs +
-        Math.floor(Math.random() * MULTIPLAYER_SCALE_CONFIG.presence.statsPollJitterMs);
-      countPollTimer = setInterval(refreshServerCounts, pollDelay);
-      // Run initial count fallback immediately (or after brief delay if specified)
-      if (MULTIPLAYER_SCALE_CONFIG.presence.statsInitialFallbackDelayMs > 0) {
-        setTimeout(refreshServerCounts, MULTIPLAYER_SCALE_CONFIG.presence.statsInitialFallbackDelayMs);
-      } else {
-        refreshServerCounts();
+      unsubscribeStatsDoc = onSnapshot(
+        statsDocRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            // Live aggregate document exists: cancel any fallback count polling
+            if (countPollTimer) {
+              clearInterval(countPollTimer);
+              countPollTimer = null;
+            }
+            if (fallbackInitTimeout) {
+              clearTimeout(fallbackInitTimeout);
+              fallbackInitTimeout = null;
+            }
+            const data = snapshot.data();
+            if (typeof data.playersOnline === 'number') firestoreRegisteredCount = data.playersOnline;
+            if (typeof data.guestsOnline === 'number') firestoreGuestsCount = data.guestsOnline;
+            if (typeof data.activeGames === 'number') firestoreGamesCount = data.activeGames;
+            notifyStatsSubscribers();
+          }
+        },
+        (err) => {
+          console.warn('Stats document listener notice:', err);
+          // If onSnapshot encounters an error, start throttled fallback count polling
+          if (!countPollTimer) {
+            countPollTimer = setInterval(
+              refreshServerCounts,
+              MULTIPLAYER_SCALE_CONFIG.presence.statsFallbackPollIntervalMs
+            );
+            refreshServerCounts();
+          }
+        }
+      );
+
+      // Delayed initial fallback: only runs if snapshot has not provided data after fallback delay
+      const initialDelay = MULTIPLAYER_SCALE_CONFIG.presence.statsInitialFallbackDelayMs;
+      if (initialDelay > 0) {
+        fallbackInitTimeout = setTimeout(() => {
+          if (firestoreRegisteredCount === null && firestoreGuestsCount === null) {
+            refreshServerCounts();
+            if (!countPollTimer) {
+              countPollTimer = setInterval(
+                refreshServerCounts,
+                MULTIPLAYER_SCALE_CONFIG.presence.statsFallbackPollIntervalMs
+              );
+            }
+          }
+        }, initialDelay);
       }
     } catch (e) {
       console.warn('Could not initialize Firestore lobby stats:', e);
@@ -717,6 +785,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
     }
     if (unsubscribeStatsDoc) unsubscribeStatsDoc();
     if (countPollTimer) clearInterval(countPollTimer);
+    if (fallbackInitTimeout) clearTimeout(fallbackInitTimeout);
     stopTracking();
   };
 }

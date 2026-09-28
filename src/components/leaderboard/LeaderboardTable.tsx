@@ -4,26 +4,54 @@ import { mockBackend } from '@/services/firebase/mockProvider';
 import { db, isFirebaseConfigured } from '@/services/firebase/config';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Trophy, Medal } from 'lucide-react';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 
+const LEADERBOARD_CACHE_TTL_MS = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardCacheTtlMs;
+const LEADERBOARD_LIMIT = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit;
+let cachedLeaderboard: UserProfile[] | null = null;
+let cachedLeaderboardTime = 0;
+
+/**
+ * Global Leaderboard Table displaying top-ranked players by Elo.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Cache Hit Time Complexity: O(1) instant in-memory retrieval with zero database read cost.
+ * - Cache Miss Time Complexity: O(log N + L) Firestore indexed range query where N is total users
+ *   and L = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit (L <= 50).
+ * - Auxiliary Space Complexity: O(L) for cached player profiles.
+ * - Growth Rate: Strictly sub-linear ceiling O(L) independent of total global user accounts.
+ */
 export const LeaderboardTable: React.FC = () => {
-  const [players, setPlayers] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [players, setPlayers] = useState<UserProfile[]>(() => cachedLeaderboard || []);
+  const [loading, setLoading] = useState(() => !cachedLeaderboard || Date.now() - cachedLeaderboardTime >= LEADERBOARD_CACHE_TTL_MS);
 
   useEffect(() => {
+    const now = Date.now();
+    if (cachedLeaderboard && now - cachedLeaderboardTime < LEADERBOARD_CACHE_TTL_MS) {
+      setPlayers(cachedLeaderboard);
+      setLoading(false);
+      return;
+    }
+
     async function fetchLeaderboard() {
       setLoading(true);
       try {
         if (isFirebaseConfigured() && db) {
           const q = query(
-            collection(db, 'users'),
+            collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
             orderBy('eloRating', 'desc'),
-            limit(50)
+            limit(LEADERBOARD_LIMIT)
           );
           const snap = await getDocs(q);
           const list = snap.docs.map((d) => d.data() as UserProfile);
+          cachedLeaderboard = list;
+          cachedLeaderboardTime = Date.now();
           setPlayers(list);
         } else {
-          setPlayers(mockBackend.getLeaderboard());
+          const mockList = mockBackend.getLeaderboard();
+          cachedLeaderboard = mockList;
+          cachedLeaderboardTime = Date.now();
+          setPlayers(mockList);
         }
       } catch (e) {
         console.error('Failed to fetch leaderboard:', e);
