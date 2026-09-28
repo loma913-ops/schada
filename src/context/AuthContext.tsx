@@ -7,6 +7,7 @@ import {
   changeUsername,
   subscribeToAuthState,
   setUserOnlineStatus,
+  getInitialAuthState,
 } from '@/services/firebase/authService';
 import { startPresenceTracking, syncPresenceHeartbeat } from '@/services/firebase/presenceService';
 
@@ -24,8 +25,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [initial] = useState(() => getInitialAuthState());
+  const [user, setUser] = useState<UserProfile | null>(initial.initialUser);
+  const [isLoading, setIsLoading] = useState(initial.initialLoading);
 
   // Initialize persistent app-level presence and activity tracking
   useEffect(() => {

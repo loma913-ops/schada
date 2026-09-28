@@ -57,6 +57,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
   - *Sub-Linear Algorithmic Complexity*: Governed by Big O algorithmic scaling: $O(1)$ constant-time presence listeners, $O(K \log K)$ ($K \le 50$) partition sorting for open rooms, and $O(\lceil K / 30 \rceil)$ batched network queries for friend profiles.
   - *Elimination of Client Sweeps*: Removed periodic client-wide database cleanup intervals in favor of lazy validation and native Firestore TTL policies.
   - *Batched Lookups & Caching*: 5-minute memory caching for the global leaderboard and `documentId() in [...]` batch lookups for social friend lists.
+  - *Zero-Flicker Synchronous Auth Hydration*: Synchronously restores cached authenticated profiles on mount to eliminate temporary "Sign In" button flicker upon page refresh, validating sessions asynchronously in the background with theme-aware loading fallbacks.
 - **PWA & Offline Capable**: Built with service worker support and offline mock providers for instant local evaluation without requiring cloud keys.
 
 ---

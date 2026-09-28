@@ -10,6 +10,7 @@ export interface PresenceStorageKeys {
   readonly sessionStorageId: string;
   readonly activeSessions: string;
   readonly authCachedUid: string;
+  readonly authCachedProfile: string;
   readonly cachedLobbyStats: string;
   readonly mockGames: string;
 }
@@ -160,8 +161,8 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     throw new MultiplayerConfigError('Presence storageKeys configuration section is missing or invalid.');
   }
 
-  const { sessionStorageId, activeSessions, authCachedUid, cachedLobbyStats, mockGames } = presence.storageKeys;
-  const storageKeyEntries = { sessionStorageId, activeSessions, authCachedUid, cachedLobbyStats, mockGames };
+  const { sessionStorageId, activeSessions, authCachedUid, authCachedProfile, cachedLobbyStats, mockGames } = presence.storageKeys;
+  const storageKeyEntries = { sessionStorageId, activeSessions, authCachedUid, authCachedProfile, cachedLobbyStats, mockGames };
   for (const [keyName, val] of Object.entries(storageKeyEntries)) {
     if (typeof val !== 'string' || val.trim().length === 0) {
       throw new MultiplayerConfigError(`Invalid presence.storageKeys.${keyName}: expected non-empty string.`);
@@ -336,6 +337,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
       sessionStorageId: 'schada_client_session_id',
       activeSessions: 'schada_active_sessions_v2',
       authCachedUid: 'schada_auth_cached_uid',
+      authCachedProfile: 'schada_auth_cached_profile',
       cachedLobbyStats: 'schada_cached_lobby_stats',
       mockGames: 'schada_mock_games',
     }),
