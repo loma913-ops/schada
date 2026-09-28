@@ -3,7 +3,7 @@ import type { GameResult, PieceColor } from '@/core/schada/types';
 import confetti from 'canvas-confetti';
 import { soundService } from '@/services/audio/soundService';
 import { haptics } from '@/services/device/haptics';
-import { Trophy, Award, RefreshCw, Home } from 'lucide-react';
+import { Trophy, Award, RefreshCw, Home, X, Eye } from 'lucide-react';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import {
@@ -32,8 +32,11 @@ export interface GameOverModalProps {
   readonly greenElo?: PlayerEloUpdate;
   readonly eloDelta?: number;
   readonly config?: GameOverModalConfig;
+  readonly triggerEffects?: boolean;
+  readonly onEffectsPlayed?: () => void;
   readonly onRematch?: () => void;
   readonly onHome: () => void;
+  readonly onClose?: () => void;
 }
 
 /**
@@ -42,6 +45,7 @@ export interface GameOverModalProps {
  * Displays match outcome, win reason, and scoring breakdown.
  * For rated matches, calculates and displays both players' updated Elo ratings
  * and delta changes formatted as ELO (GAIN/LOSS) directly underneath their respective colors.
+ * Allows dismissing modal via close button, review action, backdrop click, or Escape key to inspect the board.
  *
  * Algorithmic Complexity:
  * - Time Complexity: O(1) constant time, rendering static elements and running O(1) Elo calculation.
@@ -60,8 +64,11 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   greenElo,
   eloDelta,
   config = GAME_OVER_MODAL_CONFIG,
+  triggerEffects = true,
+  onEffectsPlayed,
   onRematch,
   onHome,
+  onClose,
 }) => {
   validateGameOverModalConfig(config);
 
@@ -95,6 +102,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   }, [isRanked, blueElo, greenElo, bluePlayer, greenPlayer, result.winner]);
 
   useEffect(() => {
+    if (!triggerEffects) return;
     haptics.gameOver();
     if (isWinner) {
       soundService.playVictory();
@@ -104,7 +112,19 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         origin: { y: 0.6 },
       });
     }
-  }, [isWinner]);
+    onEffectsPlayed?.();
+  }, [isWinner, triggerEffects, onEffectsPlayed]);
+
+  useEffect(() => {
+    if (!onClose) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const getReasonText = (): string => {
     if (result.winReason && config.copy.winReasons[result.winReason]) {
@@ -127,8 +147,37 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       : config.layout.gridColumnsUnranked;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content" style={{ textAlign: 'center' }}>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="game-over-title"
+    >
+      <div
+        className="modal-content"
+        style={{ textAlign: 'center', position: 'relative' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {onClose && (
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={onClose}
+            aria-label={config.copy.closeButtonAriaLabel}
+            style={{
+              position: 'absolute',
+              top: '1rem',
+              right: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <X size={18} />
+          </button>
+        )}
+
         <div style={{ marginBottom: '1rem' }}>
           {isWinner ? (
             <Trophy size={48} color="var(--accent-gold)" style={{ margin: '0 auto' }} />
@@ -139,7 +188,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           )}
         </div>
 
-        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>
+        <h2 id="game-over-title" style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>
           {modalTitle}
         </h2>
 
@@ -286,17 +335,30 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           {onRematch && (
             <button
+              type="button"
               className="btn-primary"
               onClick={onRematch}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.75rem' }}
             >
               <RefreshCw size={16} />
               <span>{config.copy.rematchButtonText}</span>
             </button>
           )}
+          {onClose && (
+            <button
+              type="button"
+              className="action-btn"
+              style={{ flex: 1, padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              onClick={onClose}
+            >
+              <Eye size={16} />
+              <span>{config.copy.reviewButtonText}</span>
+            </button>
+          )}
           <button
+            type="button"
             className="action-btn"
-            style={{ flex: 1, padding: '0.75rem' }}
+            style={{ flex: 1, padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
             onClick={onHome}
           >
             <Home size={16} />

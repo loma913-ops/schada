@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { Flag, Handshake, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { Flag, Handshake, RotateCcw, Volume2, VolumeX, Trophy, Home } from 'lucide-react';
 import { soundService } from '@/services/audio/soundService';
 
-interface GameControlsProps {
+export interface GameControlsProps {
   onResign: () => void;
   onOfferDraw?: () => void;
   onFlipBoard: () => void;
   disabled?: boolean;
+  isGameOver?: boolean;
+  onShowResult?: () => void;
+  onExit?: () => void;
 }
 
 export const GameControls: React.FC<GameControlsProps> = ({
@@ -14,6 +17,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
   onOfferDraw,
   onFlipBoard,
   disabled = false,
+  isGameOver = false,
+  onShowResult,
+  onExit,
 }) => {
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [isMuted, setIsMuted] = useState(soundService.getMuted());
@@ -63,26 +69,57 @@ export const GameControls: React.FC<GameControlsProps> = ({
       )}
 
       <div className="game-controls-bar">
-        <button
-          className="action-btn danger"
-          onClick={() => setShowResignConfirm(true)}
-          disabled={disabled || showResignConfirm}
-          title="Resign Game"
-        >
-          <Flag size={16} />
-          <span>Resign</span>
-        </button>
+        {isGameOver ? (
+          <>
+            {onShowResult && (
+              <button
+                type="button"
+                className="action-btn"
+                onClick={onShowResult}
+                title="View Match Results"
+              >
+                <Trophy size={16} />
+                <span>Results</span>
+              </button>
+            )}
+            {onExit && (
+              <button
+                type="button"
+                className="action-btn"
+                onClick={onExit}
+                title="Exit to Lobby"
+              >
+                <Home size={16} />
+                <span>Lobby</span>
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="action-btn danger"
+              onClick={() => setShowResignConfirm(true)}
+              disabled={disabled || showResignConfirm}
+              title="Resign Game"
+            >
+              <Flag size={16} />
+              <span>Resign</span>
+            </button>
 
-        {onOfferDraw && (
-          <button
-            className="action-btn"
-            onClick={onOfferDraw}
-            disabled={disabled}
-            title="Offer Draw"
-          >
-            <Handshake size={16} />
-            <span>Draw</span>
-          </button>
+            {onOfferDraw && (
+              <button
+                type="button"
+                className="action-btn"
+                onClick={onOfferDraw}
+                disabled={disabled}
+                title="Offer Draw"
+              >
+                <Handshake size={16} />
+                <span>Draw</span>
+              </button>
+            )}
+          </>
         )}
 
         <button className="action-btn" onClick={onFlipBoard} title="Flip Board Orientation">

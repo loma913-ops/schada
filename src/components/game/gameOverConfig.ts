@@ -28,6 +28,8 @@ export interface GameOverModalConfig {
     readonly defaultGameCompletedText: string;
     readonly rematchButtonText: string;
     readonly lobbyButtonText: string;
+    readonly reviewButtonText: string;
+    readonly closeButtonAriaLabel: string;
     readonly winReasons: Record<WinReason, string>;
   };
 }
@@ -75,6 +77,8 @@ export function validateGameOverModalConfig(config: GameOverModalConfig): void {
     'defaultGameCompletedText',
     'rematchButtonText',
     'lobbyButtonText',
+    'reviewButtonText',
+    'closeButtonAriaLabel',
   ];
 
   for (const key of requiredCopyKeys) {
@@ -122,6 +126,8 @@ export const GAME_OVER_MODAL_CONFIG: GameOverModalConfig = {
     defaultGameCompletedText: 'Game completed',
     rematchButtonText: 'Rematch',
     lobbyButtonText: 'Lobby',
+    reviewButtonText: 'Review',
+    closeButtonAriaLabel: 'Close game over modal',
     winReasons: {
       goal_reached: 'All remaining high pieces reached the goal line',
       timeout: 'Victory on time',

@@ -90,7 +90,7 @@ export function isGameTimedOut(game: GameRoom | null | undefined): GameTimeoutRe
 }
 
 const SESSION_STORAGE_PREFIX = 'schada_player_token_';
-const MOCK_GAMES_STORAGE_KEY = 'schada_mock_games';
+const MOCK_GAMES_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.mockGames;
 
 // Helper to remove any undefined values for Firestore serialization
 function sanitize<T>(obj: T): T {
@@ -963,8 +963,22 @@ export function sortLobbyRooms(rooms: GameRoom[]): GameRoom[] {
   return [...waitingRooms, ...inProgressRooms];
 }
 
+/**
+ * Retrieves open waiting and/or in-progress rooms from Firestore or mock storage.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Firestore Query Time Complexity: O(log N + K) where N is global games and K <= limitCount (K <= 50).
+ * - Sort Time Complexity: O(K log K) via sortLobbyRooms partition sorting.
+ * - Auxiliary Space Complexity: O(K) memory for the retrieved document snapshots.
+ * - Growth Rate: Strictly bounded at O(K log K) constant ceiling independent of database size N.
+ *
+ * @param limitCount Maximum number of open rooms to fetch.
+ * @param includeInProgress Whether to retrieve in-progress matches alongside waiting rooms.
+ * @returns Sorted array of open GameRoom objects.
+ */
 export async function getOpenRooms(
-  limitCount: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit
+  limitCount: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit,
+  includeInProgress: boolean = true
 ): Promise<GameRoom[]> {
   if (typeof limitCount !== 'number' || limitCount <= 0 || isNaN(limitCount)) {
     throw new RangeError(
@@ -972,13 +986,11 @@ export async function getOpenRooms(
     );
   }
 
-  cleanupAbandonedGames().catch(() => {});
-
   if (isFirebaseConfigured() && db) {
     const q = query(
-      collection(db, 'games'),
+      collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
-      where('status', 'in', ['waiting', 'in_progress']),
+      where('status', 'in', includeInProgress ? ['waiting', 'in_progress'] : ['waiting']),
       limit(limitCount)
     );
     const snap = await getDocs(q);
@@ -988,13 +1000,68 @@ export async function getOpenRooms(
 
   const all = mockStore.getAll();
   const rooms = Object.values(all)
-    .filter((g) => !g.isPrivate && (g.status === 'waiting' || g.status === 'in_progress'));
+    .filter((g) => !g.isPrivate && (includeInProgress ? (g.status === 'waiting' || g.status === 'in_progress') : g.status === 'waiting'));
   return sortLobbyRooms(rooms).slice(0, limitCount);
 }
 
+/**
+ * Retrieves in-progress games available for spectating.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Query Time Complexity: O(log N + K) index lookup, bounded by limitCount K <= 50.
+ * - Sort Time Complexity: O(K log K) chronological sort.
+ * - Auxiliary Space Complexity: O(K) memory allocation.
+ * - Growth Rate: Constant-time ceiling O(K log K) scaling sustainably as platform matches scale.
+ *
+ * @param limitCount Maximum number of live rooms to fetch.
+ * @returns Sorted array of active in-progress GameRoom objects.
+ */
+export async function getInProgressRooms(
+  limitCount: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit
+): Promise<GameRoom[]> {
+  if (typeof limitCount !== 'number' || limitCount <= 0 || isNaN(limitCount)) {
+    throw new RangeError(
+      `getInProgressRooms: Invalid limitCount. Expected positive number, received ${limitCount}.`
+    );
+  }
+
+  if (isFirebaseConfigured() && db) {
+    const q = query(
+      collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
+      where('isPrivate', '==', false),
+      where('status', '==', 'in_progress'),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    const rooms = snap.docs.map((docSnap) => docSnap.data() as GameRoom);
+    return sortLobbyRooms(rooms);
+  }
+
+  const all = mockStore.getAll();
+  const rooms = Object.values(all)
+    .filter((g) => !g.isPrivate && g.status === 'in_progress');
+  return sortLobbyRooms(rooms).slice(0, limitCount);
+}
+
+/**
+ * Subscribes to real-time open rooms. When includeInProgress is false, the subscription
+ * isolates waiting rooms strictly, preventing active match moves from triggering snapshot reads.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Notification Time Complexity: O(K log K) sort execution upon document changes (K <= maxRooms <= 50).
+ * - Auxiliary Space Complexity: O(K) for active room array state.
+ * - Network / Database Complexity: O(K) listener bandwidth. With includeInProgress=false,
+ *   update frequency drops from O(moves) to O(creations + joins), ensuring sustainable sub-linear scaling.
+ *
+ * @param callback Observer callback invoked on room list changes.
+ * @param maxRooms Maximum room limit constraint.
+ * @param includeInProgress Whether to include live matches in the real-time stream.
+ * @returns Unsubscribe teardown callback.
+ */
 export function subscribeToOpenRooms(
   callback: (rooms: GameRoom[]) => void,
-  maxRooms: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit
+  maxRooms: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit,
+  includeInProgress: boolean = true
 ): () => void {
   if (typeof callback !== 'function') {
     throw new TypeError('subscribeToOpenRooms: callback parameter must be a function.');
@@ -1005,13 +1072,12 @@ export function subscribeToOpenRooms(
     );
   }
 
-  cleanupAbandonedGames().catch(() => {});
-
   if (isFirebaseConfigured() && db) {
+    const statuses = includeInProgress ? ['waiting', 'in_progress'] : ['waiting'];
     const q = query(
-      collection(db, 'games'),
+      collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
-      where('status', 'in', ['waiting', 'in_progress']),
+      where('status', 'in', statuses),
       limit(maxRooms)
     );
     return onSnapshot(
@@ -1030,7 +1096,7 @@ export function subscribeToOpenRooms(
   const update = () => {
     const all = mockStore.getAll();
     const rooms = Object.values(all)
-      .filter((g) => !g.isPrivate && (g.status === 'waiting' || g.status === 'in_progress'));
+      .filter((g) => !g.isPrivate && (includeInProgress ? (g.status === 'waiting' || g.status === 'in_progress') : g.status === 'waiting'));
     callback(sortLobbyRooms(rooms).slice(0, maxRooms));
   };
 

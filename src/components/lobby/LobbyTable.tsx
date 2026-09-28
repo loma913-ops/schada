@@ -13,7 +13,12 @@ import {
   Users,
   ArrowLeft,
 } from 'lucide-react';
-import { subscribeToOpenRooms, type GameRoom } from '@/services/firebase/gameService';
+import {
+  subscribeToOpenRooms,
+  getInProgressRooms,
+  sortLobbyRooms,
+  type GameRoom,
+} from '@/services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import {
   LOBBY_CONFIG,
@@ -29,8 +34,20 @@ interface LobbyTableProps {
   onOpenCreateRoomModal?: () => void;
 }
 
+/**
+ * Real-time Lobby Table with partitioned room streams and dynamic filter controls.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Waiting Room Subscription: O(1) listener invocation on open challenge changes.
+ * - Live Rooms Polling: O(1) scheduled rate (liveRoomsPollIntervalMs), avoiding move-by-move stream traffic.
+ * - Merging & Partition Sorting: O(K log K) where K <= maxOpenRoomsLobbyLimit (K <= 50).
+ * - Filter Evaluation: O(K) linear pass preserving relative order.
+ * - Auxiliary Space Complexity: O(K) for active and filtered room arrays.
+ * - Growth Rate: Sub-linear ceiling O(K log K), scaling stably with thousands of active players.
+ */
 export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal }) => {
-  const [rooms, setRooms] = useState<GameRoom[]>([]);
+  const [waitingRooms, setWaitingRooms] = useState<GameRoom[]>([]);
+  const [inProgressRooms, setInProgressRooms] = useState<GameRoom[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<LobbyFilterState>(() => {
     if (typeof localStorage === 'undefined') {
@@ -40,12 +57,48 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
   });
   const navigate = useNavigate();
 
+  // 1. Real-time subscription to waiting rooms (includeInProgress: false to eliminate move noise)
   useEffect(() => {
-    const unsubscribe = subscribeToOpenRooms((openRooms) => {
-      setRooms(openRooms);
-    });
+    const unsubscribe = subscribeToOpenRooms(
+      (openWaitingRooms) => {
+        setWaitingRooms(openWaitingRooms);
+      },
+      MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit,
+      false
+    );
     return () => unsubscribe();
   }, []);
+
+  // 2. Load in-progress games on mount / relaxed interval without move streaming
+  useEffect(() => {
+    if (!filters.statuses.inProgress) {
+      setInProgressRooms([]);
+      return;
+    }
+
+    let isMounted = true;
+    const loadLiveRooms = () => {
+      getInProgressRooms(MULTIPLAYER_SCALE_CONFIG.matchmaking.maxOpenRoomsLobbyLimit)
+        .then((live) => {
+          if (isMounted) setInProgressRooms(live);
+        })
+        .catch(() => {});
+    };
+
+    loadLiveRooms();
+    const intervalId = setInterval(
+      loadLiveRooms,
+      MULTIPLAYER_SCALE_CONFIG.matchmaking.liveRoomsPollIntervalMs
+    );
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [filters.statuses.inProgress]);
+
+  const rooms = useMemo(() => {
+    return sortLobbyRooms([...waitingRooms, ...inProgressRooms]);
+  }, [waitingRooms, inProgressRooms]);
 
   const handleUpdateFilters = (updater: (prev: LobbyFilterState) => LobbyFilterState) => {
     setFilters((prev) => {

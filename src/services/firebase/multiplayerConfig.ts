@@ -6,6 +6,15 @@
  * Validates configuration to eliminate hard-coded fallback values.
  */
 
+export interface PresenceStorageKeys {
+  readonly sessionStorageId: string;
+  readonly activeSessions: string;
+  readonly authCachedUid: string;
+  readonly authCachedProfile: string;
+  readonly cachedLobbyStats: string;
+  readonly mockGames: string;
+}
+
 export interface PresenceConfig {
   readonly idleTimeoutMs: number;
   readonly hiddenGracePeriodMs: number;
@@ -15,6 +24,11 @@ export interface PresenceConfig {
   readonly statsPollIntervalMs: number;
   readonly statsPollJitterMs: number;
   readonly statsInitialFallbackDelayMs: number;
+  readonly statsFallbackPollIntervalMs: number;
+  readonly friendFreshnessThresholdMs: number;
+  readonly staleGuestPruneIntervalMs: number;
+  readonly staleGuestCutoffMs: number;
+  readonly storageKeys: PresenceStorageKeys;
 }
 
 export interface MatchmakingConfig {
@@ -32,11 +46,25 @@ export interface MatchmakingConfig {
   readonly defaultCleanupIntervalMs: number;
   readonly maxCleanupBatchSize: number;
   readonly clockTickIntervalMs: number;
+  readonly liveRoomsPollIntervalMs: number;
+  readonly friendBatchLookupSize: number;
+  readonly leaderboardLimit: number;
+  readonly leaderboardCacheTtlMs: number;
+}
+
+export interface MultiplayerCollectionsConfig {
+  readonly users: string;
+  readonly games: string;
+  readonly guestSessions: string;
+  readonly lobbyStats: string;
+  readonly friendRequests: string;
+  readonly userFriends: string;
 }
 
 export interface MultiplayerScaleConfig {
   readonly presence: PresenceConfig;
   readonly matchmaking: MatchmakingConfig;
+  readonly collections: MultiplayerCollectionsConfig;
 }
 
 export class MultiplayerConfigError extends Error {
@@ -103,6 +131,42 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     throw new MultiplayerConfigError(
       `Invalid presence.statsInitialFallbackDelayMs: expected non-negative number, received ${presence.statsInitialFallbackDelayMs}.`
     );
+  }
+
+  if (typeof presence.statsFallbackPollIntervalMs !== 'number' || presence.statsFallbackPollIntervalMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.statsFallbackPollIntervalMs: expected positive number, received ${presence.statsFallbackPollIntervalMs}.`
+    );
+  }
+
+  if (typeof presence.friendFreshnessThresholdMs !== 'number' || presence.friendFreshnessThresholdMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.friendFreshnessThresholdMs: expected positive number, received ${presence.friendFreshnessThresholdMs}.`
+    );
+  }
+
+  if (typeof presence.staleGuestPruneIntervalMs !== 'number' || presence.staleGuestPruneIntervalMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.staleGuestPruneIntervalMs: expected positive number, received ${presence.staleGuestPruneIntervalMs}.`
+    );
+  }
+
+  if (typeof presence.staleGuestCutoffMs !== 'number' || presence.staleGuestCutoffMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.staleGuestCutoffMs: expected positive number, received ${presence.staleGuestCutoffMs}.`
+    );
+  }
+
+  if (!presence.storageKeys || typeof presence.storageKeys !== 'object') {
+    throw new MultiplayerConfigError('Presence storageKeys configuration section is missing or invalid.');
+  }
+
+  const { sessionStorageId, activeSessions, authCachedUid, authCachedProfile, cachedLobbyStats, mockGames } = presence.storageKeys;
+  const storageKeyEntries = { sessionStorageId, activeSessions, authCachedUid, authCachedProfile, cachedLobbyStats, mockGames };
+  for (const [keyName, val] of Object.entries(storageKeyEntries)) {
+    if (typeof val !== 'string' || val.trim().length === 0) {
+      throw new MultiplayerConfigError(`Invalid presence.storageKeys.${keyName}: expected non-empty string.`);
+    }
   }
 
   if (!matchmaking) {
@@ -208,6 +272,51 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
       `Invalid matchmaking.clockTickIntervalMs: expected number between 10 and 5000, received ${matchmaking.clockTickIntervalMs}.`
     );
   }
+
+  if (typeof matchmaking.liveRoomsPollIntervalMs !== 'number' || matchmaking.liveRoomsPollIntervalMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.liveRoomsPollIntervalMs: expected positive number, received ${matchmaking.liveRoomsPollIntervalMs}.`
+    );
+  }
+
+  if (
+    typeof matchmaking.friendBatchLookupSize !== 'number' ||
+    matchmaking.friendBatchLookupSize <= 0 ||
+    matchmaking.friendBatchLookupSize > 30
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.friendBatchLookupSize: expected number between 1 and 30, received ${matchmaking.friendBatchLookupSize}.`
+    );
+  }
+
+  if (
+    typeof matchmaking.leaderboardLimit !== 'number' ||
+    matchmaking.leaderboardLimit <= 0 ||
+    matchmaking.leaderboardLimit > 500
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.leaderboardLimit: expected number between 1 and 500, received ${matchmaking.leaderboardLimit}.`
+    );
+  }
+
+  if (typeof matchmaking.leaderboardCacheTtlMs !== 'number' || matchmaking.leaderboardCacheTtlMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.leaderboardCacheTtlMs: expected positive number, received ${matchmaking.leaderboardCacheTtlMs}.`
+    );
+  }
+
+  const { collections } = config;
+  if (!collections || typeof collections !== 'object') {
+    throw new MultiplayerConfigError('Collections configuration section is missing or invalid.');
+  }
+
+  const { users, games, guestSessions, lobbyStats, friendRequests, userFriends } = collections;
+  const collectionEntries = { users, games, guestSessions, lobbyStats, friendRequests, userFriends };
+  for (const [colName, val] of Object.entries(collectionEntries)) {
+    if (typeof val !== 'string' || val.trim().length === 0) {
+      throw new MultiplayerConfigError(`Invalid collections.${colName}: expected non-empty string.`);
+    }
+  }
 }
 
 export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
@@ -220,6 +329,18 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     statsPollIntervalMs: 12_000,
     statsPollJitterMs: 3_000,
     statsInitialFallbackDelayMs: 0,
+    statsFallbackPollIntervalMs: 60_000,
+    friendFreshnessThresholdMs: 45_000,
+    staleGuestPruneIntervalMs: 5 * 60 * 1000,
+    staleGuestCutoffMs: 15 * 60 * 1000,
+    storageKeys: Object.freeze({
+      sessionStorageId: 'schada_client_session_id',
+      activeSessions: 'schada_active_sessions_v2',
+      authCachedUid: 'schada_auth_cached_uid',
+      authCachedProfile: 'schada_auth_cached_profile',
+      cachedLobbyStats: 'schada_cached_lobby_stats',
+      mockGames: 'schada_mock_games',
+    }),
   }),
   matchmaking: Object.freeze({
     maxOpenRoomsLobbyLimit: 50,
@@ -236,6 +357,18 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     defaultCleanupIntervalMs: 60_000,
     maxCleanupBatchSize: 50,
     clockTickIntervalMs: 100,
+    liveRoomsPollIntervalMs: 60_000,
+    friendBatchLookupSize: 30,
+    leaderboardLimit: 50,
+    leaderboardCacheTtlMs: 5 * 60 * 1000,
+  }),
+  collections: Object.freeze({
+    users: 'users',
+    games: 'games',
+    guestSessions: 'guest_sessions',
+    lobbyStats: 'stats',
+    friendRequests: 'friendRequests',
+    userFriends: 'userFriends',
   }),
 });
 

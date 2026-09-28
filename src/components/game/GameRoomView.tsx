@@ -16,7 +16,7 @@ import {
 } from '@/services/firebase/gameService';
 import { Arena, type ArenaPlayer } from './Arena';
 import type { Move, PieceColor } from '@/core/schada/types';
-import { Copy, Check, Share2, ArrowLeft, Loader2, UserCheck, Eye, Cpu } from 'lucide-react';
+import { Copy, Check, ArrowLeft, Loader2, Cpu } from 'lucide-react';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { mockBackend } from '@/services/firebase/mockProvider';
@@ -327,50 +327,6 @@ export const GameRoomView: React.FC = () => {
 
   return (
     <div className="game-room-container">
-      {/* Spectator or Player banner */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '0.75rem',
-          padding: '0.5rem 0.75rem',
-          background: isSpectator ? 'rgba(229, 183, 88, 0.12)' : 'rgba(54, 146, 231, 0.12)',
-          border: `1px solid ${isSpectator ? 'rgba(229, 183, 88, 0.3)' : 'rgba(54, 146, 231, 0.3)'}`,
-          borderRadius: 'var(--radius-md)',
-          width: '100%',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-          {isSpectator ? (
-            <>
-              <Eye size={16} color="var(--accent-gold)" />
-              <span>You are <strong>spectating</strong> this live game.</span>
-            </>
-          ) : (
-            <>
-              <UserCheck size={16} color="var(--accent-blue)" />
-              <span>
-                Playing as{' '}
-                <strong style={{ color: userColor === 'blue' ? 'var(--piece-blue)' : 'var(--piece-green)' }}>
-                  {userColor?.toUpperCase()}
-                </strong>
-              </span>
-            </>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={handleCopyLink}
-          className="btn btn-secondary"
-          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-        >
-          {copied ? <Check size={13} color="var(--accent-green)" /> : <Share2 size={13} />}
-          {copied ? 'Link Copied' : 'Share Room'}
-        </button>
-      </div>
 
       {/* Main Arena */}
       <Arena

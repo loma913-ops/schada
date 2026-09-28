@@ -22,7 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenFriends,
   pendingRequestsCount = 0,
 }) => {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { isStandalone, setInstallModalOpen } = usePwa();
 
@@ -174,6 +174,34 @@ export const Navbar: React.FC<NavbarProps> = ({
               {user.eloRating}
             </span>
           </button>
+        ) : isLoading ? (
+          <div
+            className="action-btn nav-auth-loading"
+            style={{
+              padding: '0.4rem 0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '85px',
+              minHeight: '34px',
+              opacity: 0.7,
+              cursor: 'default',
+            }}
+            aria-busy="true"
+            aria-label="Loading authentication"
+          >
+            <span
+              style={{
+                width: '14px',
+                height: '14px',
+                border: '2px solid var(--text-muted)',
+                borderTopColor: 'var(--accent-gold)',
+                borderRadius: '50%',
+                display: 'inline-block',
+                animation: 'spin 0.8s linear infinite',
+              }}
+            />
+          </div>
         ) : (
           <button
             className="action-btn active"

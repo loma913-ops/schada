@@ -45,12 +45,87 @@ export async function setUserOnlineStatus(
     }
   }
 
+  // Also update cached profile status if stored
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedProfile);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          parsed.status = status;
+          localStorage.setItem(
+            MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedProfile,
+            JSON.stringify(parsed)
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   const currentUid = typeof localStorage !== 'undefined'
     ? localStorage.getItem('schada_mock_current_user_id')
     : null;
   if (currentUid) {
     mockBackend.setUserStatus(currentUid, status);
   }
+}
+
+function persistCachedProfile(profile: UserProfile | null): void {
+  if (typeof localStorage === 'undefined') return;
+  const { authCachedUid, authCachedProfile } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
+  if (profile) {
+    localStorage.setItem(authCachedUid, profile.id);
+    localStorage.setItem(authCachedProfile, JSON.stringify(profile));
+  } else {
+    localStorage.removeItem(authCachedUid);
+    localStorage.removeItem(authCachedProfile);
+  }
+}
+
+export function getCachedAuthProfile(): UserProfile | null {
+  if (!isFirebaseConfigured() || !auth || !db) {
+    return mockBackend.getCurrentUser();
+  }
+  if (typeof localStorage === 'undefined') return null;
+  const { authCachedProfile } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
+  const raw = localStorage.getItem(authCachedProfile);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as UserProfile;
+    if (parsed && typeof parsed.id === 'string' && typeof parsed.username === 'string') {
+      return parsed;
+    }
+  } catch (e) {
+    console.warn('Failed to parse cached auth profile:', e);
+  }
+  return null;
+}
+
+export function getInitialAuthState(): { initialUser: UserProfile | null; initialLoading: boolean } {
+  if (!isFirebaseConfigured() || !auth || !db) {
+    return {
+      initialUser: mockBackend.getCurrentUser(),
+      initialLoading: false,
+    };
+  }
+
+  const cachedProfile = getCachedAuthProfile();
+  if (cachedProfile) {
+    return {
+      initialUser: cachedProfile,
+      initialLoading: false,
+    };
+  }
+
+  const { authCachedUid } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
+  const hasCachedUid = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem(authCachedUid));
+
+  return {
+    initialUser: null,
+    initialLoading: hasCachedUid,
+  };
 }
 
 export async function registerUser(
@@ -104,15 +179,14 @@ export async function registerUser(
       });
     });
 
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('schada_auth_cached_uid', uid);
-    }
+    persistCachedProfile(userProfile);
     syncPresenceHeartbeat();
     return userProfile;
   }
 
   // Fallback to local mock provider
   const registered = mockBackend.register(email, pass, username);
+  persistCachedProfile(registered);
   syncPresenceHeartbeat();
   return registered;
 }
@@ -140,15 +214,15 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
       console.warn('Could not update status to online:', e);
     }
 
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('schada_auth_cached_uid', uid);
-    }
-    syncPresenceHeartbeat();
     const data = userDoc.data() as UserProfile;
-    return { ...data, status };
+    const profileWithStatus: UserProfile = { ...data, status };
+    persistCachedProfile(profileWithStatus);
+    syncPresenceHeartbeat();
+    return profileWithStatus;
   }
 
   const user = mockBackend.login(email, pass);
+  persistCachedProfile(user);
   syncPresenceHeartbeat();
   return user;
 }
@@ -169,9 +243,7 @@ export async function logoutUser(): Promise<void> {
     }
     await signOut(auth);
   }
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem('schada_auth_cached_uid');
-  }
+  persistCachedProfile(null);
   mockBackend.logout();
   syncPresenceHeartbeat();
 }
@@ -228,20 +300,20 @@ export async function changeUsername(
         updatedAt: serverTimestamp(),
       });
 
+      persistCachedProfile(updatedProfile);
       return updatedProfile;
     });
   }
 
-  return mockBackend.changeUsername(newUsername);
+  const changed = mockBackend.changeUsername(newUsername);
+  persistCachedProfile(changed);
+  return changed;
 }
 
 export function subscribeToAuthState(callback: (user: UserProfile | null) => void): () => void {
   if (isFirebaseConfigured() && auth && db) {
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('schada_auth_cached_uid', firebaseUser.uid);
-        }
         try {
           const userDocRef = doc(db!, 'users', firebaseUser.uid);
           const active = isCurrentClientActive();
@@ -253,22 +325,26 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
           syncPresenceHeartbeat();
           const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
-            callback({ ...(userDoc.data() as UserProfile), status });
+            const profile: UserProfile = { ...(userDoc.data() as UserProfile), status };
+            persistCachedProfile(profile);
+            callback(profile);
             return;
           }
         } catch (e) {
           console.error('Error fetching user profile:', e);
         }
       } else {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem('schada_auth_cached_uid');
-        }
+        persistCachedProfile(null);
       }
       callback(null);
     });
   }
 
   // Initial mock state
-  callback(mockBackend.getCurrentUser());
+  const mockUser = mockBackend.getCurrentUser();
+  if (mockUser) {
+    persistCachedProfile(mockUser);
+  }
+  callback(mockUser);
   return () => {};
 }

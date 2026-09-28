@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X, Play } from 'lucide-react';
 import type { PieceColor } from '@/core/schada/types';
+import { getBotTier } from '@/core/bot/botTiers';
+import { BOT_ENGINE_CONFIG } from '@/core/bot/botConfig';
 
 interface PlayAgainstComputerModalProps {
   isOpen: boolean;
@@ -24,9 +26,13 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
   initialIncrementSeconds,
   initialColorPref,
 }) => {
-  const [minutes, setMinutes] = useState(initialTimeControlMinutes ?? 5);
-  const [increment, setIncrement] = useState(initialIncrementSeconds ?? 0);
-  const [strength, setStrength] = useState<number>(1);
+  const [minutes, setMinutes] = useState(
+    initialTimeControlMinutes ?? BOT_ENGINE_CONFIG.timeManagement.defaultMatchMinutes
+  );
+  const [increment, setIncrement] = useState(
+    initialIncrementSeconds ?? (BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs / 1000)
+  );
+  const [strength, setStrength] = useState<number>(BOT_ENGINE_CONFIG.defaultLevel);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>(initialColorPref ?? 'random');
 
   React.useEffect(() => {
@@ -112,22 +118,72 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
         )}
 
         {/* Bot Strength / Difficulty Level */}
-        <div className="form-group">
-          <label className="form-label">Difficulty Level</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '0.4rem' }}>
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
-              <button
-                key={lvl}
-                type="button"
-                className={`action-btn ${strength === lvl ? 'active' : ''}`}
-                style={{ padding: '0.5rem 0' }}
-                onClick={() => setStrength(lvl)}
+        {(() => {
+          const selectedTier = getBotTier(strength);
+          return (
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <label className="form-label" style={{ margin: 0 }}>Difficulty Level</label>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-gold)' }}>
+                  {selectedTier.name} • {selectedTier.elo} Elo
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '0.35rem' }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    className={`action-btn ${strength === lvl ? 'active' : ''}`}
+                    style={{ padding: '0.55rem 0', fontWeight: 700 }}
+                    onClick={() => setStrength(lvl)}
+                    aria-label={`Level ${lvl} ${getBotTier(lvl).name}`}
+                  >
+                    {lvl}
+                  </button>
+                ))}
+              </div>
+
+              {/* Rich Active Tier Description Card */}
+              <div
+                style={{
+                  marginTop: '0.6rem',
+                  padding: '0.75rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem',
+                  textAlign: 'left',
+                }}
               >
-                {lvl}
-              </button>
-            ))}
-          </div>
-        </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                      Level {selectedTier.level}: {selectedTier.name}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        background: 'rgba(229, 183, 88, 0.15)',
+                        color: 'var(--accent-gold)',
+                        border: '1px solid rgba(229, 183, 88, 0.3)',
+                      }}
+                    >
+                      {selectedTier.elo} ELO
+                    </span>
+                  </div>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                  {selectedTier.description}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Preferred Army Color */}
         <div className="form-group" style={{ marginBottom: '1.5rem' }}>

@@ -133,5 +133,104 @@ describe('MultiplayerScaleConfig validation', () => {
     expect(() => validateMultiplayerScaleConfig(invalidTickInterval)).toThrowError(
       /Invalid matchmaking.clockTickIntervalMs/
     );
+
+    const invalidFallbackPoll: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        statsFallbackPollIntervalMs: 0,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidFallbackPoll)).toThrowError(
+      /Invalid presence.statsFallbackPollIntervalMs/
+    );
+
+    const invalidFriendFreshness: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        friendFreshnessThresholdMs: -10,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidFriendFreshness)).toThrowError(
+      /Invalid presence.friendFreshnessThresholdMs/
+    );
+
+    const invalidFriendBatchSize: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        friendBatchLookupSize: 50,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidFriendBatchSize)).toThrowError(
+      /Invalid matchmaking.friendBatchLookupSize/
+    );
+
+    const invalidLeaderboardLimit: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        leaderboardLimit: 0,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidLeaderboardLimit)).toThrowError(
+      /Invalid matchmaking.leaderboardLimit/
+    );
+
+    const invalidLeaderboardCacheTtl: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        leaderboardCacheTtlMs: -500,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidLeaderboardCacheTtl)).toThrowError(
+      /Invalid matchmaking.leaderboardCacheTtlMs/
+    );
+
+    const missingStorageKeys = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        storageKeys: null as any,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(missingStorageKeys as MultiplayerScaleConfig)).toThrowError(
+      /Presence storageKeys configuration section is missing or invalid/
+    );
+
+    const emptyStorageKey = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        storageKeys: {
+          ...MULTIPLAYER_SCALE_CONFIG.presence.storageKeys,
+          sessionStorageId: '  ',
+        },
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyStorageKey as MultiplayerScaleConfig)).toThrowError(
+      /Invalid presence.storageKeys.sessionStorageId/
+    );
+
+    const missingCollections = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      collections: null as any,
+    };
+    expect(() => validateMultiplayerScaleConfig(missingCollections as MultiplayerScaleConfig)).toThrowError(
+      /Collections configuration section is missing or invalid/
+    );
+
+    const emptyCollection = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      collections: {
+        ...MULTIPLAYER_SCALE_CONFIG.collections,
+        users: '',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyCollection as MultiplayerScaleConfig)).toThrowError(
+      /Invalid collections.users/
+    );
   });
 });

@@ -3,10 +3,10 @@ import type { BoardState, Move, Piece, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import { computeCumulativeGameStates } from '@/core/schada/replay';
 import { CANONICAL_MOVE_NAVIGATOR_CONFIG } from './moveNavigatorConfig';
-import { selectBotMove, getBotThinkingDelayMs } from '@/core/bot/schadaBot';
+import { getBotThinkingDelayMs, getBotTier, botWorkerClient, BOT_ENGINE_CONFIG } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
-import { RotateCcw, Flag, ListOrdered, X, ArrowLeft } from 'lucide-react';
+import { RotateCcw, Flag, ListOrdered, X, ArrowLeft, Trophy } from 'lucide-react';
 import { SchadaBoard } from '../board/SchadaBoard';
 import { PlayerCard } from './PlayerCard';
 import { MoveHistory } from './MoveHistory';
@@ -54,12 +54,12 @@ export const Arena: React.FC<ArenaProps> = ({
   initialState,
   bluePlayer,
   greenPlayer,
-  timeControlMinutes = 5,
-  incrementSeconds = 0,
+  timeControlMinutes = BOT_ENGINE_CONFIG.timeManagement.defaultMatchMinutes,
+  incrementSeconds = BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs / 1000,
   isRanked = false,
   userColor,
   isComputer = false,
-  botLevel = 1,
+  botLevel = BOT_ENGINE_CONFIG.defaultLevel,
   isSpectator = false,
   isWaiting = false,
   syncedGameState,
@@ -93,6 +93,17 @@ export const Arena: React.FC<ArenaProps> = ({
     }
   }, [userColor, isSpectator, gameState.currentTurn]);
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+  const [showGameOverModal, setShowGameOverModal] = useState(true);
+  const [gameOverEffectsPlayed, setGameOverEffectsPlayed] = useState(false);
+
+  const prevIsGameOverRef = useRef(gameState.isGameOver);
+  useEffect(() => {
+    if (!prevIsGameOverRef.current && gameState.isGameOver) {
+      setShowGameOverModal(true);
+      setGameOverEffectsPlayed(false);
+    }
+    prevIsGameOverRef.current = gameState.isGameOver;
+  }, [gameState.isGameOver]);
 
   const gameStateRef = useRef<BoardState>(gameState);
   gameStateRef.current = gameState;
@@ -167,13 +178,14 @@ export const Arena: React.FC<ArenaProps> = ({
   const [blueTime, setBlueTime] = useState<number>(syncedBlueTimeMs ?? initialMs);
   const [greenTime, setGreenTime] = useState<number>(syncedGreenTimeMs ?? initialMs);
 
+  const blueTimeRef = useRef<number>(blueTime);
+  const greenTimeRef = useRef<number>(greenTime);
   useEffect(() => {
-    if (syncedBlueTimeMs !== undefined) setBlueTime(syncedBlueTimeMs);
-  }, [syncedBlueTimeMs]);
-
+    blueTimeRef.current = blueTime;
+  }, [blueTime]);
   useEffect(() => {
-    if (syncedGreenTimeMs !== undefined) setGreenTime(syncedGreenTimeMs);
-  }, [syncedGreenTimeMs]);
+    greenTimeRef.current = greenTime;
+  }, [greenTime]);
 
   const lastTickRef = useRef<number>(Date.now());
 
@@ -288,20 +300,25 @@ export const Arena: React.FC<ArenaProps> = ({
     }
   }, [customMakeMove, incrementSeconds, timeControlMinutes, onGameComplete]);
 
-  // Bot Turn Automation
+  // Bot Turn Automation (via Web Worker with sync fallback)
   useEffect(() => {
     if (!isComputer || !computerColor || gameState.isGameOver) return;
     if (gameState.currentTurn !== computerColor) return;
 
+    let isSubscribed = true;
     setIsBotThinking(true);
-    const delay = getBotThinkingDelayMs(botLevel);
-    const timer = setTimeout(() => {
-      const botMove = selectBotMove(
+    const delay = getBotThinkingDelayMs(botLevel, gameStateRef.current.moveHistory);
+    const timer = setTimeout(async () => {
+      const remainingTimeMs = computerColor === 'blue' ? blueTimeRef.current : greenTimeRef.current;
+      const botMove = await botWorkerClient.requestBotMove(
         gameStateRef.current.board,
         computerColor,
         botLevel,
-        gameStateRef.current.moveHistory
+        gameStateRef.current.moveHistory,
+        remainingTimeMs,
+        incrementSeconds * 1000
       );
+      if (!isSubscribed) return;
       setIsBotThinking(false);
       if (botMove) {
         handleMakeMove(botMove);
@@ -309,10 +326,19 @@ export const Arena: React.FC<ArenaProps> = ({
     }, delay);
 
     return () => {
+      isSubscribed = false;
       clearTimeout(timer);
       setIsBotThinking(false);
     };
-  }, [gameState.currentTurn, gameState.isGameOver, isComputer, computerColor, botLevel, handleMakeMove]);
+  }, [
+    gameState.currentTurn,
+    gameState.isGameOver,
+    isComputer,
+    computerColor,
+    botLevel,
+    handleMakeMove,
+    incrementSeconds,
+  ]);
 
   const handleResign = () => {
     if (gameState.isGameOver) return;
@@ -359,6 +385,9 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const topTime = topColor === 'blue' ? blueTime : greenTime;
   const bottomTime = bottomColor === 'blue' ? blueTime : greenTime;
+  // Algorithmic Complexity: O(1) constant time, verifying whether game has unlimited time controls.
+  // Growth Rate: O(1) flat.
+  const isUnlimited = timeControlMinutes <= 0;
 
   const topCaptured = displayedGameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue'];
   const bottomCaptured = displayedGameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue'];
@@ -383,6 +412,7 @@ export const Arena: React.FC<ArenaProps> = ({
           color={topColor}
           isTurn={displayedGameState.currentTurn === topColor && !gameState.isGameOver}
           remainingMs={topTime}
+          isUnlimited={isUnlimited}
           capturedPieces={topCaptured}
           materialAdvantage={materialScores.topAdvantage > 0 ? materialScores.topAdvantage : undefined}
           isUser={userColor === topColor}
@@ -413,6 +443,7 @@ export const Arena: React.FC<ArenaProps> = ({
           color={bottomColor}
           isTurn={displayedGameState.currentTurn === bottomColor && !gameState.isGameOver}
           remainingMs={bottomTime}
+          isUnlimited={isUnlimited}
           capturedPieces={bottomCaptured}
           materialAdvantage={materialScores.bottomAdvantage > 0 ? materialScores.bottomAdvantage : undefined}
           isUser={userColor === bottomColor}
@@ -441,6 +472,18 @@ export const Arena: React.FC<ArenaProps> = ({
               >
                 <Flag size={17} />
                 <span>Resign</span>
+              </button>
+            )}
+
+            {gameState.isGameOver && (
+              <button
+                className="mobile-action-btn"
+                onClick={() => setShowGameOverModal(true)}
+                title="View Match Results"
+                aria-label="Results"
+              >
+                <Trophy size={17} />
+                <span>Results</span>
               </button>
             )}
 
@@ -474,11 +517,15 @@ export const Arena: React.FC<ArenaProps> = ({
           <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             {timeControlMinutes > 0 ? `${timeControlMinutes}+${incrementSeconds}` : 'Unlimited'} •{' '}
             <span style={{ color: isRanked ? 'var(--accent-gold)' : 'var(--text-secondary)' }}>
-              {isSpectator ? 'Spectating' : isComputer ? `Level ${botLevel} Bot` : isRanked ? 'Ranked' : 'Casual'}
+              {isSpectator ? 'Spectating' : isComputer ? `${getBotTier(botLevel).name} (Lvl ${botLevel})` : isRanked ? 'Ranked' : 'Casual'}
             </span>
           </div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Turn: <strong style={{ color: displayedGameState.currentTurn === 'blue' ? 'var(--piece-blue)' : 'var(--piece-green)' }}>{displayedGameState.currentTurn.toUpperCase()}</strong>
+            {gameState.isGameOver ? (
+              <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>GAME OVER</span>
+            ) : (
+              <>Turn: <strong style={{ color: displayedGameState.currentTurn === 'blue' ? 'var(--piece-blue)' : 'var(--piece-green)' }}>{displayedGameState.currentTurn.toUpperCase()}</strong></>
+            )}
           </div>
         </div>
 
@@ -494,6 +541,9 @@ export const Arena: React.FC<ArenaProps> = ({
           onResign={handleResign}
           onFlipBoard={handleFlipBoard}
           disabled={gameState.isGameOver || isSpectator}
+          isGameOver={gameState.isGameOver}
+          onShowResult={() => setShowGameOverModal(true)}
+          onExit={onExit}
         />
       </div>
 
@@ -527,14 +577,20 @@ export const Arena: React.FC<ArenaProps> = ({
       )}
 
       {/* Game Over Modal */}
-      {gameState.isGameOver && gameState.result && (
+      {gameState.isGameOver && gameState.result && showGameOverModal && (
         <GameOverModal
           result={gameState.result}
           userColor={userColor}
           isRanked={isRanked}
           bluePlayer={bluePlayer}
           greenPlayer={greenPlayer}
+          triggerEffects={!gameOverEffectsPlayed}
+          onEffectsPlayed={() => setGameOverEffectsPlayed(true)}
           onHome={onExit}
+          onClose={() => {
+            setShowGameOverModal(false);
+            setGameOverEffectsPlayed(true);
+          }}
         />
       )}
     </div>
