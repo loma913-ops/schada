@@ -96,6 +96,30 @@ describe('GameOverModal - Rated Games Elo Display', () => {
       expect(html).toContain('(-11)');
     });
 
+    it('prioritizes authoritative blueElo and greenElo without recalculating from player cards', () => {
+      // Even if bluePlayer and greenPlayer reflect already-updated ratings or differing provisional games,
+      // blueElo and greenElo must be rendered directly and authoritatively.
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          result: mockResult,
+          isRanked: true,
+          bluePlayer: { elo: 1230, gamesPlayed: 0 },
+          greenPlayer: { elo: 1170, gamesPlayed: 20 },
+          blueElo: { newElo: 1216, delta: 16 },
+          greenElo: { newElo: 1184, delta: -16 },
+          onHome: vi.fn(),
+        })
+      );
+
+      expect(html).toContain('1216');
+      expect(html).toContain('(+16)');
+      expect(html).toContain('1184');
+      expect(html).toContain('(-16)');
+      // Must NOT contain recalculated values
+      expect(html).not.toContain('1230');
+      expect(html).not.toContain('1170');
+    });
+
     it('renders correctly for draw outcomes in rated games', () => {
       const drawResult: GameResult = {
         ...mockResult,

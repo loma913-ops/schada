@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import type { GameResult, PieceColor } from '@/core/schada/types';
 import confetti from 'canvas-confetti';
 import { soundService } from '@/services/audio/soundService';
@@ -101,8 +101,11 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     return null;
   }, [isRanked, blueElo, greenElo, bluePlayer, greenPlayer, result.winner]);
 
+  const effectsFiredRef = useRef(false);
+
   useEffect(() => {
-    if (!triggerEffects) return;
+    if (!triggerEffects || effectsFiredRef.current) return;
+    effectsFiredRef.current = true;
     haptics.gameOver();
     if (isWinner) {
       soundService.playVictory();

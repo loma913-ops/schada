@@ -13,14 +13,14 @@ import {
   arrayUnion,
   writeBatch,
 } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from './config';
+import { auth, db, isFirebaseConfigured } from './config';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import type { BoardState, Move, PieceColor } from '@/core/schada/types';
 import { createInitialGameState, executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import type { ArenaPlayer } from '@/components/game/Arena';
 import { calculateEloUpdate } from '@/core/elo/eloService';
-import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { updateUserStats } from './authService';
+import type { UserProfile } from './localProvider';
 import { safeSetItem, STORAGE_LIMITS } from '../storage/storageCleanup';
 
 export interface GamePlayer extends ArenaPlayer {
@@ -147,21 +147,28 @@ function generateToken(): string {
  * Growth Rate:
  * - O(1) constant: computational cost does not scale with game length, move count, or player ratings.
  */
-function computeRankedGameEloResult(
+export function computeRankedGameEloResult(
   game: GameRoom,
   outcome: 'blue' | 'green' | 'draw'
 ): GameEloResult | null {
   if (!game.isRanked || !game.bluePlayer || !game.greenPlayer) {
     return null;
   }
+  const blueGames = typeof game.bluePlayer.gamesPlayed === 'number'
+    ? game.bluePlayer.gamesPlayed
+    : 0;
+  const greenGames = typeof game.greenPlayer.gamesPlayed === 'number'
+    ? game.greenPlayer.gamesPlayed
+    : 0;
+
   const calc = calculateEloUpdate(
     {
       rating: game.bluePlayer.elo,
-      gamesPlayed: game.bluePlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+      gamesPlayed: blueGames,
     },
     {
       rating: game.greenPlayer.elo,
-      gamesPlayed: game.greenPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+      gamesPlayed: greenGames,
     },
     outcome
   );
@@ -405,7 +412,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
     id: params.creator.id,
     username: params.creator.username,
     elo: params.creator.elo,
-    gamesPlayed: params.creator.gamesPlayed,
+    gamesPlayed: typeof params.creator.gamesPlayed === 'number' ? params.creator.gamesPlayed : 0,
     sessionToken,
   };
 
@@ -502,7 +509,7 @@ export async function joinGame(
           id: user.id,
           username: user.username,
           elo: user.elo,
-          gamesPlayed: user.gamesPlayed,
+          gamesPlayed: typeof user.gamesPlayed === 'number' ? user.gamesPlayed : 0,
           sessionToken: newToken,
         };
 
@@ -563,7 +570,7 @@ export async function joinGame(
       id: user.id,
       username: user.username,
       elo: user.elo,
-      gamesPlayed: user.gamesPlayed,
+      gamesPlayed: typeof user.gamesPlayed === 'number' ? user.gamesPlayed : 0,
       sessionToken: newToken,
     };
 
@@ -785,8 +792,8 @@ export async function makeGameMove(
 export async function resignGameAction(
   gameId: string,
   resigningColor: PieceColor
-): Promise<void> {
-  if (pendingResolutionGameIds.has(gameId)) return;
+): Promise<UserProfile | null> {
+  if (pendingResolutionGameIds.has(gameId)) return null;
   pendingResolutionGameIds.add(gameId);
 
   try {
@@ -794,6 +801,7 @@ export async function resignGameAction(
       const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
       let resigningPlayerId: string | null = null;
       let resigningDelta = 0;
+      let isRankedGame = false;
 
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(docRef);
@@ -802,6 +810,7 @@ export async function resignGameAction(
         const game = snap.data() as GameRoom;
         if (game.status !== 'in_progress') return;
 
+        isRankedGame = Boolean(game.isRanked);
         const nextBoardState = resignGame(game.boardState, resigningColor);
         const winner = nextBoardState.result?.winner;
         const updatePayload: Partial<GameRoom> = {
@@ -812,9 +821,10 @@ export async function resignGameAction(
           lastTurnStartTimeMs: null,
         };
 
-        const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
-          ? [...game.processedEloUserIds]
-          : [];
+        const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+        if (resigningPlayer?.id) {
+          resigningPlayerId = resigningPlayer.id;
+        }
 
         if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
           const eloCalc = computeRankedGameEloResult(game, winner);
@@ -829,33 +839,35 @@ export async function resignGameAction(
               elo: eloCalc.newGreenElo,
             };
 
-            const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
             const delta = resigningColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
-            if (resigningPlayer?.id) {
-              resigningPlayerId = resigningPlayer.id;
-              resigningDelta = delta;
-              if (!processedUserIds.includes(resigningPlayer.id)) {
-                processedUserIds.push(resigningPlayer.id);
-              }
-            }
+            resigningDelta = delta;
           }
         }
 
-        updatePayload.processedEloUserIds = processedUserIds;
         tx.update(docRef, sanitize(updatePayload));
       });
 
-      if (resigningPlayerId) {
-        updateUserStats(resigningPlayerId, false, false, resigningDelta).catch((e) => {
+      if (resigningPlayerId && (!auth?.currentUser || auth.currentUser.uid === resigningPlayerId)) {
+        try {
+          const updated = await updateUserStats(
+            resigningPlayerId,
+            false,
+            false,
+            isRankedGame ? resigningDelta : 0
+          );
+          await markGameEloProcessed(gameId, resigningPlayerId);
+          return updated;
+        } catch (e) {
           console.warn('Failed to update stats for resigning player:', e);
-        });
+        }
       }
-      return;
+      return null;
     }
 
     const game = mockStore.getRaw(gameId);
-    if (!game || game.status !== 'in_progress') return;
+    if (!game || game.status !== 'in_progress') return null;
 
+    const isRankedGame = Boolean(game.isRanked);
     const nextBoardState = resignGame(game.boardState, resigningColor);
     const winner = nextBoardState.result?.winner;
     const updatePayload: Partial<GameRoom> = {
@@ -866,12 +878,13 @@ export async function resignGameAction(
       lastTurnStartTimeMs: null,
     };
 
-    const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
-      ? [...game.processedEloUserIds]
-      : [];
-
     let resigningPlayerId: string | null = null;
     let resigningDelta = 0;
+
+    const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+    if (resigningPlayer?.id) {
+      resigningPlayerId = resigningPlayer.id;
+    }
 
     if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
       const eloCalc = computeRankedGameEloResult(game, winner);
@@ -886,26 +899,28 @@ export async function resignGameAction(
           elo: eloCalc.newGreenElo,
         };
 
-        const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
         const delta = resigningColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
-        if (resigningPlayer?.id) {
-          resigningPlayerId = resigningPlayer.id;
-          resigningDelta = delta;
-          if (!processedUserIds.includes(resigningPlayer.id)) {
-            processedUserIds.push(resigningPlayer.id);
-          }
-        }
+        resigningDelta = delta;
       }
     }
 
-    updatePayload.processedEloUserIds = processedUserIds;
     mockStore.set({ ...game, ...updatePayload });
 
     if (resigningPlayerId) {
-      updateUserStats(resigningPlayerId, false, false, resigningDelta).catch((e) => {
+      try {
+        const updated = await updateUserStats(
+          resigningPlayerId,
+          false,
+          false,
+          isRankedGame ? resigningDelta : 0
+        );
+        await markGameEloProcessed(gameId, resigningPlayerId);
+        return updated;
+      } catch (e) {
         console.warn('Failed to update stats for resigning player:', e);
-      });
+      }
     }
+    return null;
   } finally {
     pendingResolutionGameIds.delete(gameId);
   }
@@ -924,8 +939,8 @@ export async function resignGameAction(
 export async function timeoutGameAction(
   gameId: string,
   timedOutColor: PieceColor
-): Promise<void> {
-  if (pendingResolutionGameIds.has(gameId)) return;
+): Promise<UserProfile | null> {
+  if (pendingResolutionGameIds.has(gameId)) return null;
   pendingResolutionGameIds.add(gameId);
 
   try {
@@ -933,6 +948,7 @@ export async function timeoutGameAction(
       const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
       let timedOutPlayerId: string | null = null;
       let timedOutDelta = 0;
+      let isRankedGame = false;
 
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(docRef);
@@ -941,6 +957,7 @@ export async function timeoutGameAction(
         const game = snap.data() as GameRoom;
         if (game.status !== 'in_progress') return;
 
+        isRankedGame = Boolean(game.isRanked);
         const nextBoardState = timeoutGame(game.boardState, timedOutColor);
         const winner = nextBoardState.result?.winner;
         const updatePayload: Partial<GameRoom> = {
@@ -951,9 +968,10 @@ export async function timeoutGameAction(
           lastTurnStartTimeMs: null,
         };
 
-        const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
-          ? [...game.processedEloUserIds]
-          : [];
+        const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+        if (timedOutPlayer?.id) {
+          timedOutPlayerId = timedOutPlayer.id;
+        }
 
         if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
           const eloCalc = computeRankedGameEloResult(game, winner);
@@ -968,33 +986,35 @@ export async function timeoutGameAction(
               elo: eloCalc.newGreenElo,
             };
 
-            const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
             const delta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
-            if (timedOutPlayer?.id) {
-              timedOutPlayerId = timedOutPlayer.id;
-              timedOutDelta = delta;
-              if (!processedUserIds.includes(timedOutPlayer.id)) {
-                processedUserIds.push(timedOutPlayer.id);
-              }
-            }
+            timedOutDelta = delta;
           }
         }
 
-        updatePayload.processedEloUserIds = processedUserIds;
         tx.update(docRef, sanitize(updatePayload));
       });
 
-      if (timedOutPlayerId) {
-        updateUserStats(timedOutPlayerId, false, false, timedOutDelta).catch((e) => {
+      if (timedOutPlayerId && (!auth?.currentUser || auth.currentUser.uid === timedOutPlayerId)) {
+        try {
+          const updated = await updateUserStats(
+            timedOutPlayerId,
+            false,
+            false,
+            isRankedGame ? timedOutDelta : 0
+          );
+          await markGameEloProcessed(gameId, timedOutPlayerId);
+          return updated;
+        } catch (e) {
           console.warn('Failed to update stats for timed-out player:', e);
-        });
+        }
       }
-      return;
+      return null;
     }
 
     const game = mockStore.getRaw(gameId);
-    if (!game || game.status !== 'in_progress') return;
+    if (!game || game.status !== 'in_progress') return null;
 
+    const isRankedGame = Boolean(game.isRanked);
     const nextBoardState = timeoutGame(game.boardState, timedOutColor);
     const winner = nextBoardState.result?.winner;
     const updatePayload: Partial<GameRoom> = {
@@ -1005,12 +1025,13 @@ export async function timeoutGameAction(
       lastTurnStartTimeMs: null,
     };
 
-    const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
-      ? [...game.processedEloUserIds]
-      : [];
-
     let timedOutPlayerId: string | null = null;
     let timedOutDelta = 0;
+
+    const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+    if (timedOutPlayer?.id) {
+      timedOutPlayerId = timedOutPlayer.id;
+    }
 
     if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
       const eloCalc = computeRankedGameEloResult(game, winner);
@@ -1025,26 +1046,28 @@ export async function timeoutGameAction(
           elo: eloCalc.newGreenElo,
         };
 
-        const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
         const delta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
-        if (timedOutPlayer?.id) {
-          timedOutPlayerId = timedOutPlayer.id;
-          timedOutDelta = delta;
-          if (!processedUserIds.includes(timedOutPlayer.id)) {
-            processedUserIds.push(timedOutPlayer.id);
-          }
-        }
+        timedOutDelta = delta;
       }
     }
 
-    updatePayload.processedEloUserIds = processedUserIds;
     mockStore.set({ ...game, ...updatePayload });
 
     if (timedOutPlayerId) {
-      updateUserStats(timedOutPlayerId, false, false, timedOutDelta).catch((e) => {
+      try {
+        const updated = await updateUserStats(
+          timedOutPlayerId,
+          false,
+          false,
+          isRankedGame ? timedOutDelta : 0
+        );
+        await markGameEloProcessed(gameId, timedOutPlayerId);
+        return updated;
+      } catch (e) {
         console.warn('Failed to update stats for timed-out player:', e);
-      });
+      }
     }
+    return null;
   } finally {
     pendingResolutionGameIds.delete(gameId);
   }

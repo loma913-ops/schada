@@ -11,7 +11,9 @@ import { SchadaBoard } from '../board/SchadaBoard';
 import { PlayerCard } from './PlayerCard';
 import { MoveHistory } from './MoveHistory';
 import { GameControls } from './GameControls';
-import { GameOverModal } from './GameOverModal';
+import { GameOverModal, type PlayerEloUpdate } from './GameOverModal';
+import { calculateEloUpdate } from '@/core/elo/eloService';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
 
 /** Pure helper - defined at module scope so it is never re-created on render. */
 function getMaterialValue(pieces: Piece[]): number {
@@ -32,6 +34,8 @@ interface ArenaProps {
   initialState: BoardState;
   bluePlayer: ArenaPlayer;
   greenPlayer: ArenaPlayer;
+  blueElo?: PlayerEloUpdate;
+  greenElo?: PlayerEloUpdate;
   timeControlMinutes?: number; // 0 for unlimited
   incrementSeconds?: number; // Fischer increment
   isRanked?: boolean;
@@ -54,6 +58,8 @@ export const Arena: React.FC<ArenaProps> = ({
   initialState,
   bluePlayer,
   greenPlayer,
+  blueElo,
+  greenElo,
   timeControlMinutes = BOT_ENGINE_CONFIG.timeManagement.defaultMatchMinutes,
   incrementSeconds = BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs / 1000,
   isRanked = false,
@@ -95,15 +101,19 @@ export const Arena: React.FC<ArenaProps> = ({
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
   const [showGameOverModal, setShowGameOverModal] = useState(true);
   const [gameOverEffectsPlayed, setGameOverEffectsPlayed] = useState(false);
+  const handleGameOverEffectsPlayed = useCallback(() => {
+    setGameOverEffectsPlayed(true);
+  }, []);
 
   const prevIsGameOverRef = useRef(gameState.isGameOver);
   useEffect(() => {
     if (!prevIsGameOverRef.current && gameState.isGameOver) {
       setShowGameOverModal(true);
       setGameOverEffectsPlayed(false);
+      onGameComplete?.(gameState);
     }
     prevIsGameOverRef.current = gameState.isGameOver;
-  }, [gameState.isGameOver]);
+  }, [gameState.isGameOver, onGameComplete, gameState]);
 
   const gameStateRef = useRef<BoardState>(gameState);
   gameStateRef.current = gameState;
@@ -261,6 +271,18 @@ export const Arena: React.FC<ArenaProps> = ({
       } else {
         soundService.playMove();
       }
+
+      if (move.piece.type !== 'pawn') {
+        const destRow = parseInt(move.to[1], 10) - 1;
+        const goalRow = move.piece.color === 'blue' ? 7 : 0;
+        if (destRow === goalRow) {
+          soundService.playGoal();
+        }
+      }
+
+      const nextState = executeMove(currentState, move);
+      prevMoveCountRef.current = nextState.moveHistory.length;
+      setGameState(nextState);
       customMakeMove(move);
       return;
     }
@@ -345,7 +367,6 @@ export const Arena: React.FC<ArenaProps> = ({
     const resigningColor = isComputer && userColor ? userColor : (userColor || gameState.currentTurn);
     if (customResign) {
       customResign();
-      setGameState((prev) => resignGame(prev, resigningColor));
       return;
     }
     const nextState = resignGame(gameState, resigningColor);
@@ -378,11 +399,43 @@ export const Arena: React.FC<ArenaProps> = ({
     return gameState.moveHistory[viewMoveIndex] || null;
   }, [gameState.moveHistory, viewMoveIndex]);
 
+  const computedElo = useMemo(() => {
+    if (blueElo && greenElo) {
+      return { blue: blueElo, green: greenElo };
+    }
+    if (isRanked && bluePlayer && greenPlayer && gameState.result?.winner) {
+      const outcome = gameState.result.winner;
+      const calc = calculateEloUpdate(
+        {
+          rating: bluePlayer.elo,
+          gamesPlayed: bluePlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        },
+        {
+          rating: greenPlayer.elo,
+          gamesPlayed: greenPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        },
+        outcome
+      );
+      return {
+        blue: { newElo: calc.newBlueRating, delta: calc.blueDelta },
+        green: { newElo: calc.newGreenRating, delta: calc.greenDelta },
+      };
+    }
+    return null;
+  }, [blueElo, greenElo, isRanked, bluePlayer, greenPlayer, gameState.result?.winner]);
+
   const topColor: PieceColor = orientation === 'blue' ? 'green' : 'blue';
   const bottomColor: PieceColor = orientation === 'blue' ? 'blue' : 'green';
 
   const topPlayer = topColor === 'blue' ? bluePlayer : greenPlayer;
   const bottomPlayer = bottomColor === 'blue' ? bluePlayer : greenPlayer;
+
+  const topElo = (gameState.isGameOver && computedElo)
+    ? (topColor === 'blue' ? computedElo.blue.newElo : computedElo.green.newElo)
+    : topPlayer.elo;
+  const bottomElo = (gameState.isGameOver && computedElo)
+    ? (bottomColor === 'blue' ? computedElo.blue.newElo : computedElo.green.newElo)
+    : bottomPlayer.elo;
 
   const topTime = topColor === 'blue' ? blueTime : greenTime;
   const bottomTime = bottomColor === 'blue' ? blueTime : greenTime;
@@ -409,7 +462,7 @@ export const Arena: React.FC<ArenaProps> = ({
         {/* Top Player Card */}
         <PlayerCard
           username={topPlayer.username}
-          elo={topPlayer.elo}
+          elo={topElo}
           color={topColor}
           isTurn={displayedGameState.currentTurn === topColor && !gameState.isGameOver}
           remainingMs={topTime}
@@ -440,7 +493,7 @@ export const Arena: React.FC<ArenaProps> = ({
         {/* Bottom Player Card */}
         <PlayerCard
           username={bottomPlayer.username}
-          elo={bottomPlayer.elo}
+          elo={bottomElo}
           color={bottomColor}
           isTurn={displayedGameState.currentTurn === bottomColor && !gameState.isGameOver}
           remainingMs={bottomTime}
@@ -585,8 +638,10 @@ export const Arena: React.FC<ArenaProps> = ({
           isRanked={isRanked}
           bluePlayer={bluePlayer}
           greenPlayer={greenPlayer}
+          blueElo={computedElo?.blue || blueElo}
+          greenElo={computedElo?.green || greenElo}
           triggerEffects={!gameOverEffectsPlayed}
-          onEffectsPlayed={() => setGameOverEffectsPlayed(true)}
+          onEffectsPlayed={handleGameOverEffectsPlayed}
           onHome={onExit}
           onClose={() => {
             setShowGameOverModal(false);

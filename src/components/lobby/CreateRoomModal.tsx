@@ -3,6 +3,7 @@ import { X, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createGame } from '@/services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { useNavigate } from 'react-router-dom';
 
 interface CreateRoomModalProps {
@@ -31,13 +32,14 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
     setLoading(true);
     try {
       const creator = user
-        ? { id: user.id, username: user.username, elo: user.eloRating }
+        ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed ?? 0 }
         : {
           id: 'guest_' + Math.random().toString(36).substring(2, 7),
           username:
             localStorage.getItem('schada_guest_name') ||
             MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName,
           elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
         };
 
       const result = await createGame({

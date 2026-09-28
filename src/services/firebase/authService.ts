@@ -170,7 +170,52 @@ export async function updateUserStats(
         // ignore
       }
     }
+    return cached;
   }
+
+  // Fallback cache synchronization if localBackend did not contain this profile (e.g. Firebase user)
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedProfile);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as UserProfile;
+        if (parsed?.id === userId) {
+          const currentGamesPlayed = parsed.gamesPlayed || 0;
+          const currentGamesWon = parsed.gamesWon || 0;
+          const currentGamesLost = parsed.gamesLost || 0;
+          const currentGamesDrawn = parsed.gamesDrawn || 0;
+          const currentElo = typeof parsed.eloRating === 'number'
+            ? parsed.eloRating
+            : ELO_CONFIG.defaultStartingRating;
+
+          const newElo = Math.max(ELO_CONFIG.minimumRating, currentElo + eloDelta);
+          const newGamesPlayed = currentGamesPlayed + 1;
+          const newGamesWon = isDraw ? currentGamesWon : won ? currentGamesWon + 1 : currentGamesWon;
+          const newGamesLost = isDraw ? currentGamesLost : !won ? currentGamesLost + 1 : currentGamesLost;
+          const newGamesDrawn = isDraw ? currentGamesDrawn + 1 : currentGamesDrawn;
+
+          const updatedLocal: UserProfile = {
+            ...parsed,
+            eloRating: newElo,
+            gamesPlayed: newGamesPlayed,
+            gamesWon: newGamesWon,
+            gamesLost: newGamesLost,
+            gamesDrawn: newGamesDrawn,
+          };
+          persistCachedProfile(updatedLocal);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: updatedLocal })
+            );
+          }
+          return updatedLocal;
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   return cached;
 }
 

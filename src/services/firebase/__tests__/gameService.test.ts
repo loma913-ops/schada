@@ -22,6 +22,7 @@ import {
 } from '../gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
+import { registerUser } from '../authService';
 
 vi.mock('../config', () => ({
   isFirebaseConfigured: () => false,
@@ -729,6 +730,84 @@ describe('GameService Multiplayer Sync', () => {
     expect(gameAfterTimeout.eloResult.blueDelta).toBeLessThan(0);
     expect(gameAfterTimeout.eloResult.greenDelta).toBeGreaterThan(0);
     expect(gameAfterTimeout.processedEloUserIds).toContain('p1_time');
+  });
+
+  it('updates stats and returns UserProfile when resigning in ranked and unranked games', async () => {
+    const user1 = await registerUser('ranked_resigner@example.com', 'password123', 'RankedResigner');
+    const creator = { id: user1.id, username: user1.username, elo: user1.eloRating, gamesPlayed: user1.gamesPlayed };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isRanked: true,
+      creator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: 'p_winner', username: 'Winner', elo: 1200 });
+
+    const updatedProfile = await resignGameAction(gameId, 'blue');
+    expect(updatedProfile).not.toBeNull();
+    expect(updatedProfile?.gamesPlayed).toBe(1);
+    expect(updatedProfile?.gamesLost).toBe(1);
+    expect(updatedProfile?.eloRating).toBeLessThan(user1.eloRating);
+
+    // Now test unranked game
+    const user2 = await registerUser('casual_resigner@example.com', 'password123', 'CasualResigner');
+    const unrankedCreator = { id: user2.id, username: user2.username, elo: user2.eloRating, gamesPlayed: user2.gamesPlayed };
+    const { gameId: unrankedId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isRanked: false,
+      creator: unrankedCreator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + unrankedId);
+    await joinGame(unrankedId, { id: 'p_casual_winner', username: 'CasualWinner', elo: 1200 });
+
+    const unrankedUpdated = await resignGameAction(unrankedId, 'blue');
+    expect(unrankedUpdated).not.toBeNull();
+    expect(unrankedUpdated?.gamesPlayed).toBe(1);
+    expect(unrankedUpdated?.gamesLost).toBe(1);
+    expect(unrankedUpdated?.eloRating).toBe(user2.eloRating); // Unchanged in casual game
+  });
+
+  it('updates stats and returns UserProfile when timing out in ranked and unranked games', async () => {
+    const user1 = await registerUser('ranked_timeout@example.com', 'password123', 'RankedTimeout');
+    const creator = { id: user1.id, username: user1.username, elo: user1.eloRating, gamesPlayed: user1.gamesPlayed };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'green',
+      isRanked: true,
+      creator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: 'p_time_winner', username: 'TimeWinner', elo: 1200 });
+
+    const updatedProfile = await timeoutGameAction(gameId, 'green');
+    expect(updatedProfile).not.toBeNull();
+    expect(updatedProfile?.gamesPlayed).toBe(1);
+    expect(updatedProfile?.gamesLost).toBe(1);
+    expect(updatedProfile?.eloRating).toBeLessThan(user1.eloRating);
+
+    // Now test unranked timeout
+    const user2 = await registerUser('casual_timeout@example.com', 'password123', 'CasualTimeout');
+    const unrankedCreator = { id: user2.id, username: user2.username, elo: user2.eloRating, gamesPlayed: user2.gamesPlayed };
+    const { gameId: unrankedId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'green',
+      isRanked: false,
+      creator: unrankedCreator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + unrankedId);
+    await joinGame(unrankedId, { id: 'p_casual_time_win', username: 'TimeCasualWinner', elo: 1200 });
+
+    const unrankedUpdated = await timeoutGameAction(unrankedId, 'green');
+    expect(unrankedUpdated).not.toBeNull();
+    expect(unrankedUpdated?.gamesPlayed).toBe(1);
+    expect(unrankedUpdated?.gamesLost).toBe(1);
+    expect(unrankedUpdated?.eloRating).toBe(user2.eloRating);
   });
 });
 

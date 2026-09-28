@@ -112,21 +112,23 @@ const MainApp: React.FC = () => {
     const defaultGuestRating = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating;
 
     const currentUser = user
-      ? { id: user.id, username: user.username, elo: user.eloRating }
+      ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed ?? 0 }
       : {
-          id: guestId,
-          username: localStorage.getItem('schada_guest_name') || defaultGuestName,
-          elo: defaultGuestRating,
-        };
+        id: guestId,
+        username: localStorage.getItem('schada_guest_name') || defaultGuestName,
+        elo: defaultGuestRating,
+        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+      };
 
     try {
       // 1. Direct targeted index lookup for an open waiting room with this time control (O(1) read)
+      const targetIsRanked = Boolean(user && isRanked);
       const existingMatch = await findOpenWaitingGame(
         minutes,
         increment,
         currentUser.id,
         undefined,
-        user ? undefined : false
+        targetIsRanked
       );
 
       if (existingMatch) {
@@ -155,7 +157,6 @@ const MainApp: React.FC = () => {
     }
   };
 
-  // Start a Pass and Play / Solo Sandbox game
   // Start a Pass and Play / Solo Sandbox game
   const handleStartPassAndPlay = () => {
     setActiveMatch({
@@ -200,10 +201,10 @@ const MainApp: React.FC = () => {
     const currentUserPlayer: ArenaPlayer = user
       ? { id: user.id, username: user.username, elo: user.eloRating }
       : {
-          id: 'guest',
-          username: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
-          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-        };
+        id: 'guest',
+        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
+        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+      };
 
     const bluePlayer = userColor === 'blue' ? currentUserPlayer : botOpponent;
     const greenPlayer = userColor === 'blue' ? botOpponent : currentUserPlayer;
@@ -247,14 +248,15 @@ const MainApp: React.FC = () => {
     }
 
     const creator = user
-      ? { id: user.id, username: user.username, elo: user.eloRating }
+      ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed }
       : {
-          id: guestId,
-          username:
-            localStorage.getItem('schada_guest_name') ||
-            MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName,
-          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-        };
+        id: guestId,
+        username:
+          localStorage.getItem('schada_guest_name') ||
+          MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName,
+        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+      };
 
     const result = await createGame({
       timeControlMinutes: minutes,

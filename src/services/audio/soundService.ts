@@ -21,6 +21,10 @@ class SoundService {
   private moveAudioElement: HTMLAudioElement | null = null;
   private captureAudioElement: HTMLAudioElement | null = null;
 
+  // Sound deduplication timestamps
+  private lastMoveSoundTime: number = 0;
+  private lastVictorySoundTime: number = 0;
+
   constructor() {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('schada_sound_muted');
@@ -132,6 +136,10 @@ class SoundService {
   public playMove(): void {
     if (this.isMuted) return;
 
+    const now = Date.now();
+    if (now - this.lastMoveSoundTime < 60) return;
+    this.lastMoveSoundTime = now;
+
     const ctx = this.ensureContext();
     if (!ctx) {
       this.playAudioElement('move');
@@ -177,6 +185,10 @@ class SoundService {
   /** Authentic wooden piece capture hit */
   public playCapture(): void {
     if (this.isMuted) return;
+
+    const now = Date.now();
+    if (now - this.lastMoveSoundTime < 60) return;
+    this.lastMoveSoundTime = now;
 
     const ctx = this.ensureContext();
     if (!ctx) {
@@ -307,6 +319,11 @@ class SoundService {
   // Victory fanfare
   public playVictory(): void {
     if (this.isMuted) return;
+
+    const now = Date.now();
+    if (now - this.lastVictorySoundTime < 2000) return;
+    this.lastVictorySoundTime = now;
+
     const ctx = this.ensureContext();
     if (!ctx) return;
 
