@@ -68,7 +68,7 @@ class BotWorkerClient {
   async requestBotMove(
     board: BoardMatrix,
     color: PieceColor,
-    level: number = 1,
+    level: number = BOT_ENGINE_CONFIG.defaultLevel,
     recentMoves?: Move[],
     timeLeftMs?: number,
     incrementMs?: number

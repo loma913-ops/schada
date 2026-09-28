@@ -51,7 +51,7 @@ self.onmessage = (event: MessageEvent<BotWorkerRequest>) => {
 
     let budget = tier.timeLimitMs;
     if (typeof timeLeftMs === 'number' && timeLeftMs > 0) {
-      const clockPortion = Math.floor(timeLeftMs / tm.clockDivisor) + (incrementMs ?? 0);
+      const clockPortion = Math.floor(timeLeftMs / tm.clockDivisor) + (incrementMs ?? tm.defaultIncrementMs);
       budget = Math.max(tm.minThinkingTimeMs, Math.min(tier.timeLimitMs, clockPortion));
     }
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Play } from 'lucide-react';
 import type { PieceColor } from '@/core/schada/types';
 import { getBotTier } from '@/core/bot/botTiers';
+import { BOT_ENGINE_CONFIG } from '@/core/bot/botConfig';
 
 interface PlayAgainstComputerModalProps {
   isOpen: boolean;
@@ -25,9 +26,13 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
   initialIncrementSeconds,
   initialColorPref,
 }) => {
-  const [minutes, setMinutes] = useState(initialTimeControlMinutes ?? 5);
-  const [increment, setIncrement] = useState(initialIncrementSeconds ?? 0);
-  const [strength, setStrength] = useState<number>(1);
+  const [minutes, setMinutes] = useState(
+    initialTimeControlMinutes ?? BOT_ENGINE_CONFIG.timeManagement.defaultMatchMinutes
+  );
+  const [increment, setIncrement] = useState(
+    initialIncrementSeconds ?? (BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs / 1000)
+  );
+  const [strength, setStrength] = useState<number>(BOT_ENGINE_CONFIG.defaultLevel);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>(initialColorPref ?? 'random');
 
   React.useEffect(() => {

@@ -41,6 +41,17 @@ export interface SearchParametersConfig {
   readonly nullMoveMinDepth: number;
   readonly openingVariancePlies: number;
   readonly openingVarianceScoreWindow: number;
+  readonly pvMoveBonus: number;
+  readonly captureBaseBonus: number;
+  readonly goalEntryBonus: number;
+  readonly primaryKillerBonus: number;
+  readonly secondaryKillerBonus: number;
+  readonly maxHistoryBonus: number;
+  readonly distanceGainMultiplier: number;
+  readonly terminalNearWinCutoff: number;
+  readonly timeoutCheckIntervalMask: number;
+  readonly mvvLvaVictimMultiplier: number;
+  readonly blunderPoolMaxCandidates: number;
 }
 
 export interface TimeManagementConfig {
@@ -50,6 +61,8 @@ export interface TimeManagementConfig {
   readonly baseThinkingDelayMs: number;
   readonly thinkingDelayStepPerLevelMs: number;
   readonly randomDelayJitterMaxMs: number;
+  readonly defaultIncrementMs: number;
+  readonly defaultMatchMinutes: number;
 }
 
 export interface OpeningBookConfig {
@@ -80,6 +93,7 @@ export interface BotTierConfig {
 }
 
 export interface BotEngineConfig {
+  readonly defaultLevel: number;
   readonly evaluationWeights: EvaluationWeightsConfig;
   readonly searchParameters: SearchParametersConfig;
   readonly timeManagement: TimeManagementConfig;
@@ -104,6 +118,10 @@ export function validateBotConfig(config: BotEngineConfig): void {
   }
 
   const { evaluationWeights, searchParameters, timeManagement, tiers } = config;
+
+  if (typeof config.defaultLevel !== 'number' || !Number.isInteger(config.defaultLevel) || config.defaultLevel < 1 || config.defaultLevel > 8) {
+    throw new BotConfigError(`defaultLevel must be an integer between 1 and 8, received ${String(config.defaultLevel)}.`);
+  }
 
   if (!evaluationWeights) {
     throw new BotConfigError('evaluationWeights section is missing.');
@@ -154,6 +172,25 @@ export function validateBotConfig(config: BotEngineConfig): void {
     throw new BotConfigError('nullMoveReduction must be a positive integer.');
   }
 
+  if (
+    searchParameters.pvMoveBonus <= 0 ||
+    searchParameters.captureBaseBonus <= 0 ||
+    searchParameters.goalEntryBonus <= 0 ||
+    searchParameters.primaryKillerBonus <= 0 ||
+    searchParameters.secondaryKillerBonus <= 0 ||
+    searchParameters.maxHistoryBonus <= 0 ||
+    searchParameters.distanceGainMultiplier <= 0 ||
+    searchParameters.terminalNearWinCutoff <= 0 ||
+    searchParameters.timeoutCheckIntervalMask <= 0 ||
+    searchParameters.mvvLvaVictimMultiplier <= 0
+  ) {
+    throw new BotConfigError('Search move ordering and heuristic bonuses must be strictly positive.');
+  }
+
+  if (searchParameters.blunderPoolMaxCandidates < 2) {
+    throw new BotConfigError('searchParameters.blunderPoolMaxCandidates must be at least 2.');
+  }
+
   // Validate Time Management
   if (timeManagement.clockDivisor <= 0) {
     throw new BotConfigError('clockDivisor must be positive.');
@@ -161,6 +198,14 @@ export function validateBotConfig(config: BotEngineConfig): void {
 
   if (timeManagement.minThinkingTimeMs <= 0 || timeManagement.workerSafetyTimeoutMs <= timeManagement.minThinkingTimeMs) {
     throw new BotConfigError('workerSafetyTimeoutMs must strictly exceed minThinkingTimeMs.');
+  }
+
+  if (timeManagement.defaultIncrementMs < 0) {
+    throw new BotConfigError('timeManagement.defaultIncrementMs must be non-negative.');
+  }
+
+  if (timeManagement.defaultMatchMinutes <= 0) {
+    throw new BotConfigError('timeManagement.defaultMatchMinutes must be strictly positive.');
   }
 
   // Validate Opening Book
@@ -226,6 +271,7 @@ export function validateBotConfig(config: BotEngineConfig): void {
 }
 
 export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
+  defaultLevel: 1,
   evaluationWeights: Object.freeze({
     fieldOfficerMaterial: 200,
     officerMaterial: 100,
@@ -253,6 +299,17 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
     nullMoveMinDepth: 3,
     openingVariancePlies: 4,
     openingVarianceScoreWindow: 15,
+    pvMoveBonus: 1_000_000,
+    captureBaseBonus: 100_000,
+    goalEntryBonus: 50_000,
+    primaryKillerBonus: 9_000,
+    secondaryKillerBonus: 8_000,
+    maxHistoryBonus: 7_000,
+    distanceGainMultiplier: 20,
+    terminalNearWinCutoff: 50,
+    timeoutCheckIntervalMask: 1023,
+    mvvLvaVictimMultiplier: 10,
+    blunderPoolMaxCandidates: 5,
   }),
   timeManagement: Object.freeze({
     clockDivisor: 25,
@@ -261,6 +318,8 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
     baseThinkingDelayMs: 250,
     thinkingDelayStepPerLevelMs: 60,
     randomDelayJitterMaxMs: 200,
+    defaultIncrementMs: 0,
+    defaultMatchMinutes: 5,
   }),
   openingBook: Object.freeze({
     enabled: true,

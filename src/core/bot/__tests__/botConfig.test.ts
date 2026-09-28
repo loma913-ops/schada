@@ -96,4 +96,104 @@ describe('Bot Configuration Validator & Error Handling', () => {
     expect(() => getBotTier(NaN)).toThrow(BotConfigError);
     expect(() => getBotTier(2.5)).toThrow(BotConfigError);
   });
+
+  it('throws BotConfigError if defaultLevel is not an integer between 1 and 8', () => {
+    const invalidZero = { ...BOT_ENGINE_CONFIG, defaultLevel: 0 };
+    expect(() => validateBotConfig(invalidZero)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidZero)).toThrow(/defaultLevel must be an integer between 1 and 8/);
+
+    const invalidNine = { ...BOT_ENGINE_CONFIG, defaultLevel: 9 };
+    expect(() => validateBotConfig(invalidNine)).toThrow(BotConfigError);
+
+    const invalidFloat = { ...BOT_ENGINE_CONFIG, defaultLevel: 1.5 };
+    expect(() => validateBotConfig(invalidFloat)).toThrow(BotConfigError);
+
+    const invalidType = { ...BOT_ENGINE_CONFIG, defaultLevel: '1' as any };
+    expect(() => validateBotConfig(invalidType)).toThrow(BotConfigError);
+  });
+
+  it('throws BotConfigError if search ordering bonuses or multipliers are non-positive', () => {
+    const invalidPvBonus: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      searchParameters: {
+        ...BOT_ENGINE_CONFIG.searchParameters,
+        pvMoveBonus: 0,
+      },
+    };
+    expect(() => validateBotConfig(invalidPvBonus)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidPvBonus)).toThrow(/Search move ordering and heuristic bonuses must be strictly positive/);
+
+    const invalidMvvLva: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      searchParameters: {
+        ...BOT_ENGINE_CONFIG.searchParameters,
+        mvvLvaVictimMultiplier: -1,
+      },
+    };
+    expect(() => validateBotConfig(invalidMvvLva)).toThrow(BotConfigError);
+  });
+
+  it('throws BotConfigError if blunderPoolMaxCandidates is less than 2', () => {
+    const invalidBlunderPool: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      searchParameters: {
+        ...BOT_ENGINE_CONFIG.searchParameters,
+        blunderPoolMaxCandidates: 1,
+      },
+    };
+    expect(() => validateBotConfig(invalidBlunderPool)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidBlunderPool)).toThrow(/blunderPoolMaxCandidates must be at least 2/);
+  });
+
+  it('throws BotConfigError if defaultIncrementMs is negative or defaultMatchMinutes is non-positive', () => {
+    const invalidIncrement: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      timeManagement: {
+        ...BOT_ENGINE_CONFIG.timeManagement,
+        defaultIncrementMs: -1,
+      },
+    };
+    expect(() => validateBotConfig(invalidIncrement)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidIncrement)).toThrow(/defaultIncrementMs must be non-negative/);
+
+    const invalidMinutes: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      timeManagement: {
+        ...BOT_ENGINE_CONFIG.timeManagement,
+        defaultMatchMinutes: 0,
+      },
+    };
+    expect(() => validateBotConfig(invalidMinutes)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidMinutes)).toThrow(/defaultMatchMinutes must be strictly positive/);
+  });
+
+  it('throws BotConfigError if opening book configuration is invalid', () => {
+    const missingBook = { ...BOT_ENGINE_CONFIG, openingBook: undefined as any };
+    expect(() => validateBotConfig(missingBook)).toThrow(BotConfigError);
+
+    const invalidPlies: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      openingBook: { ...BOT_ENGINE_CONFIG.openingBook, maxPlies: 0 },
+    };
+    expect(() => validateBotConfig(invalidPlies)).toThrow(BotConfigError);
+
+    const invalidProb: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      openingBook: { ...BOT_ENGINE_CONFIG.openingBook, tier2BookProbability: 1.5 },
+    };
+    expect(() => validateBotConfig(invalidProb)).toThrow(BotConfigError);
+
+    const invalidMinTier: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      openingBook: { ...BOT_ENGINE_CONFIG.openingBook, minTier: 0 },
+    };
+    expect(() => validateBotConfig(invalidMinTier)).toThrow(BotConfigError);
+
+    const invalidDelay: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      openingBook: { ...BOT_ENGINE_CONFIG.openingBook, bookThinkingDelayMs: -10 },
+    };
+    expect(() => validateBotConfig(invalidDelay)).toThrow(BotConfigError);
+  });
 });
+

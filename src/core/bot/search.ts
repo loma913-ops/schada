@@ -140,14 +140,15 @@ function scoreMoveForOrdering(
   ply: number,
   ctx: SearchContext
 ): number {
+  const sp = BOT_ENGINE_CONFIG.searchParameters;
   if (move.from === hashFrom && move.to === hashTo) {
-    return 1_000_000;
+    return sp.pvMoveBonus;
   }
 
   if (move.captured !== EMPTY) {
     const victim = getPieceMaterialScore(move.captured);
     const attacker = getPieceMaterialScore(move.piece);
-    return 100_000 + victim * 10 - attacker;
+    return sp.captureBaseBonus + victim * sp.mvvLvaVictimMultiplier - attacker;
   }
 
   const isHigh = move.piece === BLUE_FO || move.piece === BLUE_O || move.piece === GREEN_FO || move.piece === GREEN_O;
@@ -155,25 +156,25 @@ function scoreMoveForOrdering(
   const isBlue = move.piece <= 3;
   const goalRow = isBlue ? 7 : 0;
   if (isHigh && destRow === goalRow) {
-    return 50_000;
+    return sp.goalEntryBonus;
   }
 
   if (ply < ctx.killerMoves.length) {
     const km = ctx.killerMoves[ply];
-    if (km[0].from === move.from && km[0].to === move.to) return 9000;
-    if (km[1].from === move.from && km[1].to === move.to) return 8000;
+    if (km[0].from === move.from && km[0].to === move.to) return sp.primaryKillerBonus;
+    if (km[1].from === move.from && km[1].to === move.to) return sp.secondaryKillerBonus;
   }
 
   const hist = ctx.historyTable[move.from * 64 + move.to];
   if (hist > 0) {
-    return Math.min(7000, hist);
+    return Math.min(sp.maxHistoryBonus, hist);
   }
 
   if (isHigh) {
     const fromDist = isBlue ? DISTANCE_TABLES.blueSliding[move.from] : DISTANCE_TABLES.greenSliding[move.from];
     const toDist = isBlue ? DISTANCE_TABLES.blueSliding[move.to] : DISTANCE_TABLES.greenSliding[move.to];
     const gain = fromDist - toDist;
-    return gain * 20;
+    return gain * sp.distanceGainMultiplier;
   }
 
   return 0;
@@ -204,7 +205,8 @@ function quiescence(
   ctx: SearchContext
 ): number {
   ctx.nodesVisited++;
-  if ((ctx.nodesVisited & 1023) === 0 && performance.now() - ctx.startTime > ctx.timeLimitMs) {
+  const mask = BOT_ENGINE_CONFIG.searchParameters.timeoutCheckIntervalMask;
+  if ((ctx.nodesVisited & mask) === 0 && performance.now() - ctx.startTime > ctx.timeLimitMs) {
     ctx.timedOut = true;
     return alpha;
   }
@@ -268,7 +270,8 @@ function pvs(
   allowNull: boolean = true
 ): number {
   ctx.nodesVisited++;
-  if ((ctx.nodesVisited & 1023) === 0 && performance.now() - ctx.startTime > ctx.timeLimitMs) {
+  const mask = BOT_ENGINE_CONFIG.searchParameters.timeoutCheckIntervalMask;
+  if ((ctx.nodesVisited & mask) === 0 && performance.now() - ctx.startTime > ctx.timeLimitMs) {
     ctx.timedOut = true;
     return alpha;
   }
@@ -437,7 +440,8 @@ export function searchBestMove(
     scoredMoves.sort((a, b) => b.score - a.score);
 
     if (Math.random() < tier.blunderRate && scoredMoves.length > 1) {
-      const blunderPool = scoredMoves.slice(1, Math.min(5, scoredMoves.length));
+      const maxCandidates = BOT_ENGINE_CONFIG.searchParameters.blunderPoolMaxCandidates;
+      const blunderPool = scoredMoves.slice(1, Math.min(maxCandidates, scoredMoves.length));
       return blunderPool[Math.floor(Math.random() * blunderPool.length)].move;
     }
     return scoredMoves[0].move;
@@ -495,7 +499,7 @@ export function searchBestMove(
 
     bestMove = iterationBestMove;
 
-    if (iterationBestScore >= TERMINAL_WIN - 50) {
+    if (iterationBestScore >= TERMINAL_WIN - BOT_ENGINE_CONFIG.searchParameters.terminalNearWinCutoff) {
       break;
     }
   }

@@ -3,7 +3,7 @@ import type { BoardState, Move, Piece, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import { computeCumulativeGameStates } from '@/core/schada/replay';
 import { CANONICAL_MOVE_NAVIGATOR_CONFIG } from './moveNavigatorConfig';
-import { getBotThinkingDelayMs, getBotTier, botWorkerClient } from '@/core/bot/schadaBot';
+import { getBotThinkingDelayMs, getBotTier, botWorkerClient, BOT_ENGINE_CONFIG } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { RotateCcw, Flag, ListOrdered, X, ArrowLeft } from 'lucide-react';
@@ -54,12 +54,12 @@ export const Arena: React.FC<ArenaProps> = ({
   initialState,
   bluePlayer,
   greenPlayer,
-  timeControlMinutes = 5,
-  incrementSeconds = 0,
+  timeControlMinutes = BOT_ENGINE_CONFIG.timeManagement.defaultMatchMinutes,
+  incrementSeconds = BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs / 1000,
   isRanked = false,
   userColor,
   isComputer = false,
-  botLevel = 1,
+  botLevel = BOT_ENGINE_CONFIG.defaultLevel,
   isSpectator = false,
   isWaiting = false,
   syncedGameState,

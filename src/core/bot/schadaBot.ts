@@ -33,7 +33,7 @@ export function scoreMove(
   _recentMoves?: Move[]
 ): number {
   const fastBoard = FastBoard.fromBoardMatrix(board, botColor);
-  const tier = getBotTier(1);
+  const tier = getBotTier(BOT_ENGINE_CONFIG.defaultLevel);
   const legalFastMoves = fastBoard.generateLegalMoves(botColor);
   const matching = legalFastMoves.find(
     (m) => fastBoard.toStandardMove(m).from === move.from && fastBoard.toStandardMove(m).to === move.to
@@ -65,7 +65,7 @@ export function scoreMove(
 export function selectBotMove(
   board: BoardMatrix,
   color: PieceColor,
-  level: number = 1,
+  level: number = BOT_ENGINE_CONFIG.defaultLevel,
   recentMoves?: Move[],
   timeLeftMs?: number,
   incrementMs?: number
@@ -82,7 +82,7 @@ export function selectBotMove(
 
   let budget = tier.timeLimitMs;
   if (typeof timeLeftMs === 'number' && timeLeftMs > 0) {
-    const clockPortion = Math.floor(timeLeftMs / tm.clockDivisor) + (incrementMs ?? 0);
+    const clockPortion = Math.floor(timeLeftMs / tm.clockDivisor) + (incrementMs ?? tm.defaultIncrementMs);
     budget = Math.max(tm.minThinkingTimeMs, Math.min(tier.timeLimitMs, clockPortion));
   }
 
@@ -101,7 +101,7 @@ export function selectBotMove(
  * - Time Complexity: O(1).
  * - Auxiliary Space Complexity: O(1).
  */
-export function getBotThinkingDelayMs(level: number = 1, recentMoves?: Move[]): number {
+export function getBotThinkingDelayMs(level: number = BOT_ENGINE_CONFIG.defaultLevel, recentMoves?: Move[]): number {
   if (shouldTierUseOpeningBook(level, recentMoves)) {
     const key = buildMoveSequenceKey(recentMoves);
     if (OPENING_BOOK[key] && OPENING_BOOK[key].length > 0) {

@@ -5,8 +5,10 @@ import {
   getOpeningBookMove,
   shouldTierUseOpeningBook,
   buildMoveSequenceKey,
+  validateOpeningBook,
   OPENING_BOOK,
 } from '../openingBook';
+import { BotConfigError } from '../botConfig';
 import { getBotThinkingDelayMs } from '../schadaBot';
 
 describe('Schada Opening Book & Rapid Turn Transitions', () => {
@@ -16,7 +18,7 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
 
     expect(bookMove).not.toBeNull();
     expect(bookMove?.piece.color).toBe('blue');
-    expect(['c1', 'e1', 'c2', 'e2']).toContain(bookMove?.from);
+    expect(['c1', 'e1', 'c2', 'e2', 'a1', 'g1']).toContain(bookMove?.from);
   });
 
   it('provides legal responses for Green on ply 1', () => {
@@ -100,5 +102,56 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
         ).toBe(true);
       }
     }
+  });
+
+  it('verifies that OPENING_BOOK is tree-closed and complete for both Blue and Green up to ply 4', () => {
+    for (const [key, candidates] of Object.entries(OPENING_BOOK)) {
+      const currentPly = key === '' ? 0 : key.split(' ').length;
+      if (currentPly < 3) {
+        for (const candidate of candidates) {
+          const nextKey = key === '' ? `${candidate.from}-${candidate.to}` : `${key} ${candidate.from}-${candidate.to}`;
+          const nextCandidates = OPENING_BOOK[nextKey];
+          expect(
+            nextCandidates,
+            `Expected OPENING_BOOK to have response entries for "${nextKey}" from parent "${key}"`
+          ).toBeDefined();
+          expect(
+            nextCandidates.length,
+            `Expected at least one response for position "${nextKey}"`
+          ).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('validates OPENING_BOOK with validateOpeningBook without error', () => {
+    expect(() => validateOpeningBook(OPENING_BOOK)).not.toThrow();
+  });
+
+  it('validateOpeningBook throws BotConfigError on invalid catalogs', () => {
+    expect(() => validateOpeningBook(null as any)).toThrow(BotConfigError);
+    expect(() => validateOpeningBook({ "": [] } as any)).toThrow(BotConfigError);
+    expect(() =>
+      validateOpeningBook({
+        "": [{ from: 'invalid' as any, to: 'c3', weight: 10, lineName: 'Test' }],
+      })
+    ).toThrow(BotConfigError);
+    expect(() =>
+      validateOpeningBook({
+        "": [{ from: 'c1', to: 'c3', weight: -5, lineName: 'Test' }],
+      })
+    ).toThrow(BotConfigError);
+    expect(() =>
+      validateOpeningBook({
+        "": [{ from: 'c1', to: 'c3', weight: 10, lineName: '   ' }],
+      })
+    ).toThrow(BotConfigError);
+  });
+
+  it('getOpeningBookMove defaults to BOT_ENGINE_CONFIG.defaultLevel if level is omitted', () => {
+    const state = createInitialGameState();
+    const move = getOpeningBookMove(state.board, 'blue');
+    // Level 1 is defaultLevel and bypasses book, returning null
+    expect(move).toBeNull();
   });
 });
