@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import type { UserProfile } from '@/services/firebase/mockProvider';
-import { mockBackend } from '@/services/firebase/mockProvider';
+import type { UserProfile } from '@/services/firebase/localProvider';
+import { localBackend } from '@/services/firebase/localProvider';
 import { db, isFirebaseConfigured } from '@/services/firebase/config';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Trophy, Medal } from 'lucide-react';
@@ -48,14 +48,14 @@ export const LeaderboardTable: React.FC = () => {
           cachedLeaderboardTime = Date.now();
           setPlayers(list);
         } else {
-          const mockList = mockBackend.getLeaderboard();
+          const mockList = localBackend.getLeaderboard();
           cachedLeaderboard = mockList;
           cachedLeaderboardTime = Date.now();
           setPlayers(mockList);
         }
       } catch (e) {
         console.error('Failed to fetch leaderboard:', e);
-        setPlayers(mockBackend.getLeaderboard());
+        setPlayers(localBackend.getLeaderboard());
       } finally {
         setLoading(false);
       }

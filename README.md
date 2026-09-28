@@ -68,16 +68,16 @@ The Schada AI engine (`src/core/bot`) is implemented from scratch in TypeScript 
 
 ### Difficulty Hierarchy
 
-| Level | Tier Name | Target Elo | Max Depth | Blunder Rate | Core Capabilities & Search Characteristics |
-| :---: | :--- | :---: | :---: | :---: | :--- |
-| **1** | **Novice** | 100 | 1 ply | 65% | Opportunistic attacker. Grabs undefended pieces but plays largely random moves and ignores multi-step vector traps. |
-| **2** | **Beginner** | 400 | 1 ply | 30% | Basic material defender. Defends hanging pieces when paying attention; introduces basic forward progression. |
-| **3** | **Casual** | 800 | 2 plies | 8% | Calculates 2-ply tactics. Avoids direct self-captures and advances along shortest paths to the goal line. |
-| **4** | **Competent** | 1150 | 3 plies | 0% | Deterministic tactician. Uses move ordering (MVV-LVA), screens friendly officers with pawn shields, and avoids simple capture traps. |
-| **5** | **Intermediate** | 1500 | 4 plies | 0% | Iterative deepening search with **Pacing Paradox** awareness. Calculates terminal scores and avoids prematurely ending matches when behind on points. |
-| **6** | **Advanced** | 1800 | 5 plies | 0% | Transposition table (Zobrist hashing) and quiescence search. Exploits friendly pawn springboards for leaping Field Officers. |
-| **7** | **Expert** | 2100 | 7 plies | 0% | Null-move pruning and centrality heuristics. Deploys goal-line turret sentinels, controls central vector hubs, and optimizes $2/7$ fractional tiebreakers. |
-| **8** | **Master** | 2400 | 8 plies | 0% | Full graph flow mastery. Coordinates multi-piece pawn walls, suffocating vector blockades, and precise endgame conversion. |
+| Level | Tier Name        | Target Elo | Max Depth | Blunder Rate | Core Capabilities & Search Characteristics                                                                                                                 |
+| :---: | :--------------- | :--------: | :-------: | :----------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1** | **Novice**       |    100     |   1 ply   |     65%      | Opportunistic attacker. Grabs undefended pieces but plays largely random moves and ignores multi-step vector traps.                                        |
+| **2** | **Beginner**     |    400     |   1 ply   |     30%      | Basic material defender. Defends hanging pieces when paying attention; introduces basic forward progression.                                               |
+| **3** | **Casual**       |    800     |  2 plies  |      8%      | Calculates 2-ply tactics. Avoids direct self-captures and advances along shortest paths to the goal line.                                                  |
+| **4** | **Competent**    |    1150    |  3 plies  |      0%      | Deterministic tactician. Uses move ordering (MVV-LVA), screens friendly officers with pawn shields, and avoids simple capture traps.                       |
+| **5** | **Intermediate** |    1500    |  4 plies  |      0%      | Iterative deepening search with **Pacing Paradox** awareness. Calculates terminal scores and avoids prematurely ending matches when behind on points.      |
+| **6** | **Advanced**     |    1800    |  5 plies  |      0%      | Transposition table (Zobrist hashing) and quiescence search. Exploits friendly pawn springboards for leaping Field Officers.                               |
+| **7** | **Expert**       |    2100    |  7 plies  |      0%      | Null-move pruning and centrality heuristics. Deploys goal-line turret sentinels, controls central vector hubs, and optimizes $2/7$ fractional tiebreakers. |
+| **8** | **Master**       |    2400    |  8 plies  |      0%      | Full graph flow mastery. Coordinates multi-piece pawn walls, suffocating vector blockades, and precise endgame conversion.                                 |
 
 ### Technical Architecture
 
@@ -219,10 +219,10 @@ npm run build && npx firebase-tools deploy
 
 To bind a custom domain `schada.org` to Firebase Hosting, configure these DNS records at your registrar (Cloudflare, Namecheap, GoDaddy, etc.):
 
-| Type | Name / Host | Target / Value | Purpose |
-| :--- | :--- | :--- | :--- |
-| **A** | `@` (or root) | `199.36.158.100` | Points root domain `schada.org` to Firebase Hosting |
-| **CNAME** | `www` | `schada-online.web.app` | Points `www.schada.org` to the hosting target |
+| Type      | Name / Host   | Target / Value          | Purpose                                             |
+| :-------- | :------------ | :---------------------- | :-------------------------------------------------- |
+| **A**     | `@` (or root) | `199.36.158.100`        | Points root domain `schada.org` to Firebase Hosting |
+| **CNAME** | `www`         | `schada-online.web.app` | Points `www.schada.org` to the hosting target       |
 
 > **SSL / HTTPS Provisioning:** Firebase automatically issues and renews free SSL certificates via Let's Encrypt within 10–30 minutes of DNS verification.
 
@@ -294,10 +294,10 @@ schada/
 
 All offsets are expressed as `[file_delta, rank_delta]`:
 
-| Axis | Positive Direction | Negative Direction |
-| :--- | :--- | :--- |
-| **File** (`[0]`) | Toward `h` (right) | Toward `a` (left) |
-| **Rank** (`[1]`) | Toward `8` (up) | Toward `1` (down) |
+| Axis             | Positive Direction | Negative Direction |
+| :--------------- | :----------------- | :----------------- |
+| **File** (`[0]`) | Toward `h` (right) | Toward `a` (left)  |
+| **Rank** (`[1]`) | Toward `8` (up)    | Toward `1` (down)  |
 
 **Example:** From `d4`, the offset `[2, -1]` points to `f3` (2 files right, 1 rank down).
 
@@ -314,10 +314,10 @@ Each top-level key is a square in algebraic notation (`"a1"` to `"h8"`). Its val
 ]
 ```
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `"target"` | `[int, int]` | Relative offset from the piece's square to the destination square. |
-| `"path"` | `[[int, int], …]` | Ordered list of intermediate squares traversed. An intervening piece on any waypoint blocks standard pieces (Field Officers can leap over friendly pieces). Empty `[]` for direct moves. |
+| Field      | Type              | Description                                                                                                                                                                              |
+| :--------- | :---------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"target"` | `[int, int]`      | Relative offset from the piece's square to the destination square.                                                                                                                       |
+| `"path"`   | `[[int, int], …]` | Ordered list of intermediate squares traversed. An intervening piece on any waypoint blocks standard pieces (Field Officers can leap over friendly pieces). Empty `[]` for direct moves. |
 
 ### Direct Moves (`"path": []`)
 
@@ -349,10 +349,10 @@ A bent move travels through intermediate waypoints before reaching its destinati
 
 The board possesses rotational symmetry: ranks 5–8 mirror ranks 1–4 rotated by 180°. Whenever you update a square, its mirror square on the opposite half must be updated with **every offset negated** (multiplied by `-1`):
 
-| Square | Target | Mirror Square | Target |
-| :--- | :--- | :--- | :--- |
-| `a5` | `[0, 1]` → `a6` | `h4` | `[0, -1]` → `h3` |
-| `f2` | `[2, -1]` via `[1,0], [2,0]` | `c7` | `[-2, 1]` via `[-1,0], [-2,0]` |
+| Square | Target                       | Mirror Square | Target                         |
+| :----- | :--------------------------- | :------------ | :----------------------------- |
+| `a5`   | `[0, 1]` → `a6`              | `h4`          | `[0, -1]` → `h3`               |
+| `f2`   | `[2, -1]` via `[1,0], [2,0]` | `c7`          | `[-2, 1]` via `[-1,0], [-2,0]` |
 
 Always update **both** squares simultaneously to preserve board balance and engine integrity.
 
@@ -366,13 +366,66 @@ Always update **both** squares simultaneously to preserve board balance and engi
 
 ### Quick Reference: Common Offsets
 
-| Offset | Direction |
-| :--- | :--- |
-| `[1, 0]` | One file toward `h` |
-| `[-1, 0]` | One file toward `a` |
-| `[0, 1]` | One rank toward `8` |
-| `[0, -1]` | One rank toward `1` |
-| `[1, 1]` | Diagonal toward `h8` |
+| Offset     | Direction            |
+| :--------- | :------------------- |
+| `[1, 0]`   | One file toward `h`  |
+| `[-1, 0]`  | One file toward `a`  |
+| `[0, 1]`   | One rank toward `8`  |
+| `[0, -1]`  | One rank toward `1`  |
+| `[1, 1]`   | Diagonal toward `h8` |
 | `[-1, -1]` | Diagonal toward `a1` |
-| `[1, -1]` | Diagonal toward `h1` |
-| `[-1, 1]` | Diagonal toward `a8` |
+| `[1, -1]`  | Diagonal toward `h1` |
+| `[-1, 1]`  | Diagonal toward `a8` |
+
+---
+
+## Knowledge Graph (graphify)
+
+This project is graphified — a queryable knowledge graph of the full codebase can be built and explored using [graphify](https://github.com/safishamsi/graphifyy).
+
+### Prerequisites
+
+Install graphify via uv (recommended) or pip:
+
+```powershell
+uv tool install graphifyy
+# or: pip install graphifyy
+```
+
+Set the graphify API key as a persistent user environment variable (do **not** paste the key directly into commands or commit it to source control):
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<your-graphify-key>", "User")
+# Restart your terminal after setting this
+```
+
+### Build the graph
+
+```powershell
+# From the repo root:
+$env:GEMINI_API_KEY = API_KEY graphify .
+```
+
+This produces `graphify-out/` containing:
+
+| File              | Purpose                                                              |
+| :---------------- | :------------------------------------------------------------------- |
+| `graph.html`      | Interactive graph — open in any browser, no server needed            |
+| `GRAPH_REPORT.md` | Audit report: god nodes, surprising connections, suggested questions |
+| `graph.json`      | Raw graph data for tooling / RAG pipelines                           |
+
+### Query the graph
+
+```powershell
+# Ask a natural-language question about the codebase:
+graphify query "how does the Firebase mock switching work?"
+
+# Trace the shortest path between two concepts:
+graphify path "mockBackend" "isFirebaseConfigured"
+
+# Explain a specific node:
+graphify explain "isFirebaseConfigured"
+
+# Incremental update after code changes (only re-extracts changed files):
+graphify . --update
+```

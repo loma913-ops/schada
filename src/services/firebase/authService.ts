@@ -12,7 +12,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
-import { mockBackend, type UserProfile } from './mockProvider';
+import { localBackend, type UserProfile } from './localProvider';
 import {
   isCurrentClientActive,
   syncPresenceHeartbeat,
@@ -68,7 +68,7 @@ export async function setUserOnlineStatus(
     ? localStorage.getItem('schada_mock_current_user_id')
     : null;
   if (currentUid) {
-    mockBackend.setUserStatus(currentUid, status);
+    localBackend.setUserStatus(currentUid, status);
   }
 }
 
@@ -86,7 +86,7 @@ function persistCachedProfile(profile: UserProfile | null): void {
 
 export function getCachedAuthProfile(): UserProfile | null {
   if (!isFirebaseConfigured() || !auth || !db) {
-    return mockBackend.getCurrentUser();
+    return localBackend.getCurrentUser();
   }
   if (typeof localStorage === 'undefined') return null;
   const { authCachedProfile } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
@@ -106,7 +106,7 @@ export function getCachedAuthProfile(): UserProfile | null {
 export function getInitialAuthState(): { initialUser: UserProfile | null; initialLoading: boolean } {
   if (!isFirebaseConfigured() || !auth || !db) {
     return {
-      initialUser: mockBackend.getCurrentUser(),
+      initialUser: localBackend.getCurrentUser(),
       initialLoading: false,
     };
   }
@@ -185,7 +185,7 @@ export async function registerUser(
   }
 
   // Fallback to local mock provider
-  const registered = mockBackend.register(email, pass, username);
+  const registered = localBackend.register(email, pass, username);
   persistCachedProfile(registered);
   syncPresenceHeartbeat();
   return registered;
@@ -221,7 +221,7 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
     return profileWithStatus;
   }
 
-  const user = mockBackend.login(email, pass);
+  const user = localBackend.login(email, pass);
   persistCachedProfile(user);
   syncPresenceHeartbeat();
   return user;
@@ -244,7 +244,7 @@ export async function logoutUser(): Promise<void> {
     await signOut(auth);
   }
   persistCachedProfile(null);
-  mockBackend.logout();
+  localBackend.logout();
   syncPresenceHeartbeat();
 }
 
@@ -305,7 +305,7 @@ export async function changeUsername(
     });
   }
 
-  const changed = mockBackend.changeUsername(newUsername);
+  const changed = localBackend.changeUsername(newUsername);
   persistCachedProfile(changed);
   return changed;
 }
@@ -341,7 +341,7 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
   }
 
   // Initial mock state
-  const mockUser = mockBackend.getCurrentUser();
+  const mockUser = localBackend.getCurrentUser();
   if (mockUser) {
     persistCachedProfile(mockUser);
   }

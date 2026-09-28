@@ -19,7 +19,7 @@ import type { Move, PieceColor } from '@/core/schada/types';
 import { Copy, Check, ArrowLeft, Loader2, Cpu } from 'lucide-react';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
-import { mockBackend } from '@/services/firebase/mockProvider';
+import { localBackend } from '@/services/firebase/localProvider';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 
@@ -221,12 +221,12 @@ export const GameRoomView: React.FC = () => {
     if (game.bluePlayer.id === user.id) {
       const won = outcome === 'blue';
       const isDraw = outcome === 'draw';
-      mockBackend.updateStats(user.id, won, isDraw, eloResult.blueDelta);
+      localBackend.updateStats(user.id, won, isDraw, eloResult.blueDelta);
       refreshUser();
     } else if (game.greenPlayer.id === user.id) {
       const won = outcome === 'green';
       const isDraw = outcome === 'draw';
-      mockBackend.updateStats(user.id, won, isDraw, eloResult.greenDelta);
+      localBackend.updateStats(user.id, won, isDraw, eloResult.greenDelta);
       refreshUser();
     }
   }, [game, user, refreshUser]);

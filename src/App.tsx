@@ -31,12 +31,13 @@ const CustomGameModal = lazy(() => import('./components/lobby/CustomGameModal').
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { ELO_CONFIG } from './core/elo/eloConfig';
-import { mockBackend, type UserProfile } from './services/firebase/mockProvider';
+import { localBackend, type UserProfile } from './services/firebase/localProvider';
 import {
   createGame,
   joinGame,
   findOpenWaitingGame,
 } from './services/firebase/gameService';
+import { isFirebaseConfigured } from './services/firebase/config';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
 import { getBotTier } from './core/bot/botTiers';
 import type { BoardState, PieceColor } from './core/schada/types';
@@ -285,12 +286,18 @@ const MainApp: React.FC = () => {
     if (user && activeMatch.bluePlayer.id === user.id) {
       const won = outcome === 'blue';
       const isDraw = outcome === 'draw';
-      mockBackend.updateStats(user.id, won, isDraw, eloResult.blueDelta);
+      // Only update mock backend stats in offline/mock mode — Firebase mode persists via Firestore
+      if (!isFirebaseConfigured()) {
+        localBackend.updateStats(user.id, won, isDraw, eloResult.blueDelta);
+      }
       refreshUser();
     } else if (user && activeMatch.greenPlayer.id === user.id) {
       const won = outcome === 'green';
       const isDraw = outcome === 'draw';
-      mockBackend.updateStats(user.id, won, isDraw, eloResult.greenDelta);
+      // Only update mock backend stats in offline/mock mode — Firebase mode persists via Firestore
+      if (!isFirebaseConfigured()) {
+        localBackend.updateStats(user.id, won, isDraw, eloResult.greenDelta);
+      }
       refreshUser();
     }
   };
@@ -316,7 +323,7 @@ const MainApp: React.FC = () => {
         onOpenAuth={() => setAuthOpen(true)}
         onOpenProfile={() => setProfileOpen(true)}
         onOpenFriends={() => setFriendsOpen(true)}
-        pendingRequestsCount={user ? mockBackend.getPendingIncomingRequests(user.id).length : 0}
+        pendingRequestsCount={user ? localBackend.getPendingIncomingRequests(user.id).length : 0}
       />
 
       {/* Main Views with Routing */}
@@ -407,7 +414,7 @@ const MainApp: React.FC = () => {
             }
           }}
           onOpenFriends={() => setFriendsOpen(true)}
-          pendingRequestsCount={user ? mockBackend.getPendingIncomingRequests(user.id).length : 0}
+          pendingRequestsCount={user ? localBackend.getPendingIncomingRequests(user.id).length : 0}
         />
       )}
 

@@ -41,13 +41,13 @@ import {
   setUserOnlineStatus,
 } from '../authService';
 import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
-import { mockBackend } from '../mockProvider';
+import { localBackend } from '../localProvider';
 
 describe('authService caching and hydration', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    mockBackend.logout();
+    localBackend.logout();
   });
 
   it('provides synchronous initial state when no user is logged in', () => {

@@ -1,5 +1,5 @@
 /**
- * Mock Backend Provider for Offline and Development Testing.
+ * Local Backend Provider — offline/guest mode.
  *
  * Simulates Firebase Firestore authentication, user profiles, presence tracking,
  * and friend request management using browser localStorage.
@@ -25,7 +25,7 @@ export interface UserProfile {
   createdAt: string;
 }
 
-export interface MockFriendRequest {
+export interface LocalFriendRequest {
   id: string;
   fromUserId: string;
   fromUsername: string;
@@ -35,7 +35,7 @@ export interface MockFriendRequest {
   createdAt: string;
 }
 
-class MockBackend {
+class LocalBackend {
   private usersKey = MOCK_CONFIG.storageKeys.users;
   private currentUserIdKey = MOCK_CONFIG.storageKeys.currentUserId;
   private requestsKey = MOCK_CONFIG.storageKeys.friendRequests;
@@ -460,11 +460,11 @@ class MockBackend {
    * Growth Rate:
    * - O(R) linear.
    */
-  private getRequests(): MockFriendRequest[] {
-    return this.safeGetStorage<MockFriendRequest[]>(this.requestsKey, []);
+  private getRequests(): LocalFriendRequest[] {
+    return this.safeGetStorage<LocalFriendRequest[]>(this.requestsKey, []);
   }
 
-  private saveRequests(reqs: MockFriendRequest[]): void {
+  private saveRequests(reqs: LocalFriendRequest[]): void {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(this.requestsKey, JSON.stringify(reqs));
   }
@@ -479,7 +479,7 @@ class MockBackend {
    * Growth Rate:
    * - O(U + R) linear.
    */
-  public sendFriendRequest(fromUser: UserProfile, toUsername: string): MockFriendRequest {
+  public sendFriendRequest(fromUser: UserProfile, toUsername: string): LocalFriendRequest {
     const target = this.findUserByExactUsername(toUsername);
     if (!target) {
       throw new Error(`User "${toUsername}" not found. Please verify the exact username.`);
@@ -499,7 +499,7 @@ class MockBackend {
       throw new Error('Friend request already sent.');
     }
 
-    const newReq: MockFriendRequest = {
+    const newReq: LocalFriendRequest = {
       id: `freq_${Date.now()}`,
       fromUserId: fromUser.id,
       fromUsername: fromUser.username,
@@ -613,10 +613,10 @@ class MockBackend {
    * Growth Rate:
    * - O(R) linear.
    */
-  public getPendingIncomingRequests(userId: string): MockFriendRequest[] {
+  public getPendingIncomingRequests(userId: string): LocalFriendRequest[] {
     const reqs = this.getRequests();
     return reqs.filter((r) => r.toUserId === userId && r.status === 'pending');
   }
 }
 
-export const mockBackend = new MockBackend();
+export const localBackend = new LocalBackend();

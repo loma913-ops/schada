@@ -1,0 +1,38 @@
+# graphifyignore — schada
+# Same syntax as .gitignore. Files matched here are skipped by graphify detect.
+
+# Build outputs and dependency installs
+graphify-out/
+node_modules/
+dist/
+
+# Lock file — 296 KB of hashes, zero architectural signal
+# package.json already covers all dependency relationships
+package-lock.json
+
+# Sound assets — binary chess SFX, not transcribable speech
+# (detected as "video" by graphify but Whisper produces nothing useful)
+public/sounds/
+
+# PWA raster icons — small images with no diagram/text content
+# favicon.svg and icons.svg are kept (they have structural SVG content)
+public/pwa-192x192.png
+public/pwa-512x512.png
+public/pwa-maskable-512x512.png
+public/apple-touch-icon.png
+
+# Deployment / infra configs — not application architecture
+Dockerfile
+nginx.conf
+.dockerignore
+
+# Firebase hosting and security rules
+# (include these if running a security-focused graphify scan)
+firestore.rules
+firestore.indexes.json
+firebase.json
+.firebaserc
+
+# Environment files
+.env
+.env.example

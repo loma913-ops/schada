@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import type { UserProfile, MockFriendRequest } from '@/services/firebase/mockProvider';
+import type { UserProfile, LocalFriendRequest } from '@/services/firebase/localProvider';
 import {
   sendFriendRequest,
   respondToFriendRequest,
@@ -25,7 +25,7 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
   const [tab, setTab] = useState<'friends' | 'requests'>('friends');
   const [searchUsername, setSearchUsername] = useState('');
   const [friends, setFriends] = useState<UserProfile[]>([]);
-  const [requests, setRequests] = useState<MockFriendRequest[]>([]);
+  const [requests, setRequests] = useState<LocalFriendRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

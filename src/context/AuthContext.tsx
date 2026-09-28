@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { UserProfile } from '@/services/firebase/mockProvider';
+import type { UserProfile } from '@/services/firebase/localProvider';
 import {
   registerUser,
   loginUser,

@@ -13,7 +13,7 @@ import {
   documentId,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
-import { mockBackend, type UserProfile, type MockFriendRequest } from './mockProvider';
+import { localBackend, type UserProfile, type LocalFriendRequest } from './localProvider';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 
 export async function searchUserByExactUsername(
@@ -31,13 +31,13 @@ export async function searchUserByExactUsername(
     return null;
   }
 
-  return mockBackend.findUserByExactUsername(clean);
+  return localBackend.findUserByExactUsername(clean);
 }
 
 export async function sendFriendRequest(
   currentUser: UserProfile,
   targetUsername: string
-): Promise<MockFriendRequest> {
+): Promise<LocalFriendRequest> {
   const targetUser = await searchUserByExactUsername(targetUsername);
   if (!targetUser) {
     throw new Error(`User "${targetUsername}" not found. Verify the exact username.`);
@@ -80,7 +80,7 @@ export async function sendFriendRequest(
     };
   }
 
-  return mockBackend.sendFriendRequest(currentUser, targetUsername);
+  return localBackend.sendFriendRequest(currentUser, targetUsername);
 }
 
 export async function respondToFriendRequest(
@@ -113,7 +113,7 @@ export async function respondToFriendRequest(
     return;
   }
 
-  mockBackend.respondToFriendRequest(requestId, accept);
+  localBackend.respondToFriendRequest(requestId, accept);
 }
 
 /**
@@ -190,7 +190,7 @@ export async function getFriendsList(userId: string): Promise<UserProfile[]> {
     return profiles;
   }
 
-  return mockBackend.getFriends(userId);
+  return localBackend.getFriends(userId);
 }
 
 
@@ -201,12 +201,12 @@ export async function removeFriend(userId: string, friendId: string): Promise<vo
     return;
   }
 
-  mockBackend.removeFriend(userId, friendId);
+  localBackend.removeFriend(userId, friendId);
 }
 
 export async function getPendingIncomingRequests(
   userId: string
-): Promise<MockFriendRequest[]> {
+): Promise<LocalFriendRequest[]> {
   if (isFirebaseConfigured() && db) {
     const q = query(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests),
@@ -214,8 +214,8 @@ export async function getPendingIncomingRequests(
       where('status', '==', 'pending')
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as MockFriendRequest));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as LocalFriendRequest));
   }
 
-  return mockBackend.getPendingIncomingRequests(userId);
+  return localBackend.getPendingIncomingRequests(userId);
 }

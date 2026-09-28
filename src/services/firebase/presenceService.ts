@@ -14,7 +14,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
-import { mockBackend } from './mockProvider';
+import { localBackend } from './localProvider';
 import { MOCK_CONFIG } from './mockConfig';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { isGameTimedOut, type GameRoom } from './gameService';
@@ -85,7 +85,7 @@ export function isCurrentClientRegistered(): { isRegistered: boolean; userId: st
   if (uid) {
     return { isRegistered: true, userId: uid };
   }
-  const mockUser = mockBackend.getCurrentUser();
+  const mockUser = localBackend.getCurrentUser();
   if (mockUser) {
     return { isRegistered: true, userId: mockUser.id };
   }
@@ -154,10 +154,10 @@ function writeFirestoreUserStatus(userId: string, status: 'online' | 'in-game' |
 }
 
 /**
- * Synchronously sets user status in local mockBackend and writes to Firestore.
+ * Synchronously sets user status in local localBackend and writes to Firestore.
  */
 function updateUserStatusSync(userId: string, status: 'online' | 'in-game' | 'offline'): void {
-  mockBackend.setUserStatus(userId, status);
+  localBackend.setUserStatus(userId, status);
   writeFirestoreUserStatus(userId, status);
 }
 // In-memory tab activity and remote sync state
@@ -264,7 +264,7 @@ export function syncPresenceHeartbeat(forceRemote: boolean = false): void {
       ? (currentActivityContext === 'in-game' ? 'in-game' : 'online')
       : 'offline';
 
-    mockBackend.setUserStatus(userId, targetStatus);
+    localBackend.setUserStatus(userId, targetStatus);
   }
 
   // Throttle live Firestore writes: only execute if forced, if heartbeat interval has elapsed, or if status transitioned

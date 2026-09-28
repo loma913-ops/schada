@@ -6,7 +6,7 @@
  * Validates configuration to eliminate hard-coded fallback values.
  */
 
-import type { UserProfile } from './mockProvider';
+import type { UserProfile } from './localProvider';
 
 export class MockConfigError extends Error {
   constructor(message: string) {
