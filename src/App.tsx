@@ -32,13 +32,14 @@ import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { ELO_CONFIG } from './core/elo/eloConfig';
 import { localBackend, type UserProfile } from './services/firebase/localProvider';
+import { updateUserStats } from './services/firebase/authService';
 import {
   createGame,
   joinGame,
   findOpenWaitingGame,
 } from './services/firebase/gameService';
-import { isFirebaseConfigured } from './services/firebase/config';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
+import { safeSetItem } from './services/storage/storageCleanup';
 import { getBotTier } from './core/bot/botTiers';
 import type { BoardState, PieceColor } from './core/schada/types';
 
@@ -104,7 +105,7 @@ const MainApp: React.FC = () => {
     let guestId = localStorage.getItem('schada_guest_id');
     if (!guestId) {
       guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      localStorage.setItem('schada_guest_id', guestId);
+      safeSetItem('schada_guest_id', guestId);
     }
 
     const defaultGuestName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
@@ -242,7 +243,7 @@ const MainApp: React.FC = () => {
     let guestId = localStorage.getItem('schada_guest_id');
     if (!guestId) {
       guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      localStorage.setItem('schada_guest_id', guestId);
+      safeSetItem('schada_guest_id', guestId);
     }
 
     const creator = user
@@ -268,36 +269,38 @@ const MainApp: React.FC = () => {
   };
 
   // Game completion handler (updates Elo and records if ranked)
-  const handleGameComplete = (finalState: BoardState) => {
+  const handleGameComplete = async (finalState: BoardState) => {
     if (!activeMatch || !activeMatch.isRanked || !finalState.result) return;
 
     const { winner } = finalState.result;
     const outcome = winner === 'draw' ? 'draw' : winner;
     if (!outcome) return;
 
+    const blueGames = activeMatch.bluePlayer.gamesPlayed ?? (activeMatch.bluePlayer.id === user?.id ? user?.gamesPlayed : undefined) ?? ELO_CONFIG.defaultAssumedGamesPlayed;
+    const greenGames = activeMatch.greenPlayer.gamesPlayed ?? (activeMatch.greenPlayer.id === user?.id ? user?.gamesPlayed : undefined) ?? ELO_CONFIG.defaultAssumedGamesPlayed;
+
     // Calculate Elo update
     const eloResult = calculateEloUpdate(
-      { rating: activeMatch.bluePlayer.elo, gamesPlayed: user?.gamesPlayed || 0 },
-      { rating: activeMatch.greenPlayer.elo, gamesPlayed: activeMatch.greenPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed },
+      { rating: activeMatch.bluePlayer.elo, gamesPlayed: blueGames },
+      { rating: activeMatch.greenPlayer.elo, gamesPlayed: greenGames },
       outcome
     );
 
-    // If active user was Blue
+    const blueWon = outcome === 'blue';
+    const greenWon = outcome === 'green';
+    const isDraw = outcome === 'draw';
+
+    // Update Blue Player (e.g. host user)
+    const updatedBlue = await updateUserStats(activeMatch.bluePlayer.id, blueWon, isDraw, eloResult.blueDelta);
+
+    // Update Green Player (e.g. challenged friend or opponent)
+    const updatedGreen = await updateUserStats(activeMatch.greenPlayer.id, greenWon, isDraw, eloResult.greenDelta);
+
     if (user && activeMatch.bluePlayer.id === user.id) {
-      const won = outcome === 'blue';
-      const isDraw = outcome === 'draw';
-      // Only update mock backend stats in offline/mock mode — Firebase mode persists via Firestore
-      if (!isFirebaseConfigured()) {
-        localBackend.updateStats(user.id, won, isDraw, eloResult.blueDelta);
-      }
-      refreshUser();
+      refreshUser(updatedBlue);
     } else if (user && activeMatch.greenPlayer.id === user.id) {
-      const won = outcome === 'green';
-      const isDraw = outcome === 'draw';
-      // Only update mock backend stats in offline/mock mode — Firebase mode persists via Firestore
-      if (!isFirebaseConfigured()) {
-        localBackend.updateStats(user.id, won, isDraw, eloResult.greenDelta);
-      }
+      refreshUser(updatedGreen);
+    } else {
       refreshUser();
     }
   };

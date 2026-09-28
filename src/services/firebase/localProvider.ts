@@ -7,7 +7,9 @@
 
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { ACTIVE_SESSIONS_STORAGE_KEY } from './presenceService';
-import { MOCK_CONFIG } from './mockConfig';
+import { LOCAL_CONFIG } from './localConfig';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
+import { safeSetItem } from '../storage/storageCleanup';
 
 export interface UserProfile {
   id: string;
@@ -36,10 +38,10 @@ export interface LocalFriendRequest {
 }
 
 class LocalBackend {
-  private usersKey = MOCK_CONFIG.storageKeys.users;
-  private currentUserIdKey = MOCK_CONFIG.storageKeys.currentUserId;
-  private requestsKey = MOCK_CONFIG.storageKeys.friendRequests;
-  private friendsKey = MOCK_CONFIG.storageKeys.friends;
+  private usersKey = LOCAL_CONFIG.storageKeys.users;
+  private currentUserIdKey = LOCAL_CONFIG.storageKeys.currentUserId;
+  private requestsKey = LOCAL_CONFIG.storageKeys.friendRequests;
+  private friendsKey = LOCAL_CONFIG.storageKeys.friends;
 
   constructor() {
     this.seedDefaultUsers();
@@ -59,7 +61,7 @@ class LocalBackend {
     if (typeof localStorage === 'undefined') return;
     const existing = localStorage.getItem(this.usersKey);
     if (!existing) {
-      localStorage.setItem(this.usersKey, JSON.stringify(MOCK_CONFIG.defaultUsers));
+      safeSetItem(this.usersKey, JSON.stringify(LOCAL_CONFIG.defaultUsers));
     } else {
       // Sanitize existing cached users so inactive/offline accounts are not erroneously marked online
       try {
@@ -74,7 +76,7 @@ class LocalBackend {
           }
         }
         if (changed) {
-          localStorage.setItem(this.usersKey, JSON.stringify(users));
+          safeSetItem(this.usersKey, JSON.stringify(users));
         }
       } catch {
         // Ignore parse error
@@ -127,8 +129,7 @@ class LocalBackend {
    * - O(U) linear.
    */
   private saveUsers(users: Record<string, UserProfile>): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    safeSetItem(this.usersKey, JSON.stringify(users));
   }
 
   /**
@@ -195,7 +196,7 @@ class LocalBackend {
         this.saveUsers(users);
         try {
           window.dispatchEvent(
-            new CustomEvent(MOCK_CONFIG.events.userStatusChanged, { detail: { userId, status } })
+            new CustomEvent(LOCAL_CONFIG.events.userStatusChanged, { detail: { userId, status } })
           );
         } catch {
           // Ignore in non-browser environments
@@ -251,10 +252,7 @@ class LocalBackend {
     user.lastSeen = new Date().toISOString();
     users[user.id] = user;
     this.saveUsers(users);
-
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(this.currentUserIdKey, user.id);
-    }
+    safeSetItem(this.currentUserIdKey, user.id);
     return user;
   }
 
@@ -295,9 +293,7 @@ class LocalBackend {
 
     users[uid] = newUser;
     this.saveUsers(users);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(this.currentUserIdKey, uid);
-    }
+    safeSetItem(this.currentUserIdKey, uid);
     return newUser;
   }
 
@@ -325,7 +321,7 @@ class LocalBackend {
     localStorage.removeItem(this.currentUserIdKey);
     try {
       window.dispatchEvent(
-        new CustomEvent(MOCK_CONFIG.events.userStatusChanged, { detail: { status: 'offline' } })
+        new CustomEvent(LOCAL_CONFIG.events.userStatusChanged, { detail: { status: 'offline' } })
       );
     } catch {
       // Ignore
@@ -389,14 +385,15 @@ class LocalBackend {
   }
 
   /**
-   * Updates game results and Elo rating for a user.
+   * Updates game results and Elo rating for a user in the local mock store.
+   * Clamps ratings using the central ELO_CONFIG.minimumRating.
    *
    * Algorithmic Complexity:
-   * - Time Complexity: O(U) to load and save users.
-   * - Auxiliary Space Complexity: O(1) rating update.
+   * - Time Complexity: O(U) where U is the number of local users, dominated by JSON serialization to localStorage.
+   * - Auxiliary Space Complexity: O(U) string allocation for localStorage persistence.
    *
    * Growth Rate:
-   * - O(U) linear.
+   * - O(U) linear with respect to local cached users; for individual user lookup and mutation it is O(1).
    */
   public updateStats(userId: string, won: boolean, isDraw: boolean, eloDelta: number): void {
     const users = this.getUsers();
@@ -411,10 +408,25 @@ class LocalBackend {
     } else {
       u.gamesLost += 1;
     }
-    u.eloRating = Math.max(100, u.eloRating + eloDelta);
+    u.eloRating = Math.max(ELO_CONFIG.minimumRating, u.eloRating + eloDelta);
 
     users[userId] = u;
     this.saveUsers(users);
+  }
+
+  /**
+   * Retrieves a user profile by their unique ID from the local store.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) hash map lookup after in-memory deserialization.
+   * - Auxiliary Space Complexity: O(1) object reference.
+   *
+   * Growth Rate:
+   * - O(1) constant independent of total system users.
+   */
+  public getUserById(userId: string): UserProfile | null {
+    const users = this.getUsers();
+    return users[userId] || null;
   }
 
   /**
@@ -465,8 +477,7 @@ class LocalBackend {
   }
 
   private saveRequests(reqs: LocalFriendRequest[]): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(this.requestsKey, JSON.stringify(reqs));
+    safeSetItem(this.requestsKey, JSON.stringify(reqs));
   }
 
   /**
@@ -544,9 +555,7 @@ class LocalBackend {
       if (!friendsData[req.toUserId].includes(req.fromUserId)) {
         friendsData[req.toUserId].push(req.fromUserId);
       }
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(this.friendsKey, JSON.stringify(friendsData));
-      }
+      safeSetItem(this.friendsKey, JSON.stringify(friendsData));
     }
   }
 
@@ -598,9 +607,7 @@ class LocalBackend {
     if (friendsData[friendId]) {
       friendsData[friendId] = friendsData[friendId].filter((id) => id !== userId);
     }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(this.friendsKey, JSON.stringify(friendsData));
-    }
+    safeSetItem(this.friendsKey, JSON.stringify(friendsData));
   }
 
   /**

@@ -11,6 +11,7 @@ import {
   getLocalSessionToken,
   deleteGame,
   isGameTimedOut,
+  markGameEloProcessed,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '@/services/firebase/gameService';
@@ -19,9 +20,10 @@ import type { Move, PieceColor } from '@/core/schada/types';
 import { Copy, Check, ArrowLeft, Loader2, Cpu } from 'lucide-react';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
-import { localBackend } from '@/services/firebase/localProvider';
+import { updateUserStats } from '@/services/firebase/authService';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { safeSetItem } from '@/services/storage/storageCleanup';
 
 export const GameRoomView: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -144,14 +146,14 @@ export const GameRoomView: React.FC = () => {
     if (!gameId) return;
 
     const trimmed = guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
-    localStorage.setItem('schada_guest_name', trimmed);
-    localStorage.setItem('schada_guest_confirmed', 'true');
+    safeSetItem('schada_guest_name', trimmed);
+    safeSetItem('schada_guest_confirmed', 'true');
     setGuestPromptOpen(false);
 
     let guestId = localStorage.getItem('schada_guest_id');
     if (!guestId) {
       guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      localStorage.setItem('schada_guest_id', guestId);
+      safeSetItem('schada_guest_id', guestId);
     }
 
     joinGame(gameId, {
@@ -200,36 +202,46 @@ export const GameRoomView: React.FC = () => {
   useEffect(() => {
     if (!game || !game.boardState.isGameOver || !game.isRanked || eloUpdatedRef.current) return;
     if (!user || !game.bluePlayer || !game.greenPlayer) return;
+    if (game.processedEloUserIds?.includes(user.id)) return;
 
     const outcome = game.winner;
     if (!outcome) return;
 
     eloUpdatedRef.current = true;
 
-    const eloResult = calculateEloUpdate(
+    const eloResult = game.eloResult || calculateEloUpdate(
       {
         rating: game.bluePlayer.elo,
-        gamesPlayed: game.bluePlayer.id === user.id ? (user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed) : ELO_CONFIG.defaultAssumedGamesPlayed,
+        gamesPlayed: game.bluePlayer.id === user.id
+          ? (user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed)
+          : (game.bluePlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed),
       },
       {
         rating: game.greenPlayer.elo,
-        gamesPlayed: game.greenPlayer.id === user.id ? (user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed) : ELO_CONFIG.defaultAssumedGamesPlayed,
+        gamesPlayed: game.greenPlayer.id === user.id
+          ? (user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed)
+          : (game.greenPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed),
       },
       outcome
     );
 
-    if (game.bluePlayer.id === user.id) {
-      const won = outcome === 'blue';
+    const isBlue = game.bluePlayer.id === user.id;
+    const isGreen = game.greenPlayer.id === user.id;
+
+    if (isBlue || isGreen) {
+      const won = outcome === (isBlue ? 'blue' : 'green');
       const isDraw = outcome === 'draw';
-      localBackend.updateStats(user.id, won, isDraw, eloResult.blueDelta);
-      refreshUser();
-    } else if (game.greenPlayer.id === user.id) {
-      const won = outcome === 'green';
-      const isDraw = outcome === 'draw';
-      localBackend.updateStats(user.id, won, isDraw, eloResult.greenDelta);
-      refreshUser();
+      const delta = isBlue ? eloResult.blueDelta : eloResult.greenDelta;
+
+      updateUserStats(user.id, won, isDraw, delta).then((updatedProfile) => {
+        refreshUser(updatedProfile);
+      });
+
+      if (gameId) {
+        markGameEloProcessed(gameId, user.id);
+      }
     }
-  }, [game, user, refreshUser]);
+  }, [game, user, gameId, refreshUser]);
 
   if (loading) {
     return (

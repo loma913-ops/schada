@@ -8,6 +8,8 @@
  * 4. Preloaded HTML5 Audio element fallback so audio never drops under any browser state.
  */
 
+import { safeSetItem } from '../storage/storageCleanup';
+
 class SoundService {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
@@ -115,9 +117,7 @@ class SoundService {
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('schada_sound_muted', String(this.isMuted));
-    }
+    safeSetItem('schada_sound_muted', String(this.isMuted));
     if (this.isMuted && this.ctx) {
       this.ctx.suspend().catch(() => {});
     }

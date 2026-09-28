@@ -39,9 +39,12 @@ import {
   logoutUser,
   registerUser,
   setUserOnlineStatus,
+  updateUserStats,
+  reloadUserProfile,
 } from '../authService';
 import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
 import { localBackend } from '../localProvider';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
 
 describe('authService caching and hydration', () => {
   beforeEach(() => {
@@ -110,5 +113,44 @@ describe('authService caching and hydration', () => {
     const profile = getCachedAuthProfile();
     expect(profile).not.toBeNull();
     expect(profile?.username).toBe('bishop_boss');
+  });
+
+  it('updates user stats and Elo correctly with updateUserStats', async () => {
+    const user = await registerUser('elo_test@example.com', 'password123', 'elo_player');
+    const initialElo = user.eloRating;
+
+    // Simulate winning a match with +16 delta
+    const updated = await updateUserStats(user.id, true, false, 16);
+    expect(updated).not.toBeNull();
+    expect(updated?.eloRating).toBe(initialElo + 16);
+    expect(updated?.gamesPlayed).toBe(1);
+    expect(updated?.gamesWon).toBe(1);
+    expect(updated?.gamesLost).toBe(0);
+
+    // Verify cached profile is updated
+    const cached = getCachedAuthProfile();
+    expect(cached?.eloRating).toBe(initialElo + 16);
+    expect(cached?.gamesWon).toBe(1);
+
+    // Simulate losing a match with -12 delta
+    const afterLoss = await updateUserStats(user.id, false, false, -12);
+    expect(afterLoss?.eloRating).toBe(initialElo + 4);
+    expect(afterLoss?.gamesPlayed).toBe(2);
+    expect(afterLoss?.gamesWon).toBe(1);
+    expect(afterLoss?.gamesLost).toBe(1);
+
+    // Verify rating never drops below central ELO_CONFIG.minimumRating
+    const massiveLoss = await updateUserStats(user.id, false, false, -5000);
+    expect(massiveLoss?.eloRating).toBe(ELO_CONFIG.minimumRating);
+  });
+
+  it('reloads user profile and syncs cached credentials', async () => {
+    const user = await registerUser('reload_test@example.com', 'password123', 'reload_user');
+    await updateUserStats(user.id, true, false, 25);
+
+    const reloaded = await reloadUserProfile();
+    expect(reloaded).not.toBeNull();
+    expect(reloaded?.id).toBe(user.id);
+    expect(reloaded?.eloRating).toBe(user.eloRating + 25);
   });
 });

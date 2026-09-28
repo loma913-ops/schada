@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './styles/index.css'
 import App from './App'
 import { initDeploymentRecovery } from './services/deployment/deploymentRecoveryService'
+import { cleanupBrowserStorage } from './services/storage/storageCleanup'
+
+// Purge any leaked firestore_ coordination keys and enforce browser storage hygiene
+cleanupBrowserStorage();
 
 // Initialize post-deployment dynamic chunk error recovery and reload debouncing
 initDeploymentRecovery();

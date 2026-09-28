@@ -15,6 +15,7 @@ import {
   subscribeToOpenRooms,
   isGameTimedOut,
   startAbandonedGamesCleanupWatcher,
+  markGameEloProcessed,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '../gameService';
@@ -155,6 +156,45 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + gameId);
     const res = await joinGame(gameId, { id: 'p3', username: 'Viewer', elo: 1200 });
     expect(res.role).toBe('spectator');
+  });
+
+  it('calculates Elo deltas and updates resigning player when resigning in ranked game', async () => {
+    const creator = { id: 'p1', username: 'Host1', elo: 1300, gamesPlayed: 10 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: true,
+      isRanked: true,
+      creator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: 'p2', username: 'Challenger', elo: 1200 });
+
+    let latestGame: GameRoom | null = null;
+    const unsub = subscribeToGame(gameId, (g) => {
+      latestGame = g;
+    });
+
+    // Host (blue) resigns
+    await resignGameAction(gameId, 'blue');
+
+    expect(latestGame).not.toBeNull();
+    expect((latestGame as any).status).toBe('completed');
+    expect((latestGame as any).winner).toBe('green');
+    expect((latestGame as any).winReason).toBe('resignation');
+    expect((latestGame as any).eloResult).toBeDefined();
+    expect((latestGame as any).eloResult.blueDelta).toBeLessThan(0);
+    expect((latestGame as any).eloResult.greenDelta).toBeGreaterThan(0);
+    expect((latestGame as any).bluePlayer.elo).toBe((latestGame as any).eloResult.newBlueElo);
+    expect((latestGame as any).greenPlayer.elo).toBe((latestGame as any).eloResult.newGreenElo);
+    expect((latestGame as any).processedEloUserIds).toContain('p1');
+
+    // Winner marks themselves processed
+    await markGameEloProcessed(gameId, 'p2');
+    expect((latestGame as any).processedEloUserIds).toContain('p2');
+
+    unsub();
   });
 
   it('marks game as abandoned and removes from open rooms', async () => {

@@ -15,9 +15,10 @@ import {
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { localBackend } from './localProvider';
-import { MOCK_CONFIG } from './mockConfig';
+import { LOCAL_CONFIG } from './localConfig';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { isGameTimedOut, type GameRoom } from './gameService';
+import { safeSetItem } from '../storage/storageCleanup';
 
 export interface LobbyStats {
   playersOnline: number; // Strictly players who registered, signed in, and are active
@@ -81,7 +82,7 @@ export function isCurrentClientRegistered(): { isRegistered: boolean; userId: st
       return { isRegistered: true, userId: cachedUid };
     }
   }
-  const uid = typeof localStorage !== 'undefined' ? localStorage.getItem(MOCK_CONFIG.storageKeys.currentUserId) : null;
+  const uid = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_CONFIG.storageKeys.currentUserId) : null;
   if (uid) {
     return { isRegistered: true, userId: uid };
   }
@@ -249,9 +250,7 @@ export function syncPresenceHeartbeat(forceRemote: boolean = false): void {
         delete map[sId];
       }
     }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(ACTIVE_SESSIONS_STORAGE_KEY, JSON.stringify(map));
-    }
+    safeSetItem(ACTIVE_SESSIONS_STORAGE_KEY, JSON.stringify(map));
   } catch {
     // Ignore storage errors
   }
@@ -313,9 +312,7 @@ export function cleanupCurrentTabSession(): void {
     if (raw) {
       const map: Record<string, SessionHeartbeat> = JSON.parse(raw);
       delete map[sessionId];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(ACTIVE_SESSIONS_STORAGE_KEY, JSON.stringify(map));
-      }
+      safeSetItem(ACTIVE_SESSIONS_STORAGE_KEY, JSON.stringify(map));
 
       // Check if user has any remaining active sessions
       if (isRegistered && userId) {
@@ -524,13 +521,7 @@ export function getCachedLobbyStats(): LobbyStats {
  * Persists the latest lobby statistics to localStorage.
  */
 export function setCachedLobbyStats(stats: LobbyStats): void {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(CACHED_LOBBY_STATS_STORAGE_KEY, JSON.stringify(stats));
-    }
-  } catch {
-    // Ignore storage errors
-  }
+  safeSetItem(CACHED_LOBBY_STATS_STORAGE_KEY, JSON.stringify(stats));
 }
 
 function getCurrentLobbyStats(): LobbyStats {
@@ -650,8 +641,8 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
       e.key === ACTIVE_SESSIONS_STORAGE_KEY ||
       e.key === MOCK_GAMES_STORAGE_KEY ||
       e.key === CACHED_LOBBY_STATS_STORAGE_KEY ||
-      e.key === MOCK_CONFIG.storageKeys.currentUserId ||
-      e.key === MOCK_CONFIG.storageKeys.users
+      e.key === LOCAL_CONFIG.storageKeys.currentUserId ||
+      e.key === LOCAL_CONFIG.storageKeys.users
     ) {
       notifyStatsSubscribers();
     }
@@ -663,7 +654,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
 
   if (typeof window !== 'undefined') {
     window.addEventListener('storage', handleStorage);
-    window.addEventListener(MOCK_CONFIG.events.userStatusChanged, handleCustomStatus);
+    window.addEventListener(LOCAL_CONFIG.events.userStatusChanged, handleCustomStatus);
   }
 
   // Firestore real-time listener for aggregated platform stats

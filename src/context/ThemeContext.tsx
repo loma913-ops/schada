@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { safeSetItem } from '@/services/storage/storageCleanup';
 
 type Theme = 'dark' | 'light';
 
@@ -17,7 +18,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.style.colorScheme = theme;
-    localStorage.setItem('schada_theme', theme);
+    safeSetItem('schada_theme', theme);
 
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {

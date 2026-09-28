@@ -3,11 +3,14 @@ import { getAuth, connectAuthEmulator, type Auth } from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  memoryLocalCache,
   connectFirestoreEmulator,
   type Firestore,
 } from 'firebase/firestore';
+import { cleanupBrowserStorage } from '../storage/storageCleanup';
+
+// Purge any leaked or orphaned firestore_ keys from previous persistentMultipleTabManager sessions
+cleanupBrowserStorage();
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -34,9 +37,7 @@ if (isFirebaseConfigured()) {
   auth = getAuth(app);
   try {
     db = initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
+      localCache: memoryLocalCache(),
     });
   } catch {
     db = getFirestore(app);

@@ -10,6 +10,7 @@ import {
   updateDoc,
   runTransaction,
   serverTimestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { localBackend, type UserProfile } from './localProvider';
@@ -19,6 +20,9 @@ import {
   cleanupCurrentTabSession,
 } from './presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
+import { LOCAL_CONFIG } from './localConfig';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
+import { safeSetItem } from '../storage/storageCleanup';
 
 export function validateUsernameFormat(username: string): { valid: boolean; error?: string } {
   const trimmed = username.trim();
@@ -53,7 +57,7 @@ export async function setUserOnlineStatus(
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
           parsed.status = status;
-          localStorage.setItem(
+          safeSetItem(
             MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedProfile,
             JSON.stringify(parsed)
           );
@@ -72,15 +76,154 @@ export async function setUserOnlineStatus(
   }
 }
 
+/**
+ * Updates a user's Elo rating and match statistics across Firestore (if authenticated owner)
+ * and the local provider. Clamps ratings using the central ELO_CONFIG.minimumRating.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) Firestore document transaction / localStorage key-value update.
+ * - Auxiliary Space Complexity: O(1) scalar allocations.
+ *
+ * Growth Rate:
+ * - O(1) constant: independent of total database size or user base growth rate.
+ */
+export async function updateUserStats(
+  userId: string,
+  won: boolean,
+  isDraw: boolean,
+  eloDelta: number
+): Promise<UserProfile | null> {
+  // 1. Update local provider store
+  localBackend.updateStats(userId, won, isDraw, eloDelta);
+
+  // 2. If Firebase is active and the authenticated user owns this profile record
+  if (isFirebaseConfigured() && db && auth?.currentUser?.uid === userId) {
+    try {
+      const userDocRef = doc(db, 'users', userId);
+      const snap = await getDoc(userDocRef);
+      if (snap.exists()) {
+        const data = snap.data() as UserProfile;
+        const currentGamesPlayed = data.gamesPlayed || 0;
+        const currentGamesWon = data.gamesWon || 0;
+        const currentGamesLost = data.gamesLost || 0;
+        const currentGamesDrawn = data.gamesDrawn || 0;
+        const currentElo = typeof data.eloRating === 'number'
+          ? data.eloRating
+          : ELO_CONFIG.defaultStartingRating;
+
+        const newElo = Math.max(ELO_CONFIG.minimumRating, currentElo + eloDelta);
+        const newGamesPlayed = currentGamesPlayed + 1;
+        const newGamesWon = isDraw ? currentGamesWon : won ? currentGamesWon + 1 : currentGamesWon;
+        const newGamesLost = isDraw ? currentGamesLost : !won ? currentGamesLost + 1 : currentGamesLost;
+        const newGamesDrawn = isDraw ? currentGamesDrawn + 1 : currentGamesDrawn;
+
+        await updateDoc(userDocRef, {
+          eloRating: newElo,
+          gamesPlayed: newGamesPlayed,
+          gamesWon: newGamesWon,
+          gamesLost: newGamesLost,
+          gamesDrawn: newGamesDrawn,
+          updatedAt: serverTimestamp(),
+        });
+
+        const updatedProfile: UserProfile = {
+          ...data,
+          eloRating: newElo,
+          gamesPlayed: newGamesPlayed,
+          gamesWon: newGamesWon,
+          gamesLost: newGamesLost,
+          gamesDrawn: newGamesDrawn,
+        };
+
+        persistCachedProfile(updatedProfile);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: updatedProfile })
+          );
+        }
+        return updatedProfile;
+      }
+    } catch (e) {
+      console.warn('Could not update Firestore user stats:', e);
+    }
+  }
+
+  const cached = localBackend.getUserById(userId);
+  if (cached && typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedProfile);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.id === userId) {
+          persistCachedProfile(cached);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: cached })
+            );
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return cached;
+}
+
+/**
+ * Reloads the current user profile from Firestore or local provider, updates cache, and dispatches change events.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) single document fetch / localStorage lookup.
+ * - Auxiliary Space Complexity: O(1) profile object allocation.
+ *
+ * Growth Rate:
+ * - O(1) constant: invariant to system scale and user count.
+ */
+export async function reloadUserProfile(): Promise<UserProfile | null> {
+  if (isFirebaseConfigured() && auth?.currentUser && db) {
+    try {
+      const snap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      if (snap.exists()) {
+        const active = isCurrentClientActive();
+        const status = active ? 'online' : 'offline';
+        const profile: UserProfile = { ...(snap.data() as UserProfile), status };
+        persistCachedProfile(profile);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: profile })
+          );
+        }
+        return profile;
+      }
+    } catch (e) {
+      console.warn('Could not reload Firestore user profile:', e);
+    }
+  }
+
+  const mockUser = localBackend.getCurrentUser();
+  if (mockUser) {
+    persistCachedProfile(mockUser);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: mockUser })
+      );
+    }
+    return mockUser;
+  }
+  return null;
+}
+
 function persistCachedProfile(profile: UserProfile | null): void {
-  if (typeof localStorage === 'undefined') return;
   const { authCachedUid, authCachedProfile } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
   if (profile) {
-    localStorage.setItem(authCachedUid, profile.id);
-    localStorage.setItem(authCachedProfile, JSON.stringify(profile));
+    safeSetItem(authCachedUid, profile.id);
+    safeSetItem(authCachedProfile, JSON.stringify(profile));
   } else {
-    localStorage.removeItem(authCachedUid);
-    localStorage.removeItem(authCachedProfile);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(authCachedUid);
+      localStorage.removeItem(authCachedProfile);
+    }
   }
 }
 
@@ -312,7 +455,14 @@ export async function changeUsername(
 
 export function subscribeToAuthState(callback: (user: UserProfile | null) => void): () => void {
   if (isFirebaseConfigured() && auth && db) {
-    return onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeDoc: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+        unsubscribeDoc = null;
+      }
+
       if (firebaseUser) {
         try {
           const userDocRef = doc(db!, 'users', firebaseUser.uid);
@@ -323,21 +473,42 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
             lastSeen: serverTimestamp(),
           });
           syncPresenceHeartbeat();
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            const profile: UserProfile = { ...(userDoc.data() as UserProfile), status };
-            persistCachedProfile(profile);
-            callback(profile);
-            return;
-          }
+
+          unsubscribeDoc = onSnapshot(
+            userDocRef,
+            (userSnap) => {
+              if (userSnap.exists()) {
+                const currentActive = isCurrentClientActive();
+                const currentStatus = currentActive ? 'online' : 'offline';
+                const profile: UserProfile = {
+                  ...(userSnap.data() as UserProfile),
+                  status: currentStatus,
+                };
+                persistCachedProfile(profile);
+                callback(profile);
+              }
+            },
+            (e) => {
+              console.error('Error listening to user profile changes:', e);
+            }
+          );
         } catch (e) {
-          console.error('Error fetching user profile:', e);
+          console.error('Error initializing user profile listener:', e);
+          callback(null);
         }
       } else {
         persistCachedProfile(null);
+        callback(null);
       }
-      callback(null);
     });
+
+    return () => {
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+        unsubscribeDoc = null;
+      }
+      unsubscribeAuth();
+    };
   }
 
   // Initial mock state

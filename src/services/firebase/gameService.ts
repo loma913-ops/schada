@@ -17,9 +17,20 @@ import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import type { BoardState, Move, PieceColor } from '@/core/schada/types';
 import { createInitialGameState, executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import type { ArenaPlayer } from '@/components/game/Arena';
+import { calculateEloUpdate } from '@/core/elo/eloService';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
+import { updateUserStats } from './authService';
+import { safeSetItem, STORAGE_LIMITS } from '../storage/storageCleanup';
 
 export interface GamePlayer extends ArenaPlayer {
   sessionToken: string;
+}
+
+export interface GameEloResult {
+  blueDelta: number;
+  greenDelta: number;
+  newBlueElo: number;
+  newGreenElo: number;
 }
 
 export interface GameRoom {
@@ -40,6 +51,8 @@ export interface GameRoom {
   lastTurnStartTimeMs: number | null;
   winner?: PieceColor | 'draw' | null;
   winReason?: string | null;
+  eloResult?: GameEloResult | null;
+  processedEloUserIds?: string[];
   abandonedAt?: number;
 }
 
@@ -103,8 +116,7 @@ export function getLocalSessionToken(gameId: string): string | null {
 }
 
 export function setLocalSessionToken(gameId: string, token: string): void {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(SESSION_STORAGE_PREFIX + gameId, token);
+  safeSetItem(SESSION_STORAGE_PREFIX + gameId, token);
 }
 
 function generateGameId(): string {
@@ -118,6 +130,80 @@ function generateGameId(): string {
 
 function generateToken(): string {
   return 'tok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+}
+
+/**
+ * Computes ranked Elo update for both players upon game completion.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant arithmetic calculation via logistic distribution curve.
+ * - Auxiliary Space Complexity: O(1) constant scalar allocation.
+ *
+ * Growth Rate:
+ * - O(1) constant: computational cost does not scale with game length, move count, or player ratings.
+ */
+function computeRankedGameEloResult(
+  game: GameRoom,
+  outcome: 'blue' | 'green' | 'draw'
+): GameEloResult | null {
+  if (!game.isRanked || !game.bluePlayer || !game.greenPlayer) {
+    return null;
+  }
+  const calc = calculateEloUpdate(
+    {
+      rating: game.bluePlayer.elo,
+      gamesPlayed: game.bluePlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+    },
+    {
+      rating: game.greenPlayer.elo,
+      gamesPlayed: game.greenPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+    },
+    outcome
+  );
+  return {
+    blueDelta: calc.blueDelta,
+    greenDelta: calc.greenDelta,
+    newBlueElo: calc.newBlueRating,
+    newGreenElo: calc.newGreenRating,
+  };
+}
+
+/**
+ * Appends a user ID to a completed game's processedEloUserIds array to prevent duplicate rating updates.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(P) where P is the number of players (at most 2 in Schada).
+ * - Auxiliary Space Complexity: O(1) array allocation capped at player count.
+ *
+ * Growth Rate:
+ * - O(1) constant: player count P <= 2, ensuring optimal scalability under concurrent room completions.
+ */
+export async function markGameEloProcessed(gameId: string, userId: string): Promise<void> {
+  if (isFirebaseConfigured() && db) {
+    try {
+      const gameRef = doc(db, 'games', gameId);
+      const snap = await getDoc(gameRef);
+      if (snap.exists()) {
+        const game = snap.data() as GameRoom;
+        const currentProcessed = Array.isArray(game.processedEloUserIds) ? game.processedEloUserIds : [];
+        if (!currentProcessed.includes(userId)) {
+          await updateDoc(gameRef, {
+            processedEloUserIds: [...currentProcessed, userId],
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not mark game Elo processed in Firestore:', e);
+    }
+  } else {
+    const game = mockStore.get(gameId);
+    if (game) {
+      const currentProcessed = Array.isArray(game.processedEloUserIds) ? game.processedEloUserIds : [];
+      if (!currentProcessed.includes(userId)) {
+        mockStore.set({ ...game, processedEloUserIds: [...currentProcessed, userId] });
+      }
+    }
+  }
 }
 
 // ----------------- Mock Local Channel for Offline / Development -----------------
@@ -209,8 +295,14 @@ class MockGameStore {
     games[game.id] = game;
     this.memoryStore[game.id] = game;
 
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(MOCK_GAMES_STORAGE_KEY, JSON.stringify(games));
+    // Prune oldest mock games if exceeding storage limit
+    const entries = Object.entries(games);
+    if (entries.length > STORAGE_LIMITS.maxMockGames) {
+      const sorted = entries.sort((a, b) => (b[1]?.createdAt || 0) - (a[1]?.createdAt || 0));
+      const pruned = Object.fromEntries(sorted.slice(0, STORAGE_LIMITS.maxMockGames));
+      safeSetItem(MOCK_GAMES_STORAGE_KEY, JSON.stringify(pruned));
+    } else {
+      safeSetItem(MOCK_GAMES_STORAGE_KEY, JSON.stringify(games));
     }
 
     // Notify local callbacks
@@ -231,9 +323,7 @@ class MockGameStore {
     delete games[id];
     delete this.memoryStore[id];
 
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(MOCK_GAMES_STORAGE_KEY, JSON.stringify(games));
-    }
+    safeSetItem(MOCK_GAMES_STORAGE_KEY, JSON.stringify(games));
 
     // Notify local callbacks
     const subs = this.listeners.get(id);
@@ -296,6 +386,7 @@ export interface CreateGameParams {
     id: string;
     username: string;
     elo: number;
+    gamesPlayed?: number;
   };
 }
 
@@ -317,6 +408,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
     id: params.creator.id,
     username: params.creator.username,
     elo: params.creator.elo,
+    gamesPlayed: params.creator.gamesPlayed,
     sessionToken,
   };
 
@@ -368,7 +460,7 @@ export interface JoinGameResult {
 
 export async function joinGame(
   gameId: string,
-  user: { id: string; username: string; elo: number }
+  user: { id: string; username: string; elo: number; gamesPlayed?: number }
 ): Promise<JoinGameResult> {
   const existingToken = getLocalSessionToken(gameId);
 
@@ -413,6 +505,7 @@ export async function joinGame(
           id: user.id,
           username: user.username,
           elo: user.elo,
+          gamesPlayed: user.gamesPlayed,
           sessionToken: newToken,
         };
 
@@ -473,6 +566,7 @@ export async function joinGame(
       id: user.id,
       username: user.username,
       elo: user.elo,
+      gamesPlayed: user.gamesPlayed,
       sessionToken: newToken,
     };
 
@@ -594,8 +688,24 @@ export async function makeGameMove(
 
       if (nextBoardState.isGameOver) {
         updatePayload.status = 'completed';
-        updatePayload.winner = nextBoardState.result?.winner;
+        const winner = nextBoardState.result?.winner;
+        updatePayload.winner = winner;
         updatePayload.winReason = nextBoardState.result?.winReason;
+
+        if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+          const eloCalc = computeRankedGameEloResult(game, winner);
+          if (eloCalc) {
+            updatePayload.eloResult = eloCalc;
+            updatePayload.bluePlayer = {
+              ...game.bluePlayer,
+              elo: eloCalc.newBlueElo,
+            };
+            updatePayload.greenPlayer = {
+              ...game.greenPlayer,
+              elo: eloCalc.newGreenElo,
+            };
+          }
+        }
       }
 
       tx.update(docRef, sanitize(updatePayload));
@@ -641,8 +751,24 @@ export async function makeGameMove(
 
   if (nextBoardState.isGameOver) {
     updatePayload.status = 'completed';
-    updatePayload.winner = nextBoardState.result?.winner;
+    const winner = nextBoardState.result?.winner;
+    updatePayload.winner = winner;
     updatePayload.winReason = nextBoardState.result?.winReason;
+
+    if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+      const eloCalc = computeRankedGameEloResult(game, winner);
+      if (eloCalc) {
+        updatePayload.eloResult = eloCalc;
+        updatePayload.bluePlayer = {
+          ...game.bluePlayer,
+          elo: eloCalc.newBlueElo,
+        };
+        updatePayload.greenPlayer = {
+          ...game.greenPlayer,
+          elo: eloCalc.newGreenElo,
+        };
+      }
+    }
   }
 
   mockStore.set({ ...game, ...updatePayload });
@@ -665,13 +791,46 @@ export async function resignGameAction(
   if (!game || game.status !== 'in_progress') return;
 
   const nextBoardState = resignGame(game.boardState, resigningColor);
+  const winner = nextBoardState.result?.winner;
   const updatePayload: Partial<GameRoom> = {
     boardState: nextBoardState,
     status: 'completed',
-    winner: nextBoardState.result?.winner,
+    winner,
     winReason: nextBoardState.result?.winReason,
     lastTurnStartTimeMs: null,
   };
+
+  const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
+    ? [...game.processedEloUserIds]
+    : [];
+
+  if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+    const eloCalc = computeRankedGameEloResult(game, winner);
+    if (eloCalc) {
+      updatePayload.eloResult = eloCalc;
+      updatePayload.bluePlayer = {
+        ...game.bluePlayer,
+        elo: eloCalc.newBlueElo,
+      };
+      updatePayload.greenPlayer = {
+        ...game.greenPlayer,
+        elo: eloCalc.newGreenElo,
+      };
+
+      const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+      const resigningDelta = resigningColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
+      if (resigningPlayer?.id && !processedUserIds.includes(resigningPlayer.id)) {
+        try {
+          await updateUserStats(resigningPlayer.id, false, false, resigningDelta);
+          processedUserIds.push(resigningPlayer.id);
+        } catch (e) {
+          console.warn('Failed to update stats for resigning player:', e);
+        }
+      }
+    }
+  }
+
+  updatePayload.processedEloUserIds = processedUserIds;
 
   if (isFirebaseConfigured() && db) {
     await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));
@@ -697,13 +856,46 @@ export async function timeoutGameAction(
   if (!game || game.status !== 'in_progress') return;
 
   const nextBoardState = timeoutGame(game.boardState, timedOutColor);
+  const winner = nextBoardState.result?.winner;
   const updatePayload: Partial<GameRoom> = {
     boardState: nextBoardState,
     status: 'completed',
-    winner: nextBoardState.result?.winner,
+    winner,
     winReason: nextBoardState.result?.winReason,
     lastTurnStartTimeMs: null,
   };
+
+  const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
+    ? [...game.processedEloUserIds]
+    : [];
+
+  if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+    const eloCalc = computeRankedGameEloResult(game, winner);
+    if (eloCalc) {
+      updatePayload.eloResult = eloCalc;
+      updatePayload.bluePlayer = {
+        ...game.bluePlayer,
+        elo: eloCalc.newBlueElo,
+      };
+      updatePayload.greenPlayer = {
+        ...game.greenPlayer,
+        elo: eloCalc.newGreenElo,
+      };
+
+      const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+      const timedOutDelta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
+      if (timedOutPlayer?.id && !processedUserIds.includes(timedOutPlayer.id)) {
+        try {
+          await updateUserStats(timedOutPlayer.id, false, false, timedOutDelta);
+          processedUserIds.push(timedOutPlayer.id);
+        } catch (e) {
+          console.warn('Failed to update stats for timed-out player:', e);
+        }
+      }
+    }
+  }
+
+  updatePayload.processedEloUserIds = processedUserIds;
 
   if (isFirebaseConfigured() && db) {
     await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));

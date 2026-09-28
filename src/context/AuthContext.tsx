@@ -8,8 +8,10 @@ import {
   subscribeToAuthState,
   setUserOnlineStatus,
   getInitialAuthState,
+  reloadUserProfile,
 } from '@/services/firebase/authService';
 import { startPresenceTracking, syncPresenceHeartbeat } from '@/services/firebase/presenceService';
+import { LOCAL_CONFIG } from '@/services/firebase/localConfig';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -18,7 +20,7 @@ interface AuthContextType {
   register: (email: string, pass: string, username: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUsername: (newUsername: string) => Promise<void>;
-  refreshUser: () => void;
+  refreshUser: (updatedProfile?: UserProfile | null) => Promise<UserProfile | null>;
   setUserStatus: (status: 'online' | 'in-game' | 'offline') => Promise<void>;
 }
 
@@ -41,6 +43,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     });
     return () => unsubscribe();
+  }, []);
+
+  // Synchronize user profile updates reactively across components and tabs
+  useEffect(() => {
+    const handleProfileUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<UserProfile>;
+      if (customEvent.detail) {
+        setUser(customEvent.detail);
+      } else {
+        reloadUserProfile().then((p) => {
+          if (p) setUser(p);
+        });
+      }
+    };
+
+    window.addEventListener(LOCAL_CONFIG.events.profileUpdated, handleProfileUpdate);
+    return () => {
+      window.removeEventListener(LOCAL_CONFIG.events.profileUpdated, handleProfileUpdate);
+    };
   }, []);
 
   // Synchronize user status reactively when activity changes or multi-tab presence changes
@@ -93,8 +114,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncPresenceHeartbeat();
   }, []);
 
-  const refreshUser = React.useCallback(() => {
-    subscribeToAuthState((profile) => setUser(profile));
+  const refreshUser = React.useCallback(async (updatedProfile?: UserProfile | null) => {
+    if (updatedProfile) {
+      setUser(updatedProfile);
+      return updatedProfile;
+    }
+    const fresh = await reloadUserProfile();
+    if (fresh) {
+      setUser(fresh);
+      return fresh;
+    }
+    return null;
   }, []);
 
   const value = React.useMemo(

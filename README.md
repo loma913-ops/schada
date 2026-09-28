@@ -43,7 +43,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 
 - **8-Tier AI Bot Engine**: Play against computer opponents ranging from **Novice (100 Elo)** to **Master (2400 Elo)**. The engine features Alpha-Beta minimax with iterative deepening, Zobrist transposition tables, quiescence search, move ordering heuristics, distance-to-goal tables, and opening books—all offloaded to background **Web Workers** for 60fps UI responsiveness.
 - **Move History Navigator & Replay Controls**: Interactive move stepping (`|<<`, `<`, `>`, `>>|`) and keyboard shortcuts (`ArrowLeft`, `ArrowRight`, `Home`, `End`) allowing players to review any board position during or after a match without disrupting live game state.
-- **Dynamic Post-Game Elo Summary & Match Review**: Detailed game-over modal presenting rating point changes (+/- deltas), updated ratings, provisional badges, and game resolution reasons. The modal can be closed via a dedicated 'Review' button, close button (`X`), backdrop click, or `Escape` key so players can freely review the board and move notation, with controls to reopen match results or return to the lobby.
+- **Dynamic Post-Game Elo Summary & Match Review**: Detailed game-over modal presenting rating point changes (+/- deltas), updated ratings, provisional badges, and game resolution reasons. All ranked matches (both online multiplayer rooms and direct friend challenges) automatically compute and persist Elo updates across Firestore and the local provider upon completion—including resignation, clock timeout, and checkmate/goal resolutions—with duplicate-processing safeguards (`processedEloUserIds`) and instant user profile/leaderboard refresh. The modal can be closed via a dedicated 'Review' button, close button (`X`), backdrop click, or `Escape` key so players can freely review the board and move notation, with controls to reopen match results or return to the lobby.
 - **Competitive Integrity & Guest Mode**: Guest accounts can create and join casual rooms freely, while rated matchmaking and leaderboard ranking are reserved for authenticated accounts to prevent ladder inflation.
 - **Lichess-Inspired Minimalist UX**: Two-column responsive arena with an expanded 420px control panel, digital countdown clocks featuring automatic infinity symbol (`∞`) representation for unlimited time controls and low-time warnings for timed matches, algebraic move notation, streamlined in-game action controls, and complete dark/light theme support.
 - **Mobile Portrait Orientation Lock**: Automatic orientation detection and an interactive lock overlay ensuring an optimal vertical board aspect ratio without coordinate clipping on mobile devices.
@@ -51,14 +51,15 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Procedural Sound Engine**: Synthesized piece clacks, capture chimes, goal fanfares, and low-time countdown alerts generated entirely via the **Web Audio API** with zero external audio assets.
 - **Optimized Firestore & Presence Architecture**: Scalable, low-overhead database access patterns that reduce read and write costs by over 90% without compromising real-time responsiveness:
   - *Decoupled Presence Writes*: Local mouse/touch UI activity is tracked strictly in-memory, restricting network writes to 30–60 second heartbeats and active/idle state transitions.
-  - *Multi-Tab Persistent Cache*: Configured with `persistentLocalCache` and `persistentMultipleTabManager` in IndexedDB, sharing listeners across browser tabs and serving repeat document lookups with zero network reads.
+  - *Zero-Lock In-Memory Firestore Cache*: Configured with `memoryLocalCache()` to guarantee instant in-memory read performance across all concurrent browser tabs without IndexedDB locking contention, eliminating browser Web Storage quota exhaustion and Firebase `INTERNAL ASSERTION FAILED: Unexpected state (ID: b815)` crashes.
+  - *Automated Browser Storage Hygiene & Quota Recovery*: Built-in storage management service (`src/services/storage/storageCleanup.ts`) that purges orphaned Firebase multi-tab synchronization keys (`firestore_*`), prunes bounded local mock games and session tokens, and provides emergency quota recovery with zero-throw fallback wrappers.
   - *Lobby Move Isolation*: Real-time lobby subscription queries are partitioned strictly to `waiting` rooms, preventing active match moves from flooding lobby visitors with document updates. Live matches are polled on a relaxed, configurable interval.
   - *Centralized Scale Configuration*: All limits, TTLs, collection names, storage keys, and batch sizes are centralized in `src/services/firebase/multiplayerConfig.ts` with strict schema validation throwing `MultiplayerConfigError` to eliminate hard-coded fallback values.
   - *Sub-Linear Algorithmic Complexity*: Governed by Big O algorithmic scaling: $O(1)$ constant-time presence listeners, $O(K \log K)$ ($K \le 50$) partition sorting for open rooms, and $O(\lceil K / 30 \rceil)$ batched network queries for friend profiles.
   - *Elimination of Client Sweeps*: Removed periodic client-wide database cleanup intervals in favor of lazy validation and native Firestore TTL policies.
   - *Batched Lookups & Caching*: 5-minute memory caching for the global leaderboard and `documentId() in [...]` batch lookups for social friend lists.
   - *Zero-Flicker Synchronous Auth Hydration*: Synchronously restores cached authenticated profiles on mount to eliminate temporary "Sign In" button flicker upon page refresh, validating sessions asynchronously in the background with theme-aware loading fallbacks.
-- **PWA & Offline Capable**: Built with service worker support and offline mock providers for instant local evaluation without requiring cloud keys.
+- **PWA & Offline-First Architecture**: Built with service worker support and a local backend provider (`src/services/firebase/localProvider.ts` governed by `src/services/firebase/localConfig.ts`) for instant offline and guest play, persisting profiles, match history, and social lists in browser storage with full schema validation and zero cloud dependencies.
 
 ---
 
@@ -439,9 +440,3 @@ Run this after any update to keep the report in sync:
 ```powershell
 graphify cluster-only .
 ```
-
-### Key findings (last run)
-
-- **`isFirebaseConfigured()`** is the offline-mode gate — called by every Firebase service before any network I/O, enabling full offline/guest play with no config.
-- **`localBackend`** is the offline auth and stat provider; it bridges the Firebase, Auth, and App Routing communities.
-- The graph covers **668 nodes and 1,564 edges** across **49 communities** extracted from 122 source files.
