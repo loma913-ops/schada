@@ -13,8 +13,19 @@ interface PlayerCardProps {
   materialAdvantage?: number;
   isUser?: boolean;
   isThinking?: boolean;
+  isUnlimited?: boolean;
 }
 
+/**
+ * PlayerCard renders player metadata, rating, captured pieces rack, and digital clock.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(K) where K <= 32 is the count of captured pieces filtered into piece categories.
+ * - Auxiliary Space Complexity: O(K) temporary arrays for pawn and officer display slices.
+ *
+ * Growth Rate:
+ * - O(1) in practice as captured pieces set has a strict finite upper bound (at most 32 pieces).
+ */
 export const PlayerCard: React.FC<PlayerCardProps> = memo(function PlayerCard({
   username,
   elo,
@@ -25,6 +36,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = memo(function PlayerCard({
   materialAdvantage,
   isUser,
   isThinking,
+  isUnlimited,
 }) {
   const pawns = capturedPieces.filter((p) => p.type === 'pawn');
   const fieldOfficers = capturedPieces.filter((p) => p.type === 'field_officer');
@@ -156,7 +168,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = memo(function PlayerCard({
         )}
       </div>
 
-      <DigitalClock remainingMs={remainingMs} isActive={isTurn} />
+      <DigitalClock remainingMs={remainingMs} isActive={isTurn} isUnlimited={isUnlimited} />
     </div>
   );
 });

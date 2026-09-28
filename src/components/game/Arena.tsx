@@ -385,6 +385,9 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const topTime = topColor === 'blue' ? blueTime : greenTime;
   const bottomTime = bottomColor === 'blue' ? blueTime : greenTime;
+  // Algorithmic Complexity: O(1) constant time, verifying whether game has unlimited time controls.
+  // Growth Rate: O(1) flat.
+  const isUnlimited = timeControlMinutes <= 0;
 
   const topCaptured = displayedGameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue'];
   const bottomCaptured = displayedGameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue'];
@@ -409,6 +412,7 @@ export const Arena: React.FC<ArenaProps> = ({
           color={topColor}
           isTurn={displayedGameState.currentTurn === topColor && !gameState.isGameOver}
           remainingMs={topTime}
+          isUnlimited={isUnlimited}
           capturedPieces={topCaptured}
           materialAdvantage={materialScores.topAdvantage > 0 ? materialScores.topAdvantage : undefined}
           isUser={userColor === topColor}
@@ -439,6 +443,7 @@ export const Arena: React.FC<ArenaProps> = ({
           color={bottomColor}
           isTurn={displayedGameState.currentTurn === bottomColor && !gameState.isGameOver}
           remainingMs={bottomTime}
+          isUnlimited={isUnlimited}
           capturedPieces={bottomCaptured}
           materialAdvantage={materialScores.bottomAdvantage > 0 ? materialScores.bottomAdvantage : undefined}
           isUser={userColor === bottomColor}

@@ -177,7 +177,7 @@ body {
 /* Main Arena Layout */
 .arena-layout {
   display: grid;
-  grid-template-columns: auto 360px;
+  grid-template-columns: auto 420px;
   max-width: 1200px;
   margin: 1.5rem auto;
   padding: 0 1rem;
@@ -221,7 +221,7 @@ body {
 }
 
 .arena-panel-col {
-  width: 360px;
+  width: 420px;
   height: 0;
   min-height: 100%;
   display: flex;
@@ -517,6 +517,10 @@ body {
   display: flex;
   gap: 0.5rem;
   justify-content: space-between;
+}
+
+.game-controls-bar .action-btn {
+  white-space: nowrap;
 }
 
 .action-btn {
