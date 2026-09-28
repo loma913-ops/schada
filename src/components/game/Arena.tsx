@@ -3,7 +3,7 @@ import type { BoardState, Move, Piece, PieceColor } from '@/core/schada/types';
 import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import { computeCumulativeGameStates } from '@/core/schada/replay';
 import { CANONICAL_MOVE_NAVIGATOR_CONFIG } from './moveNavigatorConfig';
-import { selectBotMove, getBotThinkingDelayMs } from '@/core/bot/schadaBot';
+import { getBotThinkingDelayMs, getBotTier, botWorkerClient } from '@/core/bot/schadaBot';
 import { soundService } from '@/services/audio/soundService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { RotateCcw, Flag, ListOrdered, X, ArrowLeft } from 'lucide-react';
@@ -167,13 +167,14 @@ export const Arena: React.FC<ArenaProps> = ({
   const [blueTime, setBlueTime] = useState<number>(syncedBlueTimeMs ?? initialMs);
   const [greenTime, setGreenTime] = useState<number>(syncedGreenTimeMs ?? initialMs);
 
+  const blueTimeRef = useRef<number>(blueTime);
+  const greenTimeRef = useRef<number>(greenTime);
   useEffect(() => {
-    if (syncedBlueTimeMs !== undefined) setBlueTime(syncedBlueTimeMs);
-  }, [syncedBlueTimeMs]);
-
+    blueTimeRef.current = blueTime;
+  }, [blueTime]);
   useEffect(() => {
-    if (syncedGreenTimeMs !== undefined) setGreenTime(syncedGreenTimeMs);
-  }, [syncedGreenTimeMs]);
+    greenTimeRef.current = greenTime;
+  }, [greenTime]);
 
   const lastTickRef = useRef<number>(Date.now());
 
@@ -288,20 +289,25 @@ export const Arena: React.FC<ArenaProps> = ({
     }
   }, [customMakeMove, incrementSeconds, timeControlMinutes, onGameComplete]);
 
-  // Bot Turn Automation
+  // Bot Turn Automation (via Web Worker with sync fallback)
   useEffect(() => {
     if (!isComputer || !computerColor || gameState.isGameOver) return;
     if (gameState.currentTurn !== computerColor) return;
 
+    let isSubscribed = true;
     setIsBotThinking(true);
-    const delay = getBotThinkingDelayMs(botLevel);
-    const timer = setTimeout(() => {
-      const botMove = selectBotMove(
+    const delay = getBotThinkingDelayMs(botLevel, gameStateRef.current.moveHistory);
+    const timer = setTimeout(async () => {
+      const remainingTimeMs = computerColor === 'blue' ? blueTimeRef.current : greenTimeRef.current;
+      const botMove = await botWorkerClient.requestBotMove(
         gameStateRef.current.board,
         computerColor,
         botLevel,
-        gameStateRef.current.moveHistory
+        gameStateRef.current.moveHistory,
+        remainingTimeMs,
+        incrementSeconds * 1000
       );
+      if (!isSubscribed) return;
       setIsBotThinking(false);
       if (botMove) {
         handleMakeMove(botMove);
@@ -309,10 +315,19 @@ export const Arena: React.FC<ArenaProps> = ({
     }, delay);
 
     return () => {
+      isSubscribed = false;
       clearTimeout(timer);
       setIsBotThinking(false);
     };
-  }, [gameState.currentTurn, gameState.isGameOver, isComputer, computerColor, botLevel, handleMakeMove]);
+  }, [
+    gameState.currentTurn,
+    gameState.isGameOver,
+    isComputer,
+    computerColor,
+    botLevel,
+    handleMakeMove,
+    incrementSeconds,
+  ]);
 
   const handleResign = () => {
     if (gameState.isGameOver) return;
@@ -474,7 +489,7 @@ export const Arena: React.FC<ArenaProps> = ({
           <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             {timeControlMinutes > 0 ? `${timeControlMinutes}+${incrementSeconds}` : 'Unlimited'} •{' '}
             <span style={{ color: isRanked ? 'var(--accent-gold)' : 'var(--text-secondary)' }}>
-              {isSpectator ? 'Spectating' : isComputer ? `Level ${botLevel} Bot` : isRanked ? 'Ranked' : 'Casual'}
+              {isSpectator ? 'Spectating' : isComputer ? `${getBotTier(botLevel).name} (Lvl ${botLevel})` : isRanked ? 'Ranked' : 'Casual'}
             </span>
           </div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>

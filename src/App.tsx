@@ -39,6 +39,7 @@ import {
   startAbandonedGamesCleanupWatcher,
 } from './services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
+import { getBotTier } from './core/bot/botTiers';
 import type { BoardState, PieceColor } from './core/schada/types';
 
 interface ComputerModalNavState {
@@ -191,13 +192,11 @@ const MainApp: React.FC = () => {
     difficultyLevel: number;
     userColor: PieceColor;
   }) => {
-    const botElo =
-      MULTIPLAYER_SCALE_CONFIG.matchmaking.botBaseElo +
-      difficultyLevel * MULTIPLAYER_SCALE_CONFIG.matchmaking.botEloStepPerLevel;
+    const tier = getBotTier(difficultyLevel);
     const botOpponent: ArenaPlayer = {
       id: `bot_level_${difficultyLevel}`,
-      username: `SchadaBot (Level ${difficultyLevel})`,
-      elo: botElo,
+      username: `SchadaBot (${tier.name} - Lvl ${difficultyLevel})`,
+      elo: tier.elo,
     };
 
     const currentUserPlayer: ArenaPlayer = user

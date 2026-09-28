@@ -1,151 +1,116 @@
 import type { BoardMatrix, Move, PieceColor } from '../schada/types';
-import { getAllLegalMoves, haveAllRemainingHighPiecesReachedGoal, isSquareAttacked } from '../schada/engine';
-import { squareToColRow } from '../schada/vectors';
+import { FastBoard } from './fastBoard';
+import { getBotTier, BOT_ENGINE_CONFIG } from './botTiers';
+import { searchBestMove } from './search';
+import { evaluateBoard } from './evaluator';
+import {
+  getOpeningBookMove,
+  shouldTierUseOpeningBook,
+  buildMoveSequenceKey,
+  OPENING_BOOK,
+} from './openingBook';
+
+export * from './botConfig';
+export * from './botTiers';
+export * from './distanceTables';
+export * from './fastBoard';
+export * from './evaluator';
+export * from './search';
+export * from './openingBook';
+export * from './botWorkerClient';
 
 /**
- * Material and strategic weights for Schada piece evaluation
- */
-const PIECE_VALUES = {
-  field_officer: 60,
-  officer: 40,
-  pawn: 15,
-};
-
-/**
- * Evaluates the utility of a single candidate move for Level 1 bot.
+ * Evaluates the utility of a single candidate move (legacy compatibility).
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(N) where N = 64 squares = O(1) constant time.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
  */
 export function scoreMove(
   board: BoardMatrix,
   move: Move,
   botColor: PieceColor,
-  recentMoves?: Move[]
+  _recentMoves?: Move[]
 ): number {
-  let score = 0;
-  const opponentColor: PieceColor = botColor === 'blue' ? 'green' : 'blue';
-  const goalRank = botColor === 'blue' ? 7 : 0;
-  const [, toRow] = squareToColRow(move.to);
-  const [, fromRow] = squareToColRow(move.from);
+  const fastBoard = FastBoard.fromBoardMatrix(board, botColor);
+  const tier = getBotTier(1);
+  const legalFastMoves = fastBoard.generateLegalMoves(botColor);
+  const matching = legalFastMoves.find(
+    (m) => fastBoard.toStandardMove(m).from === move.from && fastBoard.toStandardMove(m).to === move.to
+  );
+  if (!matching) return -Infinity;
 
-  // 1. Goal Line Entering Priority
-  // Only reward reaching the goal line when entering from the playing field!
-  const isEnteringGoal = move.piece.type !== 'pawn' && fromRow !== goalRank && toRow === goalRank;
-  if (isEnteringGoal) {
-    if (move.piece.type === 'field_officer') {
-      score += 250; // Field Officer is worth 2 goal points and becomes immune
-    } else {
-      score += 180; // Officer is worth 1 goal point and becomes immune
-    }
-  }
-
-  // 2. High piece ALREADY on the goal line
-  // Once a high piece is in the goal line, its scoring mission is complete and it is immune.
-  // Heavily discourage unnecessary shuffling inside the goal line so the bot advances its other pieces!
-  if (move.piece.type !== 'pawn' && fromRow === goalRank) {
-    if (!move.captured) {
-      score -= 120;
-    }
-  }
-
-  // 3. Material Captures
-  if (move.captured) {
-    const victimValue = PIECE_VALUES[move.captured.type] || 10;
-    score += victimValue * 2;
-  }
-
-  // 4. Advancing High Pieces towards Goal Line
-  if (move.piece.type !== 'pawn' && fromRow !== goalRank) {
-    const previousDist = Math.abs(fromRow - goalRank);
-    const newDist = Math.abs(toRow - goalRank);
-    const distanceGain = previousDist - newDist;
-    score += distanceGain * 12; // High priority on advancing remaining high pieces
-  } else if (move.piece.type === 'pawn') {
-    // Pawns pushing forward to control space and open paths
-    const previousDist = Math.abs(fromRow - goalRank);
-    const newDist = Math.abs(toRow - goalRank);
-    const distanceGain = previousDist - newDist;
-    score += distanceGain * 3;
-  }
-
-  // 5. Lookahead / Threat Avoidance (1-ply defensive check)
-  // Simulate the move on a lightweight scratch board (avoiding heavy hash calculation & cloning)
-  const scratchBoard: BoardMatrix = { ...board };
-  scratchBoard[move.from] = null;
-  scratchBoard[move.to] = {
-    ...move.piece,
-    hasLeftBase: true,
-    hasReachedGoal: toRow === goalRank,
-  };
-
-  // Did this move immediately win the game?
-  if (haveAllRemainingHighPiecesReachedGoal(scratchBoard, botColor)) {
-    return 10000;
-  }
-
-  // Check if destination square is immediately attacked by opponent (only if outside immune goal rank)
-  if (toRow !== goalRank) {
-    const isDirectlyAttacked = isSquareAttacked(scratchBoard, move.to, opponentColor);
-    if (isDirectlyAttacked) {
-      const movingPieceValue = PIECE_VALUES[move.piece.type] || 15;
-      score -= movingPieceValue * 1.5;
-    }
-  }
-
-  // 6. Friendly leap bonuses for Field Officer (only outside the goal line)
-  if (move.piece.type === 'field_officer' && move.intermediateSquares.length > 0 && fromRow !== goalRank) {
-    score += 10; // Rewards dynamic tactical leaping
-  }
-
-  // 7. Repetition & Oscillation Avoidance using recent move history
-  if (recentMoves && recentMoves.length > 0) {
-    const lastBotMove = [...recentMoves].reverse().find((m) => m.piece.color === botColor);
-    if (lastBotMove) {
-      // Reversing the previous move (going back to previous square)
-      if (move.from === lastBotMove.to && move.to === lastBotMove.from && !move.captured) {
-        score -= 150;
-      }
-      // Moving the same piece again when it's already in the goal line
-      if (lastBotMove.to === move.from && fromRow === goalRank && !move.captured) {
-        score -= 200;
-      }
-    }
-  }
-
-  // 8. Add small subtle jitter (0-3 pts) for natural human-like variation among equal moves
-  score += (Math.random() * 3) - 1.5;
-
+  fastBoard.makeMove(matching);
+  const score = -evaluateBoard(fastBoard, fastBoard.currentTurn, tier, 1);
+  fastBoard.unmakeMove();
   return score;
 }
 
 /**
- * Selects the best move for the bot based on the selected difficulty level and move history.
+ * Selects the optimal move for the bot using the opening book or 8-tier Schada AI engine.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity:
+ *   Opening Book hit: O(1) instantaneous lookup (0ms).
+ *   Tree Search: Bounded by level's maximum depth and dynamic timeLimitMs budget:
+ *     Level 1-2: O(1) / O(M) where M <= 64 candidate moves.
+ *     Level 3-4: O(b^d) where b <= 18, d <= 3.
+ *     Level 5-8: O(b^(d/2)) iterative deepening with alpha-beta, quiescence, and PVS.
+ * - Auxiliary Space Complexity: O(d + TT_SIZE) = O(1) fixed preallocated tables.
+ *
+ * Growth Rate:
+ * - Exponential in depth d; pruned via alpha-beta cutoffs, transposition table hits,
+ *   and null-move pruning to maintain steady interactive response times.
  */
 export function selectBotMove(
   board: BoardMatrix,
   color: PieceColor,
-  _level: number = 1,
-  recentMoves?: Move[]
+  level: number = 1,
+  recentMoves?: Move[],
+  timeLeftMs?: number,
+  incrementMs?: number
 ): Move | null {
-  const legalMoves = getAllLegalMoves(board, color);
-  if (legalMoves.length === 0) return null;
-
-  // Level 1: Evaluate each candidate move and choose the top-scoring one
-  let bestMove: Move = legalMoves[0];
-  let highestScore = -Infinity;
-
-  for (const move of legalMoves) {
-    const score = scoreMove(board, move, color, recentMoves);
-    if (score > highestScore) {
-      highestScore = score;
-      bestMove = move;
-    }
+  // 1. Check precomputed opening book first (0ms)
+  const bookMove = getOpeningBookMove(board, color, level, recentMoves);
+  if (bookMove) {
+    return bookMove;
   }
 
-  return bestMove;
+  // 2. Tree Search
+  const tier = getBotTier(level);
+  const tm = BOT_ENGINE_CONFIG.timeManagement;
+
+  let budget = tier.timeLimitMs;
+  if (typeof timeLeftMs === 'number' && timeLeftMs > 0) {
+    const clockPortion = Math.floor(timeLeftMs / tm.clockDivisor) + (incrementMs ?? 0);
+    budget = Math.max(tm.minThinkingTimeMs, Math.min(tier.timeLimitMs, clockPortion));
+  }
+
+  const fastBoard = FastBoard.fromBoardMatrix(board, color);
+  const fastMove = searchBestMove(fastBoard, tier, budget, recentMoves ? recentMoves.length : 0);
+  if (!fastMove) return null;
+
+  return fastBoard.toStandardMove(fastMove);
 }
 
 /**
- * Returns a human-like thinking delay in milliseconds based on level.
+ * Returns a thinking delay in milliseconds based on level and opening book availability.
+ * If an opening book move is available for the active tier, returns 0ms for instant play.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1).
+ * - Auxiliary Space Complexity: O(1).
  */
-export function getBotThinkingDelayMs(_level: number = 1): number {
-  return 400 + Math.floor(Math.random() * 350);
+export function getBotThinkingDelayMs(level: number = 1, recentMoves?: Move[]): number {
+  if (shouldTierUseOpeningBook(level, recentMoves)) {
+    const key = buildMoveSequenceKey(recentMoves);
+    if (OPENING_BOOK[key] && OPENING_BOOK[key].length > 0) {
+      return BOT_ENGINE_CONFIG.openingBook.bookThinkingDelayMs;
+    }
+  }
+
+  const tier = getBotTier(level);
+  const tm = BOT_ENGINE_CONFIG.timeManagement;
+  const base = tm.baseThinkingDelayMs + tier.level * tm.thinkingDelayStepPerLevelMs;
+  return base + Math.floor(Math.random() * tm.randomDelayJitterMaxMs);
 }
