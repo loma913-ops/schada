@@ -40,7 +40,7 @@ export async function setUserOnlineStatus(
 ): Promise<void> {
   if (isFirebaseConfigured() && auth?.currentUser && db) {
     try {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+      await updateDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, auth.currentUser.uid), {
         status,
         lastSeen: serverTimestamp(),
       });
@@ -99,9 +99,11 @@ export async function updateUserStats(
   // 2. If Firebase is active and the authenticated user owns this profile record
   if (isFirebaseConfigured() && db && auth?.currentUser?.uid === userId) {
     try {
-      const userDocRef = doc(db, 'users', userId);
-      const snap = await getDoc(userDocRef);
-      if (snap.exists()) {
+      const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId);
+      const updatedProfile = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(userDocRef);
+        if (!snap.exists()) return null;
+
         const data = snap.data() as UserProfile;
         const currentGamesPlayed = data.gamesPlayed || 0;
         const currentGamesWon = data.gamesWon || 0;
@@ -117,7 +119,7 @@ export async function updateUserStats(
         const newGamesLost = isDraw ? currentGamesLost : !won ? currentGamesLost + 1 : currentGamesLost;
         const newGamesDrawn = isDraw ? currentGamesDrawn + 1 : currentGamesDrawn;
 
-        await updateDoc(userDocRef, {
+        tx.update(userDocRef, {
           eloRating: newElo,
           gamesPlayed: newGamesPlayed,
           gamesWon: newGamesWon,
@@ -126,15 +128,17 @@ export async function updateUserStats(
           updatedAt: serverTimestamp(),
         });
 
-        const updatedProfile: UserProfile = {
+        return {
           ...data,
           eloRating: newElo,
           gamesPlayed: newGamesPlayed,
           gamesWon: newGamesWon,
           gamesLost: newGamesLost,
           gamesDrawn: newGamesDrawn,
-        };
+        } as UserProfile;
+      });
 
+      if (updatedProfile) {
         persistCachedProfile(updatedProfile);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
@@ -183,7 +187,7 @@ export async function updateUserStats(
 export async function reloadUserProfile(): Promise<UserProfile | null> {
   if (isFirebaseConfigured() && auth?.currentUser && db) {
     try {
-      const snap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      const snap = await getDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, auth.currentUser.uid));
       if (snap.exists()) {
         const active = isCurrentClientActive();
         const status = active ? 'online' : 'offline';
@@ -287,7 +291,7 @@ export async function registerUser(
   if (isFirebaseConfigured() && auth && db) {
     const firestore = db;
     // 1. Check uniqueness via transaction on `usernames/{usernameLower}`
-    const usernameDocRef = doc(firestore, 'usernames', usernameLower);
+    const usernameDocRef = doc(firestore, MULTIPLAYER_SCALE_CONFIG.collections.usernames, usernameLower);
     const existing = await getDoc(usernameDocRef);
     if (existing.exists()) {
       throw new Error(`Username "${username}" is already taken.`);
@@ -315,7 +319,7 @@ export async function registerUser(
     // 3. Atomically write profile and reserve username
     await runTransaction(firestore, async (tx) => {
       tx.set(usernameDocRef, { uid, createdAt: serverTimestamp() });
-      tx.set(doc(firestore, 'users', uid), {
+      tx.set(doc(firestore, MULTIPLAYER_SCALE_CONFIG.collections.users, uid), {
         ...userProfile,
         createdAt: serverTimestamp(),
         lastSeen: serverTimestamp(),
@@ -338,7 +342,7 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
   if (isFirebaseConfigured() && auth && db) {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
     const uid = userCredential.user.uid;
-    const userDocRef = doc(db, 'users', uid);
+    const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, uid);
     const userDoc = await getDoc(userDocRef);
 
     if (!userDoc.exists()) {
@@ -347,16 +351,6 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
 
     const active = isCurrentClientActive();
     const status = active ? 'online' : 'offline';
-
-    try {
-      await updateDoc(userDocRef, {
-        status,
-        lastSeen: serverTimestamp(),
-      });
-    } catch (e) {
-      console.warn('Could not update status to online:', e);
-    }
-
     const data = userDoc.data() as UserProfile;
     const profileWithStatus: UserProfile = { ...data, status };
     persistCachedProfile(profileWithStatus);
@@ -376,9 +370,9 @@ export async function logoutUser(): Promise<void> {
     const uid = auth.currentUser?.uid;
     if (uid) {
       try {
-        await updateDoc(doc(db, 'users', uid), {
+        await updateDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, uid), {
           status: 'offline',
-          lastSeen: serverTimestamp(),
+          lastSeen: new Date(0),
         });
       } catch (e) {
         console.warn('Could not update status to offline on logout:', e);
@@ -404,7 +398,7 @@ export async function changeUsername(
 
   if (isFirebaseConfigured() && db) {
     const firestore = db;
-    const userDocRef = doc(firestore, 'users', uid);
+    const userDocRef = doc(firestore, MULTIPLAYER_SCALE_CONFIG.collections.users, uid);
 
     return await runTransaction(firestore, async (tx) => {
       const userSnap = await tx.get(userDocRef);
@@ -415,14 +409,14 @@ export async function changeUsername(
         throw new Error('You have already changed your username once. No further changes are allowed.');
       }
 
-      const newUsernameDocRef = doc(firestore, 'usernames', newLower);
+      const newUsernameDocRef = doc(firestore, MULTIPLAYER_SCALE_CONFIG.collections.usernames, newLower);
       const newUsernameSnap = await tx.get(newUsernameDocRef);
       if (newUsernameSnap.exists()) {
         throw new Error(`Username "${newUsername}" is already taken.`);
       }
 
       // Delete old username reservation
-      const oldUsernameDocRef = doc(firestore, 'usernames', current.usernameLower);
+      const oldUsernameDocRef = doc(firestore, MULTIPLAYER_SCALE_CONFIG.collections.usernames, current.usernameLower);
       tx.delete(oldUsernameDocRef);
 
       // Reserve new username
@@ -453,24 +447,57 @@ export async function changeUsername(
   return changed;
 }
 
+/**
+ * Compares two user profiles for meaningful field changes, explicitly ignoring
+ * volatile server timestamp heartbeats (`lastSeen`).
+ *
+ * This prevents cyclical ping-pong render loops and unbounded network write/read storms
+ * when presence heartbeats touch the user document.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant scalar field equality comparisons.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ */
+function hasMeaningfulProfileChanged(
+  prev: UserProfile | null,
+  next: UserProfile | null
+): boolean {
+  if (!prev && !next) return false;
+  if (!prev || !next) return true;
+  return (
+    prev.id !== next.id ||
+    prev.email !== next.email ||
+    prev.username !== next.username ||
+    prev.eloRating !== next.eloRating ||
+    prev.gamesPlayed !== next.gamesPlayed ||
+    prev.gamesWon !== next.gamesWon ||
+    prev.gamesLost !== next.gamesLost ||
+    prev.gamesDrawn !== next.gamesDrawn ||
+    prev.status !== next.status ||
+    prev.usernameChangeCount !== next.usernameChangeCount
+  );
+}
+
 export function subscribeToAuthState(callback: (user: UserProfile | null) => void): () => void {
   if (isFirebaseConfigured() && auth && db) {
     let unsubscribeDoc: (() => void) | null = null;
+    let lastProfileSnapshot: UserProfile | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (unsubscribeDoc) {
         unsubscribeDoc();
         unsubscribeDoc = null;
+        lastProfileSnapshot = null;
       }
 
       if (firebaseUser) {
         try {
-          const userDocRef = doc(db!, 'users', firebaseUser.uid);
+          const userDocRef = doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, firebaseUser.uid);
           const active = isCurrentClientActive();
           const status = active ? 'online' : 'offline';
           await updateDoc(userDocRef, {
             status,
-            lastSeen: serverTimestamp(),
+            lastSeen: active ? serverTimestamp() : new Date(0),
           });
           syncPresenceHeartbeat();
 
@@ -480,12 +507,17 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
               if (userSnap.exists()) {
                 const currentActive = isCurrentClientActive();
                 const currentStatus = currentActive ? 'online' : 'offline';
+                const data = userSnap.data() as UserProfile;
                 const profile: UserProfile = {
-                  ...(userSnap.data() as UserProfile),
+                  ...data,
                   status: currentStatus,
                 };
-                persistCachedProfile(profile);
-                callback(profile);
+                // Only dispatch callback when meaningful profile fields change (avoids lastSeen ping-pong loops)
+                if (hasMeaningfulProfileChanged(lastProfileSnapshot, profile)) {
+                  lastProfileSnapshot = profile;
+                  persistCachedProfile(profile);
+                  callback(profile);
+                }
               }
             },
             (e) => {
@@ -497,6 +529,7 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
           callback(null);
         }
       } else {
+        lastProfileSnapshot = null;
         persistCachedProfile(null);
         callback(null);
       }

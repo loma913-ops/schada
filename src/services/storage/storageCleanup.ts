@@ -7,14 +7,16 @@
  * 3. Providing safe storage operations with automatic emergency quota eviction and error suppression.
  */
 
-export const STORAGE_LIMITS = {
-  maxMockGames: 5,
-  maxPlayerTokens: 20,
-  maxSessionAgeMs: 60 * 1000, // 60 seconds
-} as const;
+import { MULTIPLAYER_SCALE_CONFIG } from '../firebase/multiplayerConfig';
+
+export const STORAGE_LIMITS = MULTIPLAYER_SCALE_CONFIG.storageLimits;
 
 /**
  * Checks if window.localStorage is accessible.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant write/delete operation.
+ * - Auxiliary Space Complexity: O(1) constant memory.
  */
 export function isLocalStorageAvailable(): boolean {
   try {
@@ -25,7 +27,7 @@ export function isLocalStorageAvailable(): boolean {
           ? localStorage
           : null;
     if (!storage) return false;
-    const testKey = '__schada_storage_test__';
+    const testKey = STORAGE_LIMITS.testStorageKey;
     storage.setItem(testKey, '1');
     storage.removeItem(testKey);
     return true;
@@ -37,11 +39,12 @@ export function isLocalStorageAvailable(): boolean {
 /**
  * Cleans up orphaned or excessive data stored in localStorage.
  *
- * Algorithmic Complexity:
- * - Time Complexity: O(K) where K is the number of keys in localStorage.
- * - Auxiliary Space Complexity: O(K) for key collection.
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(K + G log G) where K is the number of keys in localStorage and G is mock games count (G <= 10).
+ *   Prioritizes linear O(K) growth rate to scale sustainably as browser usage increases.
+ * - Auxiliary Space Complexity: O(K) for key collection arrays.
  *
- * @param emergency If true, aggressively removes all mock games and non-critical tokens.
+ * @param emergency If true, aggressively removes all mock games and non-critical tokens while preserving active match tokens.
  */
 export function cleanupBrowserStorage(emergency: boolean = false): void {
   try {
@@ -49,6 +52,8 @@ export function cleanupBrowserStorage(emergency: boolean = false): void {
 
     const keysToRemove: string[] = [];
     const playerTokenKeys: string[] = [];
+    const playerTokenPrefix = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.playerTokenPrefix;
+    const firestorePrefix = STORAGE_LIMITS.firestoreKeyPrefix;
 
     // Inspect all keys
     for (let i = 0; i < localStorage.length; i++) {
@@ -57,9 +62,9 @@ export function cleanupBrowserStorage(emergency: boolean = false): void {
 
       // 1. Purge all orphaned Firebase multi-tab synchronization keys
       // (firestore_clients_*, firestore_targets_*, firestore_zombie_targets_*, etc.)
-      if (key.startsWith('firestore_')) {
+      if (key.startsWith(firestorePrefix)) {
         keysToRemove.push(key);
-      } else if (key.startsWith('schada_player_token_')) {
+      } else if (key.startsWith(playerTokenPrefix)) {
         playerTokenKeys.push(key);
       }
     }
@@ -71,11 +76,16 @@ export function cleanupBrowserStorage(emergency: boolean = false): void {
 
     // 2. Prune player session tokens
     if (emergency) {
-      for (const key of playerTokenKeys) {
+      // In emergency, retain the last emergencyRetainedTokens to protect active games if possible
+      const toRemove = playerTokenKeys.slice(
+        0,
+        Math.max(0, playerTokenKeys.length - STORAGE_LIMITS.emergencyRetainedTokens)
+      );
+      for (const key of toRemove) {
         localStorage.removeItem(key);
       }
     } else if (playerTokenKeys.length > STORAGE_LIMITS.maxPlayerTokens) {
-      // Remove oldest tokens in excess of limit
+      // Remove excess tokens beyond limit
       const excess = playerTokenKeys.slice(0, playerTokenKeys.length - STORAGE_LIMITS.maxPlayerTokens);
       for (const key of excess) {
         localStorage.removeItem(key);
@@ -83,7 +93,7 @@ export function cleanupBrowserStorage(emergency: boolean = false): void {
     }
 
     // 3. Prune or purge mock games
-    const mockGamesKey = 'schada_mock_games';
+    const mockGamesKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.mockGames;
     const rawGames = localStorage.getItem(mockGamesKey);
     if (rawGames) {
       if (emergency) {
@@ -111,26 +121,31 @@ export function cleanupBrowserStorage(emergency: boolean = false): void {
     }
 
     // 4. Prune stale active presence sessions
-    const activeSessionsKey = 'schada_active_sessions';
-    const rawSessions = localStorage.getItem(activeSessionsKey);
-    if (rawSessions) {
-      try {
-        const sessions = JSON.parse(rawSessions);
-        const now = Date.now();
-        let changed = false;
-        if (sessions && typeof sessions === 'object') {
-          for (const [id, s] of Object.entries(sessions as Record<string, any>)) {
-            if (!s || typeof s.lastSeen !== 'number' || now - s.lastSeen > STORAGE_LIMITS.maxSessionAgeMs) {
-              delete sessions[id];
-              changed = true;
+    const sessionKeys = [
+      MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.activeSessions,
+      'schada_active_sessions', // legacy key support
+    ];
+    for (const activeSessionsKey of sessionKeys) {
+      const rawSessions = localStorage.getItem(activeSessionsKey);
+      if (rawSessions) {
+        try {
+          const sessions = JSON.parse(rawSessions);
+          const now = Date.now();
+          let changed = false;
+          if (sessions && typeof sessions === 'object') {
+            for (const [id, s] of Object.entries(sessions as Record<string, any>)) {
+              if (!s || typeof s.lastSeen !== 'number' || now - s.lastSeen > STORAGE_LIMITS.maxSessionAgeMs) {
+                delete sessions[id];
+                changed = true;
+              }
+            }
+            if (changed) {
+              localStorage.setItem(activeSessionsKey, JSON.stringify(sessions));
             }
           }
-          if (changed) {
-            localStorage.setItem(activeSessionsKey, JSON.stringify(sessions));
-          }
+        } catch {
+          localStorage.removeItem(activeSessionsKey);
         }
-      } catch {
-        localStorage.removeItem(activeSessionsKey);
       }
     }
   } catch (err) {
@@ -141,6 +156,10 @@ export function cleanupBrowserStorage(emergency: boolean = false): void {
 /**
  * Safely writes to localStorage with automatic QuotaExceededError handling.
  * If quota is exceeded, performs emergency eviction of non-essential keys and retries once.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) amortized normal execution; O(K) in rare emergency purge scenario where K is key count.
+ * - Auxiliary Space Complexity: O(1) in steady state; O(K) temporary array allocations during emergency purge.
  */
 export function safeSetItem(key: string, value: string): boolean {
   if (typeof localStorage === 'undefined') return false;
@@ -175,6 +194,10 @@ export function safeSetItem(key: string, value: string): boolean {
 
 /**
  * Safely reads from localStorage.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant time hash lookup.
+ * - Auxiliary Space Complexity: O(1) scalar reference.
  */
 export function safeGetItem(key: string): string | null {
   try {
@@ -187,6 +210,10 @@ export function safeGetItem(key: string): string | null {
 
 /**
  * Safely removes a key from localStorage.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant time deletion.
+ * - Auxiliary Space Complexity: O(1) constant memory.
  */
 export function safeRemoveItem(key: string): void {
   try {

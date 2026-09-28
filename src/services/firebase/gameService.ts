@@ -1,6 +1,5 @@
 import {
   doc,
-  getDoc,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -11,6 +10,8 @@ import {
   onSnapshot,
   runTransaction,
   limit,
+  arrayUnion,
+  writeBatch,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
@@ -102,8 +103,12 @@ export function isGameTimedOut(game: GameRoom | null | undefined): GameTimeoutRe
   return { timedOut: false };
 }
 
-const SESSION_STORAGE_PREFIX = 'schada_player_token_';
+const SESSION_STORAGE_PREFIX = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.playerTokenPrefix;
 const MOCK_GAMES_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.mockGames;
+
+// In-memory set tracking active game resolution transactions (resignation or timeout)
+// to prevent duplicate concurrent network transactions on the same client session.
+const pendingResolutionGameIds = new Set<string>();
 
 // Helper to remove any undefined values for Firestore serialization
 function sanitize<T>(obj: T): T {
@@ -170,28 +175,20 @@ function computeRankedGameEloResult(
 
 /**
  * Appends a user ID to a completed game's processedEloUserIds array to prevent duplicate rating updates.
+ * Utilizes atomic arrayUnion to eliminate getDoc reads and guarantee race-condition-free updates.
  *
- * Algorithmic Complexity:
- * - Time Complexity: O(P) where P is the number of players (at most 2 in Schada).
- * - Auxiliary Space Complexity: O(1) array allocation capped at player count.
- *
- * Growth Rate:
- * - O(1) constant: player count P <= 2, ensuring optimal scalability under concurrent room completions.
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) direct single write with zero read operations.
+ * - Auxiliary Space Complexity: O(1) constant scalar memory.
+ * - Growth Rate: O(1) constant, invariant to room size or active player count.
  */
 export async function markGameEloProcessed(gameId: string, userId: string): Promise<void> {
   if (isFirebaseConfigured() && db) {
     try {
-      const gameRef = doc(db, 'games', gameId);
-      const snap = await getDoc(gameRef);
-      if (snap.exists()) {
-        const game = snap.data() as GameRoom;
-        const currentProcessed = Array.isArray(game.processedEloUserIds) ? game.processedEloUserIds : [];
-        if (!currentProcessed.includes(userId)) {
-          await updateDoc(gameRef, {
-            processedEloUserIds: [...currentProcessed, userId],
-          });
-        }
-      }
+      const gameRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
+      await updateDoc(gameRef, {
+        processedEloUserIds: arrayUnion(userId),
+      });
     } catch (e) {
       console.warn('Could not mark game Elo processed in Firestore:', e);
     }
@@ -441,7 +438,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
   setLocalSessionToken(gameId, sessionToken);
 
   if (isFirebaseConfigured() && db) {
-    const docRef = doc(db, 'games', gameId);
+    const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
     await setDoc(docRef, sanitize(newGame));
   } else {
     mockStore.set(newGame);
@@ -466,7 +463,7 @@ export async function joinGame(
 
   // If live Firebase is configured, execute atomic transaction to prevent race conditions
   if (isFirebaseConfigured() && db) {
-    const docRef = doc(db, 'games', gameId);
+    const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
     return await runTransaction(db, async (tx) => {
       const snap = await tx.get(docRef);
       if (!snap.exists()) {
@@ -595,7 +592,7 @@ export function subscribeToGame(
   onError?: (err: Error) => void
 ): () => void {
   if (isFirebaseConfigured() && db) {
-    const docRef = doc(db, 'games', gameId);
+    const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
     return onSnapshot(
       docRef,
       async (snap) => {
@@ -644,7 +641,7 @@ export async function makeGameMove(
   playerColor: PieceColor
 ): Promise<void> {
   if (isFirebaseConfigured() && db) {
-    const docRef = doc(db, 'games', gameId);
+    const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(docRef);
       if (!snap.exists()) {
@@ -774,149 +771,294 @@ export async function makeGameMove(
   mockStore.set({ ...game, ...updatePayload });
 }
 
+/**
+ * Executes player resignation atomically, updating game room status, winner,
+ * and ranked Elo ratings within a single Firestore transaction.
+ * Losing player stats are offloaded to background execution to prevent network blocking.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant time point read and point write in transaction.
+ *   Elo calculation and game state update run in O(1) constant time.
+ * - Auxiliary Space Complexity: O(1) constant scalar and payload memory.
+ * - Growth Rate: O(1) invariant to total games played or database volume.
+ */
 export async function resignGameAction(
   gameId: string,
   resigningColor: PieceColor
 ): Promise<void> {
-  let game: GameRoom | null = null;
-  if (isFirebaseConfigured() && db) {
-    const snap = await getDoc(doc(db, 'games', gameId));
-    if (snap.exists()) {
-      game = snap.data() as GameRoom;
-    }
-  } else {
-    game = mockStore.get(gameId);
-  }
+  if (pendingResolutionGameIds.has(gameId)) return;
+  pendingResolutionGameIds.add(gameId);
 
-  if (!game || game.status !== 'in_progress') return;
+  try {
+    if (isFirebaseConfigured() && db) {
+      const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
+      let resigningPlayerId: string | null = null;
+      let resigningDelta = 0;
 
-  const nextBoardState = resignGame(game.boardState, resigningColor);
-  const winner = nextBoardState.result?.winner;
-  const updatePayload: Partial<GameRoom> = {
-    boardState: nextBoardState,
-    status: 'completed',
-    winner,
-    winReason: nextBoardState.result?.winReason,
-    lastTurnStartTimeMs: null,
-  };
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(docRef);
+        if (!snap.exists()) return;
 
-  const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
-    ? [...game.processedEloUserIds]
-    : [];
+        const game = snap.data() as GameRoom;
+        if (game.status !== 'in_progress') return;
 
-  if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
-    const eloCalc = computeRankedGameEloResult(game, winner);
-    if (eloCalc) {
-      updatePayload.eloResult = eloCalc;
-      updatePayload.bluePlayer = {
-        ...game.bluePlayer,
-        elo: eloCalc.newBlueElo,
-      };
-      updatePayload.greenPlayer = {
-        ...game.greenPlayer,
-        elo: eloCalc.newGreenElo,
-      };
+        const nextBoardState = resignGame(game.boardState, resigningColor);
+        const winner = nextBoardState.result?.winner;
+        const updatePayload: Partial<GameRoom> = {
+          boardState: nextBoardState,
+          status: 'completed',
+          winner,
+          winReason: nextBoardState.result?.winReason,
+          lastTurnStartTimeMs: null,
+        };
 
-      const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
-      const resigningDelta = resigningColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
-      if (resigningPlayer?.id && !processedUserIds.includes(resigningPlayer.id)) {
-        try {
-          await updateUserStats(resigningPlayer.id, false, false, resigningDelta);
-          processedUserIds.push(resigningPlayer.id);
-        } catch (e) {
+        const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
+          ? [...game.processedEloUserIds]
+          : [];
+
+        if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+          const eloCalc = computeRankedGameEloResult(game, winner);
+          if (eloCalc) {
+            updatePayload.eloResult = eloCalc;
+            updatePayload.bluePlayer = {
+              ...game.bluePlayer,
+              elo: eloCalc.newBlueElo,
+            };
+            updatePayload.greenPlayer = {
+              ...game.greenPlayer,
+              elo: eloCalc.newGreenElo,
+            };
+
+            const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+            const delta = resigningColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
+            if (resigningPlayer?.id) {
+              resigningPlayerId = resigningPlayer.id;
+              resigningDelta = delta;
+              if (!processedUserIds.includes(resigningPlayer.id)) {
+                processedUserIds.push(resigningPlayer.id);
+              }
+            }
+          }
+        }
+
+        updatePayload.processedEloUserIds = processedUserIds;
+        tx.update(docRef, sanitize(updatePayload));
+      });
+
+      if (resigningPlayerId) {
+        updateUserStats(resigningPlayerId, false, false, resigningDelta).catch((e) => {
           console.warn('Failed to update stats for resigning player:', e);
+        });
+      }
+      return;
+    }
+
+    const game = mockStore.getRaw(gameId);
+    if (!game || game.status !== 'in_progress') return;
+
+    const nextBoardState = resignGame(game.boardState, resigningColor);
+    const winner = nextBoardState.result?.winner;
+    const updatePayload: Partial<GameRoom> = {
+      boardState: nextBoardState,
+      status: 'completed',
+      winner,
+      winReason: nextBoardState.result?.winReason,
+      lastTurnStartTimeMs: null,
+    };
+
+    const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
+      ? [...game.processedEloUserIds]
+      : [];
+
+    let resigningPlayerId: string | null = null;
+    let resigningDelta = 0;
+
+    if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+      const eloCalc = computeRankedGameEloResult(game, winner);
+      if (eloCalc) {
+        updatePayload.eloResult = eloCalc;
+        updatePayload.bluePlayer = {
+          ...game.bluePlayer,
+          elo: eloCalc.newBlueElo,
+        };
+        updatePayload.greenPlayer = {
+          ...game.greenPlayer,
+          elo: eloCalc.newGreenElo,
+        };
+
+        const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+        const delta = resigningColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
+        if (resigningPlayer?.id) {
+          resigningPlayerId = resigningPlayer.id;
+          resigningDelta = delta;
+          if (!processedUserIds.includes(resigningPlayer.id)) {
+            processedUserIds.push(resigningPlayer.id);
+          }
         }
       }
     }
-  }
 
-  updatePayload.processedEloUserIds = processedUserIds;
-
-  if (isFirebaseConfigured() && db) {
-    await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));
-  } else {
+    updatePayload.processedEloUserIds = processedUserIds;
     mockStore.set({ ...game, ...updatePayload });
+
+    if (resigningPlayerId) {
+      updateUserStats(resigningPlayerId, false, false, resigningDelta).catch((e) => {
+        console.warn('Failed to update stats for resigning player:', e);
+      });
+    }
+  } finally {
+    pendingResolutionGameIds.delete(gameId);
   }
 }
 
+/**
+ * Resolves game clock expiration atomically, updating game room status, winner,
+ * and ranked Elo ratings within a single Firestore transaction.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant time point read and point write in transaction.
+ *   Clock computation and Elo calculation run in O(1) constant time.
+ * - Auxiliary Space Complexity: O(1) constant payload allocations.
+ * - Growth Rate: O(1) invariant to active concurrent games or database size.
+ */
 export async function timeoutGameAction(
   gameId: string,
   timedOutColor: PieceColor
 ): Promise<void> {
-  let game: GameRoom | null = null;
-  if (isFirebaseConfigured() && db) {
-    const snap = await getDoc(doc(db, 'games', gameId));
-    if (snap.exists()) {
-      game = snap.data() as GameRoom;
-    }
-  } else {
-    game = mockStore.getRaw(gameId);
-  }
+  if (pendingResolutionGameIds.has(gameId)) return;
+  pendingResolutionGameIds.add(gameId);
 
-  if (!game || game.status !== 'in_progress') return;
+  try {
+    if (isFirebaseConfigured() && db) {
+      const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
+      let timedOutPlayerId: string | null = null;
+      let timedOutDelta = 0;
 
-  const nextBoardState = timeoutGame(game.boardState, timedOutColor);
-  const winner = nextBoardState.result?.winner;
-  const updatePayload: Partial<GameRoom> = {
-    boardState: nextBoardState,
-    status: 'completed',
-    winner,
-    winReason: nextBoardState.result?.winReason,
-    lastTurnStartTimeMs: null,
-  };
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(docRef);
+        if (!snap.exists()) return;
 
-  const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
-    ? [...game.processedEloUserIds]
-    : [];
+        const game = snap.data() as GameRoom;
+        if (game.status !== 'in_progress') return;
 
-  if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
-    const eloCalc = computeRankedGameEloResult(game, winner);
-    if (eloCalc) {
-      updatePayload.eloResult = eloCalc;
-      updatePayload.bluePlayer = {
-        ...game.bluePlayer,
-        elo: eloCalc.newBlueElo,
-      };
-      updatePayload.greenPlayer = {
-        ...game.greenPlayer,
-        elo: eloCalc.newGreenElo,
-      };
+        const nextBoardState = timeoutGame(game.boardState, timedOutColor);
+        const winner = nextBoardState.result?.winner;
+        const updatePayload: Partial<GameRoom> = {
+          boardState: nextBoardState,
+          status: 'completed',
+          winner,
+          winReason: nextBoardState.result?.winReason,
+          lastTurnStartTimeMs: null,
+        };
 
-      const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
-      const timedOutDelta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
-      if (timedOutPlayer?.id && !processedUserIds.includes(timedOutPlayer.id)) {
-        try {
-          await updateUserStats(timedOutPlayer.id, false, false, timedOutDelta);
-          processedUserIds.push(timedOutPlayer.id);
-        } catch (e) {
+        const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
+          ? [...game.processedEloUserIds]
+          : [];
+
+        if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+          const eloCalc = computeRankedGameEloResult(game, winner);
+          if (eloCalc) {
+            updatePayload.eloResult = eloCalc;
+            updatePayload.bluePlayer = {
+              ...game.bluePlayer,
+              elo: eloCalc.newBlueElo,
+            };
+            updatePayload.greenPlayer = {
+              ...game.greenPlayer,
+              elo: eloCalc.newGreenElo,
+            };
+
+            const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+            const delta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
+            if (timedOutPlayer?.id) {
+              timedOutPlayerId = timedOutPlayer.id;
+              timedOutDelta = delta;
+              if (!processedUserIds.includes(timedOutPlayer.id)) {
+                processedUserIds.push(timedOutPlayer.id);
+              }
+            }
+          }
+        }
+
+        updatePayload.processedEloUserIds = processedUserIds;
+        tx.update(docRef, sanitize(updatePayload));
+      });
+
+      if (timedOutPlayerId) {
+        updateUserStats(timedOutPlayerId, false, false, timedOutDelta).catch((e) => {
           console.warn('Failed to update stats for timed-out player:', e);
+        });
+      }
+      return;
+    }
+
+    const game = mockStore.getRaw(gameId);
+    if (!game || game.status !== 'in_progress') return;
+
+    const nextBoardState = timeoutGame(game.boardState, timedOutColor);
+    const winner = nextBoardState.result?.winner;
+    const updatePayload: Partial<GameRoom> = {
+      boardState: nextBoardState,
+      status: 'completed',
+      winner,
+      winReason: nextBoardState.result?.winReason,
+      lastTurnStartTimeMs: null,
+    };
+
+    const processedUserIds: string[] = Array.isArray(game.processedEloUserIds)
+      ? [...game.processedEloUserIds]
+      : [];
+
+    let timedOutPlayerId: string | null = null;
+    let timedOutDelta = 0;
+
+    if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+      const eloCalc = computeRankedGameEloResult(game, winner);
+      if (eloCalc) {
+        updatePayload.eloResult = eloCalc;
+        updatePayload.bluePlayer = {
+          ...game.bluePlayer,
+          elo: eloCalc.newBlueElo,
+        };
+        updatePayload.greenPlayer = {
+          ...game.greenPlayer,
+          elo: eloCalc.newGreenElo,
+        };
+
+        const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+        const delta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
+        if (timedOutPlayer?.id) {
+          timedOutPlayerId = timedOutPlayer.id;
+          timedOutDelta = delta;
+          if (!processedUserIds.includes(timedOutPlayer.id)) {
+            processedUserIds.push(timedOutPlayer.id);
+          }
         }
       }
     }
-  }
 
-  updatePayload.processedEloUserIds = processedUserIds;
-
-  if (isFirebaseConfigured() && db) {
-    await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));
-  } else {
+    updatePayload.processedEloUserIds = processedUserIds;
     mockStore.set({ ...game, ...updatePayload });
+
+    if (timedOutPlayerId) {
+      updateUserStats(timedOutPlayerId, false, false, timedOutDelta).catch((e) => {
+        console.warn('Failed to update stats for timed-out player:', e);
+      });
+    }
+  } finally {
+    pendingResolutionGameIds.delete(gameId);
   }
 }
 
+/**
+ * Marks a game as abandoned. Directly executes a single document update without
+ * an unnecessary getDoc read round-trip.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) single direct write operation with 0 reads.
+ * - Auxiliary Space Complexity: O(1) constant payload.
+ */
 export async function abandonGame(gameId: string): Promise<void> {
-  let game: GameRoom | null = null;
-  if (isFirebaseConfigured() && db) {
-    const snap = await getDoc(doc(db, 'games', gameId));
-    if (snap.exists()) {
-      game = snap.data() as GameRoom;
-    }
-  } else {
-    game = mockStore.get(gameId);
-  }
-
-  if (!game) return;
-
   const now = Date.now();
   const updatePayload: Partial<GameRoom> = {
     status: 'abandoned',
@@ -925,9 +1067,17 @@ export async function abandonGame(gameId: string): Promise<void> {
   };
 
   if (isFirebaseConfigured() && db) {
-    await updateDoc(doc(db, 'games', gameId), sanitize(updatePayload));
+    try {
+      const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
+      await updateDoc(docRef, sanitize(updatePayload));
+    } catch (err) {
+      console.warn('Could not mark game abandoned in Firestore:', err);
+    }
   } else {
-    mockStore.set({ ...game, ...updatePayload });
+    const game = mockStore.get(gameId);
+    if (game) {
+      mockStore.set({ ...game, ...updatePayload });
+    }
   }
 }
 
@@ -937,7 +1087,7 @@ export async function deleteGame(gameId: string): Promise<void> {
   }
 
   if (isFirebaseConfigured() && db) {
-    await deleteDoc(doc(db, 'games', gameId));
+    await deleteDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId));
   } else {
     mockStore.delete(gameId);
   }
@@ -975,18 +1125,22 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
 
   if (isFirebaseConfigured() && db) {
     try {
-      // 1. Remove games explicitly marked as 'abandoned' for maxAgeMs (bounded to batchLimit)
+      // 1. Remove games explicitly marked as 'abandoned' for maxAgeMs in a single atomic batch
       const qAbandoned = query(
-        collection(db, 'games'),
+        collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
         where('status', '==', 'abandoned'),
         limit(batchLimit)
       );
       const snapAbandoned = await getDocs(qAbandoned);
+      const batchAbandoned = writeBatch(db);
+      let abandonedDeleteCount = 0;
+
       for (const docSnap of snapAbandoned.docs) {
         const game = docSnap.data() as GameRoom;
         const abandonedTime = game.abandonedAt || game.createdAt;
         if (abandonedTime && now - abandonedTime >= maxAgeMs) {
-          await deleteDoc(doc(db, 'games', docSnap.id));
+          batchAbandoned.delete(docSnap.ref);
+          abandonedDeleteCount++;
           removedIds.push(docSnap.id);
           if (typeof localStorage !== 'undefined') {
             localStorage.removeItem(SESSION_STORAGE_PREFIX + docSnap.id);
@@ -994,9 +1148,13 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
         }
       }
 
+      if (abandonedDeleteCount > 0) {
+        await batchAbandoned.commit();
+      }
+
       // 2. Auto-resolve in-progress games that have timed out (bounded to batchLimit)
       const qInProgress = query(
-        collection(db, 'games'),
+        collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
         where('status', '==', 'in_progress'),
         limit(batchLimit)
       );
@@ -1011,21 +1169,31 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
         }
       }
 
-      // 3. Mark stale waiting games as abandoned if older than maxAgeMs (when maxAgeMs > 0, bounded to batchLimit)
+      // 3. Mark stale waiting games as abandoned if older than maxAgeMs in a single atomic batch
       if (maxAgeMs > 0) {
         const qWaiting = query(
-          collection(db, 'games'),
+          collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
           where('status', '==', 'waiting'),
           limit(batchLimit)
         );
         const snapWaiting = await getDocs(qWaiting);
+        const batchWaiting = writeBatch(db);
+        let waitingUpdateCount = 0;
+
         for (const docSnap of snapWaiting.docs) {
           const game = docSnap.data() as GameRoom;
           if (game.createdAt && now - game.createdAt >= maxAgeMs) {
-            await abandonGame(docSnap.id).catch((err) => {
-              console.warn('Failed to abandon stale waiting game in cleanup:', docSnap.id, err);
+            batchWaiting.update(docSnap.ref, {
+              status: 'abandoned',
+              abandonedAt: now,
+              lastTurnStartTimeMs: null,
             });
+            waitingUpdateCount++;
           }
+        }
+
+        if (waitingUpdateCount > 0) {
+          await batchWaiting.commit();
         }
       }
     } catch (err) {
@@ -1320,7 +1488,7 @@ export async function findOpenWaitingGame(
     }
     constraints.push(limit(candidateLimit));
     const q = query(
-      collection(db, 'games'),
+      collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       ...constraints
     );
     const snap = await getDocs(q);

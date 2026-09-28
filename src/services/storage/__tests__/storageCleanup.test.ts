@@ -68,11 +68,11 @@ describe('Storage Sanitation & Quota Management Service', () => {
   });
 
   it('prunes player session tokens beyond maxPlayerTokens limit', () => {
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 120; i++) {
       localStorage.setItem(`schada_player_token_game${i}`, `tok_${i}`);
     }
 
-    expect(localStorage.length).toBe(30);
+    expect(localStorage.length).toBe(120);
 
     cleanupBrowserStorage();
 
@@ -83,7 +83,26 @@ describe('Storage Sanitation & Quota Management Service', () => {
       }
     }
 
-    expect(tokenCount).toBeLessThanOrEqual(STORAGE_LIMITS.maxPlayerTokens);
+    expect(tokenCount).toBe(STORAGE_LIMITS.maxPlayerTokens);
+  });
+
+  it('preserves emergencyRetainedTokens player tokens during emergency cleanup to protect active matches', () => {
+    for (let i = 0; i < 20; i++) {
+      localStorage.setItem(`schada_player_token_game${i}`, `tok_${i}`);
+    }
+
+    expect(localStorage.length).toBe(20);
+
+    cleanupBrowserStorage(true);
+
+    let tokenCount = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      if (localStorage.key(i)?.startsWith('schada_player_token_')) {
+        tokenCount++;
+      }
+    }
+
+    expect(tokenCount).toBe(STORAGE_LIMITS.emergencyRetainedTokens);
   });
 
   it('prunes mock games to maxMockGames limit keeping newest games', () => {

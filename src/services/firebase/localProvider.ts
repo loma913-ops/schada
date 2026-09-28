@@ -274,7 +274,7 @@ class LocalBackend {
       throw new Error(`Username "${username}" is already taken.`);
     }
 
-    const uid = `user_${Date.now()}`;
+    const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const newUser: UserProfile = {
       id: uid,
       email: email.trim(),
@@ -511,7 +511,7 @@ class LocalBackend {
     }
 
     const newReq: LocalFriendRequest = {
-      id: `freq_${Date.now()}`,
+      id: `freq_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       fromUserId: fromUser.id,
       fromUsername: fromUser.username,
       toUserId: target.id,

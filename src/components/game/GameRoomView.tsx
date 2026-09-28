@@ -9,6 +9,7 @@ import {
   timeoutGameAction,
   abandonGame,
   getLocalSessionToken,
+  setLocalSessionToken,
   deleteGame,
   isGameTimedOut,
   markGameEloProcessed,
@@ -37,7 +38,10 @@ export const GameRoomView: React.FC = () => {
 
   // Guest prompt state
   const [guestName, setGuestName] = useState(
-    () => localStorage.getItem('schada_guest_name') || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName
+    () =>
+      (typeof localStorage !== 'undefined'
+        ? localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestName)
+        : null) || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName
   );
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
@@ -106,29 +110,46 @@ export const GameRoomView: React.FC = () => {
     if (!gameId || !game || hasJoined) return;
 
     const existingToken = getLocalSessionToken(gameId);
-    const isAlreadySeated =
-      existingToken &&
-      ((game.bluePlayer && game.bluePlayer.sessionToken === existingToken) ||
-        (game.greenPlayer && game.greenPlayer.sessionToken === existingToken));
+    const guestIdKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId;
+    const guestId = typeof localStorage !== 'undefined' ? localStorage.getItem(guestIdKey) : null;
+
+    const isAlreadySeated = Boolean(
+      (existingToken &&
+        ((game.bluePlayer && game.bluePlayer.sessionToken === existingToken) ||
+          (game.greenPlayer && game.greenPlayer.sessionToken === existingToken))) ||
+      (user &&
+        ((game.bluePlayer && game.bluePlayer.id === user.id) ||
+          (game.greenPlayer && game.greenPlayer.id === user.id))) ||
+      (guestId &&
+        ((game.bluePlayer && game.bluePlayer.id === guestId) ||
+          (game.greenPlayer && game.greenPlayer.id === guestId)))
+    );
 
     if (isAlreadySeated) {
+      if (user && game.bluePlayer?.id === user.id && game.bluePlayer.sessionToken) {
+        setLocalSessionToken(gameId, game.bluePlayer.sessionToken);
+      } else if (user && game.greenPlayer?.id === user.id && game.greenPlayer.sessionToken) {
+        setLocalSessionToken(gameId, game.greenPlayer.sessionToken);
+      }
       setHasJoined(true);
       return;
     }
 
     // If game has empty seat and user is not logged in and hasn't confirmed guest name yet
-    if (game.status === 'waiting' && !user && !localStorage.getItem('schada_guest_confirmed')) {
+    const guestConfirmedKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestConfirmed;
+    if (game.status === 'waiting' && !user && !localStorage.getItem(guestConfirmedKey)) {
       setGuestPromptOpen(true);
       return;
     }
 
     // Auto join with either authenticated account or confirmed guest name
     const joinUser = user
-      ? { id: user.id, username: user.username, elo: user.eloRating }
+      ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed }
       : {
-          id: 'guest_' + (localStorage.getItem('schada_guest_id') || Math.random().toString(36).substring(2, 8)),
+          id: 'guest_' + (guestId || Math.random().toString(36).substring(2, 8)),
           username: guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
           elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
         };
 
     joinGame(gameId, joinUser).then((res) => {
@@ -146,20 +167,23 @@ export const GameRoomView: React.FC = () => {
     if (!gameId) return;
 
     const trimmed = guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
-    safeSetItem('schada_guest_name', trimmed);
-    safeSetItem('schada_guest_confirmed', 'true');
+    const { guestName: guestNameKey, guestConfirmed: guestConfirmedKey, guestId: guestIdKey } =
+      MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
+    safeSetItem(guestNameKey, trimmed);
+    safeSetItem(guestConfirmedKey, 'true');
     setGuestPromptOpen(false);
 
-    let guestId = localStorage.getItem('schada_guest_id');
+    let guestId = localStorage.getItem(guestIdKey);
     if (!guestId) {
       guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      safeSetItem('schada_guest_id', guestId);
+      safeSetItem(guestIdKey, guestId);
     }
 
     joinGame(gameId, {
       id: guestId,
       username: trimmed,
       elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+      gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
     }).then((res) => {
       if (res.success) {
         if (res.color) {
@@ -178,25 +202,56 @@ export const GameRoomView: React.FC = () => {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // Determine user's role and color
+  // Determine user's role and color with multi-tier identification:
+  // 1. Session token in localStorage
+  // 2. Authenticated user ID match
+  // 3. Persistent guest ID match
   const sessionToken = gameId ? getLocalSessionToken(gameId) : null;
-  const isBlue = Boolean(sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken);
-  const isGreen = Boolean(sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken);
+  const guestId =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId)
+      : null;
+
+  const isBlue = Boolean(
+    (sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken) ||
+    (user && game?.bluePlayer && game.bluePlayer.id === user.id) ||
+    (guestId && game?.bluePlayer && game.bluePlayer.id === guestId)
+  );
+  const isGreen = Boolean(
+    (sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken) ||
+    (user && game?.greenPlayer && game.greenPlayer.id === user.id) ||
+    (guestId && game?.greenPlayer && game.greenPlayer.id === guestId)
+  );
+
+  // Maintain local session token synchronization if seated player token exists in room document
+  useEffect(() => {
+    if (!gameId) return;
+    if (isBlue && game?.bluePlayer?.sessionToken && sessionToken !== game.bluePlayer.sessionToken) {
+      setLocalSessionToken(gameId, game.bluePlayer.sessionToken);
+    } else if (isGreen && game?.greenPlayer?.sessionToken && sessionToken !== game.greenPlayer.sessionToken) {
+      setLocalSessionToken(gameId, game.greenPlayer.sessionToken);
+    }
+  }, [gameId, isBlue, isGreen, game?.bluePlayer?.sessionToken, game?.greenPlayer?.sessionToken, sessionToken]);
 
   const userColor: PieceColor | undefined = isBlue ? 'blue' : isGreen ? 'green' : (joinedColor || undefined);
   const isSpectator = !userColor;
 
   // Set in-game presence context while player in an active match
+  const userId = user?.id;
   useEffect(() => {
-    if (user && !isSpectator && game?.status === 'in_progress') {
+    if (userId && !isSpectator && game?.status === 'in_progress') {
       setActivityContext('in-game');
     } else {
       setActivityContext('online');
     }
+  }, [userId, isSpectator, game?.status]);
+
+  // Clean up activity context on component unmount
+  useEffect(() => {
     return () => {
       setActivityContext('online');
     };
-  }, [user, isSpectator, game?.status]);
+  }, []);
 
   // Handle game completion & ranked rating updates
   useEffect(() => {
@@ -356,15 +411,27 @@ export const GameRoomView: React.FC = () => {
         syncedGreenTimeMs={currentGreenTime}
         onMakeMove={async (move: Move) => {
           if (!userColor || game.status === 'waiting') return;
-          await makeGameMove(gameId!, move, userColor);
+          try {
+            await makeGameMove(gameId!, move, userColor);
+          } catch (err) {
+            console.error('Failed to make move:', err);
+          }
         }}
         onResign={async () => {
           if (!userColor || game.status === 'waiting') return;
-          await resignGameAction(gameId!, userColor);
+          try {
+            await resignGameAction(gameId!, userColor);
+          } catch (err) {
+            console.error('Failed to resign game:', err);
+          }
         }}
         onTimeout={async (timedOutColor) => {
           if (game.status === 'waiting') return;
-          await timeoutGameAction(gameId!, timedOutColor);
+          try {
+            await timeoutGameAction(gameId!, timedOutColor);
+          } catch (err) {
+            console.error('Failed to timeout game:', err);
+          }
         }}
         onExit={async () => {
           if (game.status === 'waiting' && gameId) {

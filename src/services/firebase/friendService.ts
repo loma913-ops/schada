@@ -6,11 +6,11 @@ import {
   getDoc,
   addDoc,
   updateDoc,
-  deleteDoc,
   doc,
-  setDoc,
   serverTimestamp,
   documentId,
+  limit,
+  writeBatch,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { localBackend, type UserProfile, type LocalFriendRequest } from './localProvider';
@@ -23,7 +23,11 @@ export async function searchUserByExactUsername(
   if (!clean) return null;
 
   if (isFirebaseConfigured() && db) {
-    const q = query(collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users), where('usernameLower', '==', clean));
+    const q = query(
+      collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
+      where('usernameLower', '==', clean),
+      limit(1)
+    );
     const snap = await getDocs(q);
     if (!snap.empty) {
       return snap.docs[0].data() as UserProfile;
@@ -48,12 +52,13 @@ export async function sendFriendRequest(
   }
 
   if (isFirebaseConfigured() && db) {
-    // Check if request already exists
+    // Check if request already exists (bounded to 1 read)
     const q = query(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests),
       where('fromUserId', '==', currentUser.id),
       where('toUserId', '==', targetUser.id),
-      where('status', '==', 'pending')
+      where('status', '==', 'pending'),
+      limit(1)
     );
     const existingSnap = await getDocs(q);
     if (!existingSnap.empty) {
@@ -94,16 +99,22 @@ export async function respondToFriendRequest(
     const reqData = reqSnap.data();
 
     if (accept) {
-      await updateDoc(reqRef, {
+      const batch = writeBatch(db);
+      batch.update(reqRef, {
         status: 'accepted',
         respondedAt: serverTimestamp(),
       });
-      // Write both sides of the friendship so getFriendsList can find them
+      // Atomically write both reciprocal friendship documents in a single round-trip commit
       const { fromUserId, toUserId } = reqData;
-      await Promise.all([
-        setDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, fromUserId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, toUserId), { since: serverTimestamp() }),
-        setDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, toUserId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, fromUserId), { since: serverTimestamp() }),
-      ]);
+      batch.set(
+        doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, fromUserId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, toUserId),
+        { since: serverTimestamp() }
+      );
+      batch.set(
+        doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, toUserId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, fromUserId),
+        { since: serverTimestamp() }
+      );
+      await batch.commit();
     } else {
       await updateDoc(reqRef, {
         status: 'declined',
@@ -142,19 +153,27 @@ export async function getFriendsList(userId: string): Promise<UserProfile[]> {
         getDocs(query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('toUserId',   '==', userId), where('status', '==', 'accepted'))),
       ]);
 
-      const backfills: Promise<unknown>[] = [];
+      const backfillBatch = writeBatch(db!);
+      let backfillCount = 0;
       for (const reqDoc of [...sentSnap.docs, ...receivedSnap.docs]) {
         const data = reqDoc.data();
         const friendId = data.fromUserId === userId ? data.toUserId : data.fromUserId;
         if (!knownFriendIds.has(friendId)) {
           knownFriendIds.add(friendId);
-          backfills.push(
-            setDoc(doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, userId,    MULTIPLAYER_SCALE_CONFIG.collections.userFriends, friendId), { since: serverTimestamp() }),
-            setDoc(doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, friendId,  MULTIPLAYER_SCALE_CONFIG.collections.userFriends, userId),   { since: serverTimestamp() }),
+          backfillBatch.set(
+            doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, friendId),
+            { since: serverTimestamp() }
           );
+          backfillBatch.set(
+            doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, friendId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, userId),
+            { since: serverTimestamp() }
+          );
+          backfillCount += 2;
         }
       }
-      if (backfills.length > 0) Promise.all(backfills).catch(console.error);
+      if (backfillCount > 0) {
+        backfillBatch.commit().catch(console.error);
+      }
     }
 
     if (knownFriendIds.size === 0) return [];
@@ -196,8 +215,10 @@ export async function getFriendsList(userId: string): Promise<UserProfile[]> {
 
 export async function removeFriend(userId: string, friendId: string): Promise<void> {
   if (isFirebaseConfigured() && db) {
-    await deleteDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, friendId));
-    await deleteDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, friendId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, userId));
+    const batch = writeBatch(db);
+    batch.delete(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, friendId));
+    batch.delete(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, friendId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, userId));
+    await batch.commit();
     return;
   }
 
@@ -211,7 +232,8 @@ export async function getPendingIncomingRequests(
     const q = query(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests),
       where('toUserId', '==', userId),
-      where('status', '==', 'pending')
+      where('status', '==', 'pending'),
+      limit(MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit)
     );
     const snap = await getDocs(q);
     return snap.docs.map((d) => ({ id: d.id, ...d.data() } as LocalFriendRequest));

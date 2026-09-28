@@ -342,11 +342,12 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const handleResign = () => {
     if (gameState.isGameOver) return;
+    const resigningColor = isComputer && userColor ? userColor : (userColor || gameState.currentTurn);
     if (customResign) {
       customResign();
+      setGameState((prev) => resignGame(prev, resigningColor));
       return;
     }
-    const resigningColor = isComputer && userColor ? userColor : gameState.currentTurn;
     const nextState = resignGame(gameState, resigningColor);
     setGameState(nextState);
     if (onGameComplete) onGameComplete(nextState);

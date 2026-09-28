@@ -13,6 +13,10 @@ export interface PresenceStorageKeys {
   readonly authCachedProfile: string;
   readonly cachedLobbyStats: string;
   readonly mockGames: string;
+  readonly guestId: string;
+  readonly guestName: string;
+  readonly guestConfirmed: string;
+  readonly playerTokenPrefix: string;
 }
 
 export interface PresenceConfig {
@@ -54,6 +58,7 @@ export interface MatchmakingConfig {
 
 export interface MultiplayerCollectionsConfig {
   readonly users: string;
+  readonly usernames: string;
   readonly games: string;
   readonly guestSessions: string;
   readonly lobbyStats: string;
@@ -61,10 +66,20 @@ export interface MultiplayerCollectionsConfig {
   readonly userFriends: string;
 }
 
+export interface StorageLimitsConfig {
+  readonly maxMockGames: number;
+  readonly maxPlayerTokens: number;
+  readonly maxSessionAgeMs: number;
+  readonly emergencyRetainedTokens: number;
+  readonly testStorageKey: string;
+  readonly firestoreKeyPrefix: string;
+}
+
 export interface MultiplayerScaleConfig {
   readonly presence: PresenceConfig;
   readonly matchmaking: MatchmakingConfig;
   readonly collections: MultiplayerCollectionsConfig;
+  readonly storageLimits: StorageLimitsConfig;
 }
 
 export class MultiplayerConfigError extends Error {
@@ -161,8 +176,30 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     throw new MultiplayerConfigError('Presence storageKeys configuration section is missing or invalid.');
   }
 
-  const { sessionStorageId, activeSessions, authCachedUid, authCachedProfile, cachedLobbyStats, mockGames } = presence.storageKeys;
-  const storageKeyEntries = { sessionStorageId, activeSessions, authCachedUid, authCachedProfile, cachedLobbyStats, mockGames };
+  const {
+    sessionStorageId,
+    activeSessions,
+    authCachedUid,
+    authCachedProfile,
+    cachedLobbyStats,
+    mockGames,
+    guestId,
+    guestName,
+    guestConfirmed,
+    playerTokenPrefix,
+  } = presence.storageKeys;
+  const storageKeyEntries = {
+    sessionStorageId,
+    activeSessions,
+    authCachedUid,
+    authCachedProfile,
+    cachedLobbyStats,
+    mockGames,
+    guestId,
+    guestName,
+    guestConfirmed,
+    playerTokenPrefix,
+  };
   for (const [keyName, val] of Object.entries(storageKeyEntries)) {
     if (typeof val !== 'string' || val.trim().length === 0) {
       throw new MultiplayerConfigError(`Invalid presence.storageKeys.${keyName}: expected non-empty string.`);
@@ -310,12 +347,49 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     throw new MultiplayerConfigError('Collections configuration section is missing or invalid.');
   }
 
-  const { users, games, guestSessions, lobbyStats, friendRequests, userFriends } = collections;
-  const collectionEntries = { users, games, guestSessions, lobbyStats, friendRequests, userFriends };
+  const { users, usernames, games, guestSessions, lobbyStats, friendRequests, userFriends } = collections;
+  const collectionEntries = { users, usernames, games, guestSessions, lobbyStats, friendRequests, userFriends };
   for (const [colName, val] of Object.entries(collectionEntries)) {
     if (typeof val !== 'string' || val.trim().length === 0) {
       throw new MultiplayerConfigError(`Invalid collections.${colName}: expected non-empty string.`);
     }
+  }
+
+  const { storageLimits } = config;
+  if (!storageLimits || typeof storageLimits !== 'object') {
+    throw new MultiplayerConfigError('Storage limits configuration section is missing or invalid.');
+  }
+
+  if (typeof storageLimits.maxMockGames !== 'number' || storageLimits.maxMockGames <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid storageLimits.maxMockGames: expected positive number, received ${storageLimits.maxMockGames}.`
+    );
+  }
+
+  if (typeof storageLimits.maxPlayerTokens !== 'number' || storageLimits.maxPlayerTokens <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid storageLimits.maxPlayerTokens: expected positive number, received ${storageLimits.maxPlayerTokens}.`
+    );
+  }
+
+  if (typeof storageLimits.maxSessionAgeMs !== 'number' || storageLimits.maxSessionAgeMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid storageLimits.maxSessionAgeMs: expected positive number, received ${storageLimits.maxSessionAgeMs}.`
+    );
+  }
+
+  if (typeof storageLimits.emergencyRetainedTokens !== 'number' || storageLimits.emergencyRetainedTokens < 0) {
+    throw new MultiplayerConfigError(
+      `Invalid storageLimits.emergencyRetainedTokens: expected non-negative number, received ${storageLimits.emergencyRetainedTokens}.`
+    );
+  }
+
+  if (typeof storageLimits.testStorageKey !== 'string' || storageLimits.testStorageKey.trim().length === 0) {
+    throw new MultiplayerConfigError('Invalid storageLimits.testStorageKey: expected non-empty string.');
+  }
+
+  if (typeof storageLimits.firestoreKeyPrefix !== 'string' || storageLimits.firestoreKeyPrefix.trim().length === 0) {
+    throw new MultiplayerConfigError('Invalid storageLimits.firestoreKeyPrefix: expected non-empty string.');
   }
 }
 
@@ -328,7 +402,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     activityThrottleMs: 1_000,
     statsPollIntervalMs: 12_000,
     statsPollJitterMs: 3_000,
-    statsInitialFallbackDelayMs: 0,
+    statsInitialFallbackDelayMs: 2_000,
     statsFallbackPollIntervalMs: 60_000,
     friendFreshnessThresholdMs: 45_000,
     staleGuestPruneIntervalMs: 5 * 60 * 1000,
@@ -340,6 +414,10 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
       authCachedProfile: 'schada_auth_cached_profile',
       cachedLobbyStats: 'schada_cached_lobby_stats',
       mockGames: 'schada_mock_games',
+      guestId: 'schada_guest_id',
+      guestName: 'schada_guest_name',
+      guestConfirmed: 'schada_guest_confirmed',
+      playerTokenPrefix: 'schada_player_token_',
     }),
   }),
   matchmaking: Object.freeze({
@@ -364,11 +442,20 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
   }),
   collections: Object.freeze({
     users: 'users',
+    usernames: 'usernames',
     games: 'games',
     guestSessions: 'guest_sessions',
     lobbyStats: 'stats',
     friendRequests: 'friendRequests',
     userFriends: 'userFriends',
+  }),
+  storageLimits: Object.freeze({
+    maxMockGames: 5,
+    maxPlayerTokens: 100,
+    maxSessionAgeMs: 60 * 1000,
+    emergencyRetainedTokens: 5,
+    testStorageKey: '__schada_storage_test__',
+    firestoreKeyPrefix: 'firestore_',
   }),
 });
 

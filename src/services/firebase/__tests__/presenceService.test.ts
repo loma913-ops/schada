@@ -337,6 +337,25 @@ describe('User Online & Active Presence Service', () => {
     expect(JSON.parse(raw!)).toEqual(stats);
   });
 
+  it('getCachedLobbyStats returns zeros when cached data exceeds SESSION_TTL_MS', () => {
+    const stats: LobbyStats = {
+      playersOnline: 2,
+      guestsOnline: 0,
+      activeGames: 0,
+    };
+    setCachedLobbyStats(stats);
+    // Artificially age the cache timestamp beyond SESSION_TTL_MS
+    localStorage.setItem(
+      `${CACHED_LOBBY_STATS_STORAGE_KEY}_time`,
+      String(Date.now() - (SESSION_TTL_MS + 5000))
+    );
+    expect(getCachedLobbyStats()).toEqual({
+      playersOnline: 0,
+      guestsOnline: 0,
+      activeGames: 0,
+    });
+  });
+
   it('getLocalSessionStats excludes inactive and expired guest sessions', () => {
     const now = Date.now();
     const sessions: Record<string, SessionHeartbeat> = {

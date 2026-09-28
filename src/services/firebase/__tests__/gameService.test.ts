@@ -4,6 +4,7 @@ import {
   joinGame,
   makeGameMove,
   resignGameAction,
+  timeoutGameAction,
   abandonGame,
   getOpenRooms,
   getLocalSessionToken,
@@ -659,6 +660,75 @@ describe('GameService Multiplayer Sync', () => {
     expect(rankedFound).not.toBeNull();
     expect(rankedFound?.id).toBe(rankedGameId);
     expect(rankedFound?.isRanked).toBe(true);
+  });
+
+  it('correctly completes game and computes ranked Elo when resigning', async () => {
+    const creator = { id: 'p1_resign', username: 'Boogerd1936', elo: 1200, gamesPlayed: 10 };
+    const joiner = { id: 'p2_winner', username: 'mutagenicpixels', elo: 1200, gamesPlayed: 10 };
+
+    const { gameId, color: creatorColor } = await createGame({
+      timeControlMinutes: 5,
+      isRanked: true,
+      colorPref: 'blue',
+      creator,
+    });
+    expect(creatorColor).toBe('blue');
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    const joinRes = await joinGame(gameId, joiner);
+    expect(joinRes.success).toBe(true);
+    expect(joinRes.color).toBe('green');
+
+    // Boogerd1936 (blue) resigns
+    await resignGameAction(gameId, 'blue');
+
+    let gameAfterResign: any = null;
+    const unsub = subscribeToGame(gameId, (g) => {
+      gameAfterResign = g;
+    });
+    unsub();
+
+    expect(gameAfterResign).not.toBeNull();
+    expect(gameAfterResign.status).toBe('completed');
+    expect(gameAfterResign.winner).toBe('green');
+    expect(gameAfterResign.winReason).toBe('resignation');
+    expect(gameAfterResign.eloResult).toBeDefined();
+    expect(gameAfterResign.eloResult.blueDelta).toBeLessThan(0);
+    expect(gameAfterResign.eloResult.greenDelta).toBeGreaterThan(0);
+    expect(gameAfterResign.processedEloUserIds).toContain('p1_resign');
+  });
+
+  it('correctly completes game and computes ranked Elo upon timeout', async () => {
+    const creator = { id: 'p1_time', username: 'PlayerOne', elo: 1200, gamesPlayed: 5 };
+    const joiner = { id: 'p2_winner_time', username: 'PlayerTwo', elo: 1200, gamesPlayed: 5 };
+
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      isRanked: true,
+      colorPref: 'blue',
+      creator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, joiner);
+
+    // Blue times out
+    await timeoutGameAction(gameId, 'blue');
+
+    let gameAfterTimeout: any = null;
+    const unsub = subscribeToGame(gameId, (g) => {
+      gameAfterTimeout = g;
+    });
+    unsub();
+
+    expect(gameAfterTimeout).not.toBeNull();
+    expect(gameAfterTimeout.status).toBe('completed');
+    expect(gameAfterTimeout.winner).toBe('green');
+    expect(gameAfterTimeout.winReason).toBe('timeout');
+    expect(gameAfterTimeout.eloResult).toBeDefined();
+    expect(gameAfterTimeout.eloResult.blueDelta).toBeLessThan(0);
+    expect(gameAfterTimeout.eloResult.greenDelta).toBeGreaterThan(0);
+    expect(gameAfterTimeout.processedEloUserIds).toContain('p1_time');
   });
 });
 

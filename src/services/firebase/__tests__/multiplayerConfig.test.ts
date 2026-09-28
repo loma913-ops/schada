@@ -232,5 +232,71 @@ describe('MultiplayerScaleConfig validation', () => {
     expect(() => validateMultiplayerScaleConfig(emptyCollection as MultiplayerScaleConfig)).toThrowError(
       /Invalid collections.users/
     );
+
+    const emptyUsernamesCollection = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      collections: {
+        ...MULTIPLAYER_SCALE_CONFIG.collections,
+        usernames: '   ',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyUsernamesCollection as MultiplayerScaleConfig)).toThrowError(
+      /Invalid collections.usernames/
+    );
+
+    const emptyTokenPrefix = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        storageKeys: {
+          ...MULTIPLAYER_SCALE_CONFIG.presence.storageKeys,
+          playerTokenPrefix: '',
+        },
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyTokenPrefix as MultiplayerScaleConfig)).toThrowError(
+      /Invalid presence.storageKeys.playerTokenPrefix/
+    );
+
+    const missingStorageLimits = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      storageLimits: null as any,
+    };
+    expect(() => validateMultiplayerScaleConfig(missingStorageLimits as MultiplayerScaleConfig)).toThrowError(
+      /Storage limits configuration section is missing or invalid/
+    );
+
+    const invalidMaxTokens = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      storageLimits: {
+        ...MULTIPLAYER_SCALE_CONFIG.storageLimits,
+        maxPlayerTokens: 0,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidMaxTokens as MultiplayerScaleConfig)).toThrowError(
+      /Invalid storageLimits.maxPlayerTokens/
+    );
+
+    const invalidEmergencyTokens = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      storageLimits: {
+        ...MULTIPLAYER_SCALE_CONFIG.storageLimits,
+        emergencyRetainedTokens: -1,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidEmergencyTokens as MultiplayerScaleConfig)).toThrowError(
+      /Invalid storageLimits.emergencyRetainedTokens/
+    );
+
+    const emptyTestStorageKey = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      storageLimits: {
+        ...MULTIPLAYER_SCALE_CONFIG.storageLimits,
+        testStorageKey: '  ',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyTestStorageKey as MultiplayerScaleConfig)).toThrowError(
+      /Invalid storageLimits.testStorageKey/
+    );
   });
 });

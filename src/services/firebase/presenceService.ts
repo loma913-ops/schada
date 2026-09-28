@@ -12,6 +12,7 @@ import {
   Timestamp,
   getDocs,
   limit,
+  writeBatch,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { localBackend } from './localProvider';
@@ -144,7 +145,7 @@ function writeFirestoreUserStatus(userId: string, status: 'online' | 'in-game' |
     try {
       updateDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId), {
         status,
-        lastSeen: serverTimestamp(),
+        lastSeen: status === 'offline' ? new Date(0) : serverTimestamp(),
       }).catch((e) => {
         console.warn('Could not update Firestore user status:', e);
       });
@@ -166,6 +167,7 @@ let lastRemoteHeartbeatTime = 0;
 let lastKnownRemoteStatus: 'online' | 'in-game' | 'offline' | null = null;
 let lastKnownRemoteActive: boolean | null = null;
 let lastThrottleRecord = 0;
+let lastNotifiedStats: LobbyStats | null = null;
 
 export function resetPresenceStateForTesting(): void {
   lastUserActivityTime = Date.now();
@@ -173,6 +175,7 @@ export function resetPresenceStateForTesting(): void {
   lastRemoteHeartbeatTime = 0;
   lastKnownRemoteStatus = null;
   lastKnownRemoteActive = null;
+  lastNotifiedStats = null;
   hiddenSince = null;
   currentActivityContext = 'online';
   firestoreRegisteredCount = null;
@@ -180,6 +183,16 @@ export function resetPresenceStateForTesting(): void {
   firestoreGamesCount = null;
 }
 
+/**
+ * Records local user input activity (mouse, key, touch) in memory.
+ * Uses activityThrottleMs to prevent CPU overhead and only dispatches network
+ * heartbeats upon a genuine state transition between idle and active.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) in-memory timestamp comparison and scalar update.
+ * - Auxiliary Space Complexity: O(1) constant memory.
+ * - Growth Rate: O(1) invariant to frequency of UI events or duration of session.
+ */
 export function recordUserActivity(): void {
   const now = Date.now();
   if (now >= lastThrottleRecord && now - lastThrottleRecord < MULTIPLAYER_SCALE_CONFIG.presence.activityThrottleMs) return;
@@ -192,9 +205,11 @@ export function recordUserActivity(): void {
   }
 
   const nowActive = isCurrentClientActive();
-  // State transition from idle -> active forces remote sync so status updates immediately
+  // Only force remote sync if there was an actual state transition between idle and active
   const stateTransition = wasActive !== nowActive;
-  syncPresenceHeartbeat(stateTransition);
+  if (stateTransition) {
+    syncPresenceHeartbeat(true);
+  }
 }
 
 /**
@@ -484,15 +499,29 @@ let firestoreRegisteredCount: number | null = null;
 let firestoreGuestsCount: number | null = null;
 let firestoreGamesCount: number | null = null;
 
+const CACHED_LOBBY_STATS_TIME_KEY = `${CACHED_LOBBY_STATS_STORAGE_KEY}_time`;
+
 /**
  * Retrieves the last-known lobby statistics from localStorage to enable instant
  * stale-while-revalidate rendering without resetting counts to zero on page reloads.
+ * Returns zeros if the cached data is older than SESSION_TTL_MS.
  */
 export function getCachedLobbyStats(): LobbyStats {
   try {
     if (typeof localStorage !== 'undefined') {
       const raw = localStorage.getItem(CACHED_LOBBY_STATS_STORAGE_KEY);
+      const timeRaw = localStorage.getItem(CACHED_LOBBY_STATS_TIME_KEY);
       if (raw) {
+        if (timeRaw) {
+          const cachedTime = Number(timeRaw);
+          if (!isNaN(cachedTime) && Date.now() - cachedTime > SESSION_TTL_MS) {
+            return {
+              playersOnline: 0,
+              guestsOnline: 0,
+              activeGames: 0,
+            };
+          }
+        }
         const parsed = JSON.parse(raw);
         if (
           typeof parsed.playersOnline === 'number' &&
@@ -522,6 +551,7 @@ export function getCachedLobbyStats(): LobbyStats {
  */
 export function setCachedLobbyStats(stats: LobbyStats): void {
   safeSetItem(CACHED_LOBBY_STATS_STORAGE_KEY, JSON.stringify(stats));
+  safeSetItem(CACHED_LOBBY_STATS_TIME_KEY, String(Date.now()));
 }
 
 function getCurrentLobbyStats(): LobbyStats {
@@ -568,9 +598,28 @@ function getCurrentLobbyStats(): LobbyStats {
   return stats;
 }
 
+/**
+ * Notifies local subscribers of lobby statistics updates.
+ * Deduplicates notification dispatches when metric values (players, guests, active games)
+ * have not changed, eliminating unnecessary component re-renders.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) deduplication check; O(S) listener iteration where S is subscriber count (S <= 10).
+ * - Auxiliary Space Complexity: O(1) scalar comparison.
+ * - Growth Rate: O(S) linear in local subscribers, invariant to server user volume.
+ */
 function notifyStatsSubscribers() {
   if (statsSubscribers.size === 0) return;
   const stats = getCurrentLobbyStats();
+  if (
+    lastNotifiedStats &&
+    lastNotifiedStats.playersOnline === stats.playersOnline &&
+    lastNotifiedStats.guestsOnline === stats.guestsOnline &&
+    lastNotifiedStats.activeGames === stats.activeGames
+  ) {
+    return;
+  }
+  lastNotifiedStats = stats;
   for (const cb of statsSubscribers) {
     try {
       cb(stats);
@@ -588,9 +637,9 @@ const STALE_GUEST_CUTOFF_MS = MULTIPLAYER_SCALE_CONFIG.presence.staleGuestCutoff
  * Opportunistically purges orphan guest sessions older than 15 minutes to keep Firestore clean.
  *
  * Algorithmic Complexity (Big O):
- * - Time Complexity: O(B) where B <= maxCleanupBatchSize (B <= 50) for batch retrieval and deletion.
- * - Auxiliary Space Complexity: O(B) for document snapshot handles.
- * - Network / Database Complexity: O(1) query read plus at most B deletion writes, strictly gated to
+ * - Time Complexity: O(B) where B <= maxCleanupBatchSize (B <= 50) for batch retrieval and atomic commit.
+ * - Auxiliary Space Complexity: O(B) for document snapshot handles within batch buffer.
+ * - Network / Database Complexity: O(1) query read plus 1 atomic batch deletion commit, strictly gated to
  *   at most once per staleGuestPruneIntervalMs.
  */
 export async function pruneStaleGuestSessions(): Promise<void> {
@@ -608,7 +657,11 @@ export async function pruneStaleGuestSessions(): Promise<void> {
     );
     const snap = await getDocs(staleQuery);
     if (!snap.empty) {
-      await Promise.all(snap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+      const batch = writeBatch(db);
+      for (const d of snap.docs) {
+        batch.delete(d.ref);
+      }
+      await batch.commit();
     }
   } catch {
     // Non-critical background cleanup
@@ -669,50 +722,71 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
     try {
       const statsDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.lobbyStats, 'lobby');
 
-      // Server-side count fallback: refreshes server counts with getCountFromServer if needed
-      const refreshServerCounts = async () => {
+      let lastServerCountsRefreshTime = 0;
+      let inFlightRefreshPromise: Promise<void> | null = null;
+
+      // Server-side count fallback: refreshes server counts with getCountFromServer if needed.
+      // Employs in-flight deduplication and 10s cooldown to eliminate redundant concurrent network reads.
+      const refreshServerCounts = async (force: boolean = false): Promise<void> => {
         if (!db) return;
-        try {
-          const thresholdDate = new Date(Date.now() - SESSION_TTL_MS);
-          const qUsers = query(
-            collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
-            where('status', 'in', ['online', 'in-game'])
-          );
-          const qGuests = query(
-            collection(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions),
-            where('lastSeen', '>=', Timestamp.fromDate(thresholdDate))
-          );
-          const qGames = query(
-            collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
-            where('status', 'in', ['waiting', 'in_progress'])
-          );
+        const now = Date.now();
+        if (!force && inFlightRefreshPromise) return inFlightRefreshPromise;
+        if (!force && now - lastServerCountsRefreshTime < 10_000) return;
 
-          const [usersSnap, guestsSnap, gamesSnap] = await Promise.all([
-            getCountFromServer(qUsers).catch(() => null),
-            getCountFromServer(qGuests).catch(() => null),
-            getCountFromServer(qGames).catch(() => null),
-          ]);
+        lastServerCountsRefreshTime = now;
 
-          let changed = false;
-          if (usersSnap) {
-            firestoreRegisteredCount = usersSnap.data().count;
-            changed = true;
-          }
-          if (guestsSnap) {
-            firestoreGuestsCount = guestsSnap.data().count;
-            changed = true;
-          }
-          if (gamesSnap) {
-            firestoreGamesCount = gamesSnap.data().count;
-            changed = true;
-          }
+        inFlightRefreshPromise = (async () => {
+          try {
+            const thresholdDate = new Date(now - SESSION_TTL_MS);
+            const thresholdTimestamp = Timestamp.fromDate(thresholdDate);
 
-          if (changed) {
-            notifyStatsSubscribers();
+            // Query active users whose heartbeat was received within SESSION_TTL_MS.
+            // Uses a single-field index on lastSeen, avoiding unbuilt composite indexes (failed-precondition).
+            const qUsers = query(
+              collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
+              where('lastSeen', '>=', thresholdTimestamp)
+            );
+
+            const qGuests = query(
+              collection(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions),
+              where('lastSeen', '>=', thresholdTimestamp)
+            );
+            const qGames = query(
+              collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
+              where('status', 'in', ['waiting', 'in_progress'])
+            );
+
+            const [usersSnap, guestsSnap, gamesSnap] = await Promise.all([
+              getCountFromServer(qUsers).catch(() => null),
+              getCountFromServer(qGuests).catch(() => null),
+              getCountFromServer(qGames).catch(() => null),
+            ]);
+
+            let changed = false;
+            if (usersSnap) {
+              firestoreRegisteredCount = usersSnap.data().count;
+              changed = true;
+            }
+            if (guestsSnap) {
+              firestoreGuestsCount = guestsSnap.data().count;
+              changed = true;
+            }
+            if (gamesSnap) {
+              firestoreGamesCount = gamesSnap.data().count;
+              changed = true;
+            }
+
+            if (changed) {
+              notifyStatsSubscribers();
+            }
+          } catch {
+            // Graceful fallback to local session stats
+          } finally {
+            inFlightRefreshPromise = null;
           }
-        } catch {
-          // Graceful fallback to local session stats
-        }
+        })();
+
+        return inFlightRefreshPromise;
       };
 
       unsubscribeStatsDoc = onSnapshot(
@@ -733,18 +807,29 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
             if (typeof data.guestsOnline === 'number') firestoreGuestsCount = data.guestsOnline;
             if (typeof data.activeGames === 'number') firestoreGamesCount = data.activeGames;
             notifyStatsSubscribers();
+          } else {
+            // Aggregate document does not exist: query live counts immediately and keep polling active
+            refreshServerCounts();
+            if (!countPollTimer) {
+              countPollTimer = setInterval(
+                refreshServerCounts,
+                MULTIPLAYER_SCALE_CONFIG.presence.statsFallbackPollIntervalMs
+              );
+            }
           }
         },
         (err) => {
-          console.warn('Stats document listener notice:', err);
-          // If onSnapshot encounters an error, start throttled fallback count polling
+          // If the stats document listener encounters permission or existence constraints, gracefully switch to throttled count polling
+          if (import.meta.env.DEV) {
+            console.warn('Stats document listener notice (falling back to server count polling):', err);
+          }
           if (!countPollTimer) {
             countPollTimer = setInterval(
               refreshServerCounts,
               MULTIPLAYER_SCALE_CONFIG.presence.statsFallbackPollIntervalMs
             );
-            refreshServerCounts();
           }
+          refreshServerCounts();
         }
       );
 
