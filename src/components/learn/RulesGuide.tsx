@@ -383,7 +383,7 @@ export const RulesGuide: React.FC = () => {
           <div style={{ marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                Select a Notable Example:
+                Select an Example:
               </span>
               <button
                 type="button"

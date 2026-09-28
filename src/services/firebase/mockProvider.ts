@@ -1,4 +1,13 @@
+/**
+ * Mock Backend Provider for Offline and Development Testing.
+ *
+ * Simulates Firebase Firestore authentication, user profiles, presence tracking,
+ * and friend request management using browser localStorage.
+ */
+
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
+import { ACTIVE_SESSIONS_STORAGE_KEY } from './presenceService';
+import { MOCK_CONFIG } from './mockConfig';
 
 export interface UserProfile {
   id: string;
@@ -27,71 +36,38 @@ export interface MockFriendRequest {
 }
 
 class MockBackend {
-  private usersKey = 'schada_mock_users';
-  private currentUserIdKey = 'schada_mock_current_user_id';
-  private requestsKey = 'schada_mock_friend_requests';
-  private friendsKey = 'schada_mock_friends'; // map of userId -> friendIds[]
+  private usersKey = MOCK_CONFIG.storageKeys.users;
+  private currentUserIdKey = MOCK_CONFIG.storageKeys.currentUserId;
+  private requestsKey = MOCK_CONFIG.storageKeys.friendRequests;
+  private friendsKey = MOCK_CONFIG.storageKeys.friends;
 
   constructor() {
     this.seedDefaultUsers();
   }
 
-  private seedDefaultUsers() {
+  /**
+   * Initializes default mock user accounts if not present in localStorage.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) where U is the count of default mock users.
+   * - Auxiliary Space Complexity: O(U) serialized user JSON.
+   *
+   * Growth Rate:
+   * - O(U) linear with respect to default user count.
+   */
+  private seedDefaultUsers(): void {
     if (typeof localStorage === 'undefined') return;
     const existing = localStorage.getItem(this.usersKey);
     if (!existing) {
-      const defaultUsers: Record<string, UserProfile> = {
-        'mock-grandmaster': {
-          id: 'mock-grandmaster',
-          email: 'gm@schada.org',
-          username: 'SchadaGrandmaster',
-          usernameLower: 'schadagrandmaster',
-          usernameChangeCount: 0,
-          eloRating: 1650,
-          gamesPlayed: 48,
-          gamesWon: 36,
-          gamesLost: 8,
-          gamesDrawn: 4,
-          status: 'offline',
-          createdAt: new Date().toISOString(),
-        },
-        'mock-tactician': {
-          id: 'mock-tactician',
-          email: 'tactics@schada.org',
-          username: 'Boogerd1936',
-          usernameLower: 'boogerd1936',
-          usernameChangeCount: 0,
-          eloRating: 1420,
-          gamesPlayed: 25,
-          gamesWon: 16,
-          gamesLost: 7,
-          gamesDrawn: 2,
-          status: 'offline',
-          createdAt: new Date().toISOString(),
-        },
-        'mock-learner': {
-          id: 'mock-learner',
-          email: 'novice@schada.org',
-          username: 'BoardMaster',
-          usernameLower: 'boardmaster',
-          usernameChangeCount: 1,
-          eloRating: 1220,
-          gamesPlayed: 10,
-          gamesWon: 5,
-          gamesLost: 4,
-          gamesDrawn: 1,
-          status: 'offline',
-          createdAt: new Date().toISOString(),
-        },
-      };
-      localStorage.setItem(this.usersKey, JSON.stringify(defaultUsers));
+      localStorage.setItem(this.usersKey, JSON.stringify(MOCK_CONFIG.defaultUsers));
     } else {
       // Sanitize existing cached users so inactive/offline accounts are not erroneously marked online
       try {
         const users: Record<string, UserProfile> = JSON.parse(existing);
         let changed = false;
+        const activeIds = this.getActiveRegisteredUserIds();
         for (const [uid, u] of Object.entries(users)) {
-          const active = this.isUserActive(uid);
+          const active = activeIds.has(uid);
           if (!active && u.status !== 'offline') {
             u.status = 'offline';
             changed = true;
@@ -106,31 +82,111 @@ class MockBackend {
     }
   }
 
-  private getUsers(): Record<string, UserProfile> {
-    if (typeof localStorage === 'undefined') return {};
-    return JSON.parse(localStorage.getItem(this.usersKey) || '{}');
+  /**
+   * Safely retrieves and deserializes data from localStorage with a fallback value.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(S) where S is the serialized string length.
+   * - Auxiliary Space Complexity: O(S) parsed memory representation.
+   *
+   * Growth Rate:
+   * - O(S) linear with respect to stored payload size.
+   */
+  private safeGetStorage<T>(key: string, defaultValue: T): T {
+    if (typeof localStorage === 'undefined') return defaultValue;
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : defaultValue;
+    } catch {
+      return defaultValue;
+    }
   }
 
-  private saveUsers(users: Record<string, UserProfile>) {
+  /**
+   * Retrieves the map of all stored user profiles.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) where U is the number of stored users.
+   * - Auxiliary Space Complexity: O(U) parsed users map.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
+  private getUsers(): Record<string, UserProfile> {
+    return this.safeGetStorage<Record<string, UserProfile>>(this.usersKey, {});
+  }
+
+  /**
+   * Serializes and writes user profiles to localStorage.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) where U is the number of users to serialize.
+   * - Auxiliary Space Complexity: O(U) serialized string.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
+  private saveUsers(users: Record<string, UserProfile>): void {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(this.usersKey, JSON.stringify(users));
   }
 
-  public isUserActive(userId: string): boolean {
+  /**
+   * Retrieves all user IDs currently active across any client tab.
+   * Prioritizes algorithmic growth rate O(N) by reading storage and deserializing
+   * exactly once instead of repeating disk reads per caller.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(N) where N is the number of active tab sessions in localStorage.
+   * - Auxiliary Space Complexity: O(N) auxiliary set to store active registered user IDs.
+   *
+   * Growth Rate:
+   * - O(N) linear with respect to active tab session count.
+   */
+  private getActiveRegisteredUserIds(): Set<string> {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_SESSIONS_STORAGE_KEY) : null;
+    if (!raw) return new Set();
     try {
-      const raw = localStorage.getItem('schada_active_sessions_v2');
-      if (!raw) return false;
       const map: Record<string, { lastSeen: number; isRegistered: boolean; userId: string | null; isActive: boolean }> = JSON.parse(raw);
       const now = Date.now();
-      return Object.values(map).some(
-        (s) => s.userId === userId && s.isRegistered && s.isActive && (now - s.lastSeen <= 15000)
-      );
+      const ttl = MULTIPLAYER_SCALE_CONFIG.presence.sessionTtlMs;
+      const activeIds = new Set<string>();
+      for (const s of Object.values(map)) {
+        if (s.userId && s.isRegistered && s.isActive && now - s.lastSeen <= ttl) {
+          activeIds.add(s.userId);
+        }
+      }
+      return activeIds;
     } catch {
-      return false;
+      return new Set();
     }
   }
 
-  public setUserStatus(userId: string, status: 'online' | 'in-game' | 'offline') {
+  /**
+   * Checks whether a specific user is currently active across client tabs.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(N) to build active session set + O(1) set lookup.
+   * - Auxiliary Space Complexity: O(N) auxiliary set.
+   *
+   * Growth Rate:
+   * - O(N) linear.
+   */
+  public isUserActive(userId: string): boolean {
+    return this.getActiveRegisteredUserIds().has(userId);
+  }
+
+  /**
+   * Updates a user's status and dispatches a notification event.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) where U is total user count.
+   * - Auxiliary Space Complexity: O(U) serialization.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
+  public setUserStatus(userId: string, status: 'online' | 'in-game' | 'offline'): void {
     const users = this.getUsers();
     if (users[userId]) {
       if (users[userId].status !== status) {
@@ -138,7 +194,9 @@ class MockBackend {
         users[userId].lastSeen = new Date().toISOString();
         this.saveUsers(users);
         try {
-          window.dispatchEvent(new CustomEvent('schada_user_status_changed', { detail: { userId, status } }));
+          window.dispatchEvent(
+            new CustomEvent(MOCK_CONFIG.events.userStatusChanged, { detail: { userId, status } })
+          );
         } catch {
           // Ignore in non-browser environments
         }
@@ -146,37 +204,82 @@ class MockBackend {
     }
   }
 
+  /**
+   * Retrieves the currently authenticated mock user profile.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) hash map lookup after O(U) user store load.
+   * - Auxiliary Space Complexity: O(1) profile reference.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
   public getCurrentUser(): UserProfile | null {
+    if (typeof localStorage === 'undefined') return null;
     const uid = localStorage.getItem(this.currentUserIdKey);
     if (!uid) return null;
     const users = this.getUsers();
-    const user = users[uid];
-    if (!user) return null;
-    const active = this.isUserActive(uid);
-    // User status of online is ONLY when logged in and active
-    const effectiveStatus: 'online' | 'in-game' | 'offline' = active
-      ? (user.status === 'in-game' ? 'in-game' : 'online')
-      : 'offline';
-    return {
-      ...user,
-      status: effectiveStatus,
-    };
+    const u = users[uid] || null;
+    if (u) {
+      const active = this.isUserActive(u.id);
+      return {
+        ...u,
+        status: (active ? (u.status === 'in-game' ? 'in-game' : 'online') : 'offline') as 'online' | 'in-game' | 'offline',
+      };
+    }
+    return null;
   }
 
+  /**
+   * Authenticates a user with email and password in the mock provider.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) search through registered user accounts.
+   * - Auxiliary Space Complexity: O(1) scalar allocations.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
+  public login(email: string, _password: string): UserProfile {
+    const users = this.getUsers();
+    const emailLower = email.toLowerCase().trim();
+    const user = Object.values(users).find((u) => u.email.toLowerCase() === emailLower);
+    if (!user) {
+      throw new Error('No user found with this email. Please check your credentials or register.');
+    }
+    user.status = 'online';
+    user.lastSeen = new Date().toISOString();
+    users[user.id] = user;
+    this.saveUsers(users);
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.currentUserIdKey, user.id);
+    }
+    return user;
+  }
+
+  /**
+   * Registers a new user account in the mock provider.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) uniqueness checks.
+   * - Auxiliary Space Complexity: O(1) new user object.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
   public register(email: string, _password: string, username: string): UserProfile {
     const users = this.getUsers();
     const usernameLower = username.toLowerCase().trim();
 
-    // Check if username already taken
-    const exists = Object.values(users).some((u) => u.usernameLower === usernameLower);
-    if (exists) {
+    if (Object.values(users).some((u) => u.usernameLower === usernameLower)) {
       throw new Error(`Username "${username}" is already taken.`);
     }
 
     const uid = `user_${Date.now()}`;
     const newUser: UserProfile = {
       id: uid,
-      email,
+      email: email.trim(),
       username: username.trim(),
       usernameLower,
       usernameChangeCount: 0,
@@ -192,27 +295,24 @@ class MockBackend {
 
     users[uid] = newUser;
     this.saveUsers(users);
-    localStorage.setItem(this.currentUserIdKey, uid);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.currentUserIdKey, uid);
+    }
     return newUser;
   }
 
-  public login(email: string, _password: string): UserProfile {
-    const users = this.getUsers();
-    const user = Object.values(users).find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (!user) {
-      throw new Error('No user found with this email. Please check your credentials or register.');
-    }
-
-    user.status = 'online';
-    user.lastSeen = new Date().toISOString();
-    users[user.id] = user;
-    this.saveUsers(users);
-
-    localStorage.setItem(this.currentUserIdKey, user.id);
-    return user;
-  }
-
-  public logout() {
+  /**
+   * Logs out the current mock user and updates status to offline.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) user store update.
+   * - Auxiliary Space Complexity: O(1) scalar allocations.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
+  public logout(): void {
+    if (typeof localStorage === 'undefined') return;
     const currentId = localStorage.getItem(this.currentUserIdKey);
     if (currentId) {
       const users = this.getUsers();
@@ -224,34 +324,43 @@ class MockBackend {
     }
     localStorage.removeItem(this.currentUserIdKey);
     try {
-      window.dispatchEvent(new CustomEvent('schada_user_status_changed', { detail: { status: 'offline' } }));
+      window.dispatchEvent(
+        new CustomEvent(MOCK_CONFIG.events.userStatusChanged, { detail: { status: 'offline' } })
+      );
     } catch {
       // Ignore
     }
   }
 
+  /**
+   * Computes the number of unique registered users currently active.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(N) to iterate session heartbeats.
+   * - Auxiliary Space Complexity: O(N) active IDs set.
+   *
+   * Growth Rate:
+   * - O(N) linear.
+   */
   public getOnlineRegisteredUsersCount(): number {
-    try {
-      const raw = localStorage.getItem('schada_active_sessions_v2');
-      if (!raw) {
-        const currentUid = localStorage.getItem(this.currentUserIdKey);
-        return currentUid && this.isUserActive(currentUid) ? 1 : 0;
-      }
-      const map = JSON.parse(raw);
-      const now = Date.now();
-      const activeRegisteredIds = new Set<string>();
-      for (const s of Object.values(map) as any[]) {
-        if (s.isRegistered && s.userId && s.isActive && (now - s.lastSeen <= 15000)) {
-          activeRegisteredIds.add(s.userId);
-        }
-      }
-      return activeRegisteredIds.size;
-    } catch {
-      const currentUid = localStorage.getItem(this.currentUserIdKey);
-      return currentUid && this.isUserActive(currentUid) ? 1 : 0;
+    const activeIds = this.getActiveRegisteredUserIds();
+    if (activeIds.size > 0) {
+      return activeIds.size;
     }
+    const currentUid = typeof localStorage !== 'undefined' ? localStorage.getItem(this.currentUserIdKey) : null;
+    return currentUid && this.isUserActive(currentUid) ? 1 : 0;
   }
 
+  /**
+   * Updates username for the authenticated user, enforcing the 1-time change limit.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) uniqueness check across existing users.
+   * - Auxiliary Space Complexity: O(1) scalar allocations.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
   public changeUsername(newUsername: string): UserProfile {
     const current = this.getCurrentUser();
     if (!current) throw new Error('Not authenticated');
@@ -279,7 +388,17 @@ class MockBackend {
     return current;
   }
 
-  public updateStats(userId: string, won: boolean, isDraw: boolean, eloDelta: number) {
+  /**
+   * Updates game results and Elo rating for a user.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) to load and save users.
+   * - Auxiliary Space Complexity: O(1) rating update.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
+  public updateStats(userId: string, won: boolean, isDraw: boolean, eloDelta: number): void {
     const users = this.getUsers();
     const u = users[userId];
     if (!u) return;
@@ -298,26 +417,68 @@ class MockBackend {
     this.saveUsers(users);
   }
 
+  /**
+   * Finds a user by their exact normalized username.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) linear search.
+   * - Auxiliary Space Complexity: O(1) reference.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
   public findUserByExactUsername(username: string): UserProfile | null {
     const users = this.getUsers();
     const target = username.toLowerCase().trim();
     return Object.values(users).find((u) => u.usernameLower === target) || null;
   }
 
+  /**
+   * Returns a leaderboard sorted by Elo rating in descending order.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U log U) comparison sort where U is user count.
+   * - Auxiliary Space Complexity: O(U) array allocation.
+   *
+   * Growth Rate:
+   * - O(U log U) log-linear with respect to user count.
+   */
   public getLeaderboard(): UserProfile[] {
     const users = this.getUsers();
     return Object.values(users).sort((a, b) => b.eloRating - a.eloRating);
   }
 
   // Friend Requests
+
+  /**
+   * Retrieves pending and historic friend requests.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(R) where R is total stored requests.
+   * - Auxiliary Space Complexity: O(R) parsed requests array.
+   *
+   * Growth Rate:
+   * - O(R) linear.
+   */
   private getRequests(): MockFriendRequest[] {
-    return JSON.parse(localStorage.getItem(this.requestsKey) || '[]');
+    return this.safeGetStorage<MockFriendRequest[]>(this.requestsKey, []);
   }
 
-  private saveRequests(reqs: MockFriendRequest[]) {
+  private saveRequests(reqs: MockFriendRequest[]): void {
+    if (typeof localStorage === 'undefined') return;
     localStorage.setItem(this.requestsKey, JSON.stringify(reqs));
   }
 
+  /**
+   * Creates and dispatches a new friend request.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U + R) where U is user lookup and R is existing requests scan.
+   * - Auxiliary Space Complexity: O(1) request object allocation.
+   *
+   * Growth Rate:
+   * - O(U + R) linear.
+   */
   public sendFriendRequest(fromUser: UserProfile, toUsername: string): MockFriendRequest {
     const target = this.findUserByExactUsername(toUsername);
     if (!target) {
@@ -353,7 +514,17 @@ class MockBackend {
     return newReq;
   }
 
-  public respondToFriendRequest(requestId: string, accept: boolean) {
+  /**
+   * Responds to an incoming friend request (accept or decline).
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(R + F) where R is requests search and F is friend list update.
+   * - Auxiliary Space Complexity: O(F) friends data map.
+   *
+   * Growth Rate:
+   * - O(R + F) linear.
+   */
+  public respondToFriendRequest(requestId: string, accept: boolean): void {
     const reqs = this.getRequests();
     const req = reqs.find((r) => r.id === requestId);
     if (!req) return;
@@ -363,9 +534,7 @@ class MockBackend {
 
     if (accept) {
       // Add each other as friends
-      const friendsData: Record<string, string[]> = JSON.parse(
-        localStorage.getItem(this.friendsKey) || '{}'
-      );
+      const friendsData = this.safeGetStorage<Record<string, string[]>>(this.friendsKey, {});
       if (!friendsData[req.fromUserId]) friendsData[req.fromUserId] = [];
       if (!friendsData[req.toUserId]) friendsData[req.toUserId] = [];
 
@@ -375,21 +544,34 @@ class MockBackend {
       if (!friendsData[req.toUserId].includes(req.fromUserId)) {
         friendsData[req.toUserId].push(req.fromUserId);
       }
-      localStorage.setItem(this.friendsKey, JSON.stringify(friendsData));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.friendsKey, JSON.stringify(friendsData));
+      }
     }
   }
 
+  /**
+   * Retrieves friends for a user with real-time active status computed in linear O(N + F) time.
+   * Pre-computes active session IDs in a hash set to eliminate O(F * N) repetitive disk reads.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(N + F + U) where N is active tab count, F is friend count, U is total users.
+   * - Auxiliary Space Complexity: O(N + F) for the active IDs set and friends array.
+   *
+   * Growth Rate:
+   * - O(N + F + U) linear, significantly outperforming legacy O(F * N) per-friend disk lookups.
+   */
   public getFriends(userId: string): UserProfile[] {
-    const friendsData: Record<string, string[]> = JSON.parse(
-      localStorage.getItem(this.friendsKey) || '{}'
-    );
+    const friendsData = this.safeGetStorage<Record<string, string[]>>(this.friendsKey, {});
     const friendIds = friendsData[userId] || [];
     const users = this.getUsers();
+    const activeUserIds = this.getActiveRegisteredUserIds();
+
     return friendIds
       .map((fid) => {
         const u = users[fid];
         if (!u) return null;
-        const active = this.isUserActive(u.id);
+        const active = activeUserIds.has(u.id);
         return {
           ...u,
           status: (active ? (u.status === 'in-game' ? 'in-game' : 'online') : 'offline') as 'online' | 'in-game' | 'offline',
@@ -398,19 +580,39 @@ class MockBackend {
       .filter(Boolean) as UserProfile[];
   }
 
-  public removeFriend(userId: string, friendId: string) {
-    const friendsData: Record<string, string[]> = JSON.parse(
-      localStorage.getItem(this.friendsKey) || '{}'
-    );
+  /**
+   * Removes a friendship between two users.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(F) where F is friend list length.
+   * - Auxiliary Space Complexity: O(F) filtered arrays.
+   *
+   * Growth Rate:
+   * - O(F) linear.
+   */
+  public removeFriend(userId: string, friendId: string): void {
+    const friendsData = this.safeGetStorage<Record<string, string[]>>(this.friendsKey, {});
     if (friendsData[userId]) {
       friendsData[userId] = friendsData[userId].filter((id) => id !== friendId);
     }
     if (friendsData[friendId]) {
       friendsData[friendId] = friendsData[friendId].filter((id) => id !== userId);
     }
-    localStorage.setItem(this.friendsKey, JSON.stringify(friendsData));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.friendsKey, JSON.stringify(friendsData));
+    }
   }
 
+  /**
+   * Retrieves pending incoming friend requests for a specific user.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(R) where R is total stored requests.
+   * - Auxiliary Space Complexity: O(R) filtered array.
+   *
+   * Growth Rate:
+   * - O(R) linear.
+   */
   public getPendingIncomingRequests(userId: string): MockFriendRequest[] {
     const reqs = this.getRequests();
     return reqs.filter((r) => r.toUserId === userId && r.status === 'pending');
