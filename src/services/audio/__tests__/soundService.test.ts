@@ -232,6 +232,10 @@ describe('SoundService', () => {
       (globalThis.window as any).AudioContext = MockContext;
     }
 
+    // Simulate environment without HTML5 Audio to force synthesis fallback
+    const savedAudio = (globalThis as any).Audio;
+    delete (globalThis as any).Audio;
+
     const service = new SoundService();
     service.playMove();
     expect(mockCreateOscillator).toHaveBeenCalled();
@@ -243,6 +247,8 @@ describe('SoundService', () => {
     service.playCapture();
     expect(mockCreateOscillator).toHaveBeenCalled();
     expect(mockStart).toHaveBeenCalled();
+    
+    (globalThis as any).Audio = savedAudio;
   });
 
   it('immediately plays from HTMLAudioElement pool when AudioContext is suspended on desktop', () => {
@@ -271,6 +277,98 @@ describe('SoundService', () => {
     // Verify audio element from pool was played immediately
     const playedInstance = MockAudio.instances.find((inst) => inst.play.mock.calls.length > 0);
     expect(playedInstance).toBeDefined();
+  });
+
+  it('plays buffer directly without synthesis if moveBuffer is loaded in fallback', () => {
+    class RunningContext {
+      state = 'running';
+      createBufferSource = vi.fn().mockReturnValue({
+        connect: vi.fn(),
+        start: vi.fn(),
+        disconnect: vi.fn(),
+        onended: null,
+      });
+      createOscillator = vi.fn();
+      decodeAudioData = vi.fn();
+      destination = {};
+      resume = vi.fn();
+      currentTime = 10;
+    }
+
+    (globalThis as any).AudioContext = RunningContext;
+    if (globalThis.window) {
+      (globalThis.window as any).AudioContext = RunningContext;
+    }
+
+    const service = new SoundService();
+    (service as any).ensureContext();
+    (service as any).moveBuffer = {} as AudioBuffer;
+
+    (service as any).playFallbackAudio('move');
+    expect((service as any).ctx.createBufferSource).toHaveBeenCalled();
+    expect((service as any).ctx.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('isolates oscillator lifecycles in synthesizeMoveSound to avoid premature cutoff clicks', () => {
+    const oscillators: any[] = [];
+    const gains: any[] = [];
+
+    class RunningContext {
+      state = 'running';
+      createGain = vi.fn().mockImplementation(() => {
+        const g = {
+          gain: { 
+            setValueAtTime: vi.fn(), 
+            exponentialRampToValueAtTime: vi.fn(),
+            linearRampToValueAtTime: vi.fn(),
+          },
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        };
+        gains.push(g);
+        return g;
+      });
+      createOscillator = vi.fn().mockImplementation(() => {
+        const osc = {
+          type: 'triangle',
+          frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+          connect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          disconnect: vi.fn(),
+          onended: null as (() => void) | null,
+        };
+        oscillators.push(osc);
+        return osc;
+      });
+      decodeAudioData = vi.fn();
+      destination = {};
+      resume = vi.fn();
+      currentTime = 5;
+    }
+
+    (globalThis as any).AudioContext = RunningContext;
+    if (globalThis.window) {
+      (globalThis.window as any).AudioContext = RunningContext;
+    }
+
+    const service = new SoundService();
+    (service as any).synthesizeMoveSound((service as any).ensureContext());
+
+    expect(oscillators.length).toBe(2);
+    expect(gains.length).toBe(2);
+
+    // Triggering osc1.onended must NOT disconnect osc2 or gain2 prematurely
+    oscillators[0].onended?.();
+    expect(oscillators[0].disconnect).toHaveBeenCalled();
+    expect(gains[0].disconnect).toHaveBeenCalled();
+    expect(oscillators[1].disconnect).not.toHaveBeenCalled();
+    expect(gains[1].disconnect).not.toHaveBeenCalled();
+
+    // Triggering osc2.onended disconnects osc2 and gain2
+    oscillators[1].onended?.();
+    expect(oscillators[1].disconnect).toHaveBeenCalled();
+    expect(gains[1].disconnect).toHaveBeenCalled();
   });
 });
 

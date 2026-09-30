@@ -47,7 +47,7 @@ export class SoundService {
       const unlockAudio = () => {
         const ctx = this.ensureContext();
         if (ctx && ctx.state === 'suspended') {
-          ctx.resume().catch(() => {});
+          ctx.resume().catch(() => { });
         }
       };
 
@@ -61,7 +61,7 @@ export class SoundService {
           if (document.visibilityState === 'visible') {
             const ctx = this.ensureContext();
             if (ctx && ctx.state === 'suspended') {
-              ctx.resume().catch(() => {});
+              ctx.resume().catch(() => { });
             }
           }
         });
@@ -93,7 +93,12 @@ export class SoundService {
   /** Lazily creates and initializes AudioContext */
   private ensureContext(): AudioContext | null {
     if (this.isMuted || typeof window === 'undefined') return null;
-    if (this.ctx && this.ctx.state !== 'closed') return this.ctx;
+    if (this.ctx && this.ctx.state !== 'closed') {
+      if ((!this.moveBuffer || !this.captureBuffer) && !this.isDecoding) {
+        this.loadBuffers(this.ctx);
+      }
+      return this.ctx;
+    }
 
     try {
       const AudioCtx =
@@ -157,7 +162,8 @@ export class SoundService {
   /** Synthesizes authentic wooden chess piece move tap with dual-component transient */
   private synthesizeMoveSound(ctx: AudioContext): void {
     try {
-      const now = ctx.currentTime;
+      const LOOKAHEAD = 0.015;
+      const now = ctx.currentTime + LOOKAHEAD;
       const { moveTransient, moveBody } = AUDIO_CONFIG.synthesis;
 
       // High-frequency transient impact
@@ -166,7 +172,8 @@ export class SoundService {
       osc1.type = 'triangle';
       osc1.frequency.setValueAtTime(moveTransient.startFreq, now);
       osc1.frequency.exponentialRampToValueAtTime(moveTransient.endFreq, now + moveTransient.duration);
-      gain1.gain.setValueAtTime(moveTransient.startGain, now);
+      gain1.gain.setValueAtTime(0, now);
+      gain1.gain.linearRampToValueAtTime(moveTransient.startGain, now + 0.002);
       gain1.gain.exponentialRampToValueAtTime(0.0001, now + moveTransient.duration);
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
@@ -179,7 +186,8 @@ export class SoundService {
       osc2.type = 'sine';
       osc2.frequency.setValueAtTime(moveBody.startFreq, now);
       osc2.frequency.exponentialRampToValueAtTime(moveBody.endFreq, now + moveBody.duration);
-      gain2.gain.setValueAtTime(moveBody.startGain, now);
+      gain2.gain.setValueAtTime(0, now);
+      gain2.gain.linearRampToValueAtTime(moveBody.startGain, now + 0.002);
       gain2.gain.exponentialRampToValueAtTime(0.0001, now + moveBody.duration);
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
@@ -190,6 +198,13 @@ export class SoundService {
         try {
           osc1.disconnect();
           gain1.disconnect();
+        } catch {
+          // ignore
+        }
+      };
+
+      osc2.onended = () => {
+        try {
           osc2.disconnect();
           gain2.disconnect();
         } catch {
@@ -204,7 +219,8 @@ export class SoundService {
   /** Synthesizes authentic piece capture impact with two-stage strike sound */
   private synthesizeCaptureSound(ctx: AudioContext): void {
     try {
-      const now = ctx.currentTime;
+      const LOOKAHEAD = 0.015;
+      const now = ctx.currentTime + LOOKAHEAD;
       const { captureImpact1, captureImpact2 } = AUDIO_CONFIG.synthesis;
 
       // First impact: piece striking piece
@@ -213,7 +229,8 @@ export class SoundService {
       osc1.type = 'triangle';
       osc1.frequency.setValueAtTime(captureImpact1.startFreq, now);
       osc1.frequency.exponentialRampToValueAtTime(captureImpact1.endFreq, now + captureImpact1.duration);
-      gain1.gain.setValueAtTime(captureImpact1.startGain, now);
+      gain1.gain.setValueAtTime(0, now);
+      gain1.gain.linearRampToValueAtTime(captureImpact1.startGain, now + 0.002);
       gain1.gain.exponentialRampToValueAtTime(0.0001, now + captureImpact1.duration);
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
@@ -227,17 +244,25 @@ export class SoundService {
       osc2.type = 'sine';
       osc2.frequency.setValueAtTime(captureImpact2.startFreq, t2);
       osc2.frequency.exponentialRampToValueAtTime(captureImpact2.endFreq, t2 + captureImpact2.duration);
-      gain2.gain.setValueAtTime(captureImpact2.startGain, t2);
+      gain2.gain.setValueAtTime(0, t2);
+      gain2.gain.linearRampToValueAtTime(captureImpact2.startGain, t2 + 0.002);
       gain2.gain.exponentialRampToValueAtTime(0.0001, t2 + captureImpact2.duration);
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
       osc2.start(t2);
       osc2.stop(t2 + captureImpact2.stopDelay);
 
-      osc2.onended = () => {
+      osc1.onended = () => {
         try {
           osc1.disconnect();
           gain1.disconnect();
+        } catch {
+          // ignore
+        }
+      };
+
+      osc2.onended = () => {
+        try {
           osc2.disconnect();
           gain2.disconnect();
         } catch {
@@ -253,21 +278,25 @@ export class SoundService {
   private playFallbackAudio(type: 'move' | 'capture'): void {
     if (this.isMuted) return;
 
-    // If AudioContext is actively running, synthesize sound directly
+    // If AudioContext is actively running and buffer is ready, play the decoded buffer
     if (this.ctx && this.ctx.state === 'running') {
-      try {
+      const buffer = type === 'move' ? this.moveBuffer : this.captureBuffer;
+      if (buffer) {
+        this.playBufferDirect(this.ctx, buffer);
+        return;
+      }
+    }
+
+    if (typeof Audio === 'undefined') {
+      if (this.ctx && this.ctx.state === 'running') {
         if (type === 'move') {
           this.synthesizeMoveSound(this.ctx);
         } else {
           this.synthesizeCaptureSound(this.ctx);
         }
-        return;
-      } catch {
-        // Fall through to HTMLAudioElement
       }
+      return;
     }
-
-    if (typeof Audio === 'undefined') return;
 
     try {
       const src = type === 'move' ? SOUND_ASSET_PATHS.move : SOUND_ASSET_PATHS.capture;
@@ -283,30 +312,42 @@ export class SoundService {
       if (playPromise) {
         playPromise.catch(() => {
           this.activeAudios.delete(audio);
+          // If HTML5 Audio is blocked by browser autoplay policy, synthesize sound if ctx is running
+          if (this.ctx && this.ctx.state === 'running') {
+            if (type === 'move') {
+              this.synthesizeMoveSound(this.ctx);
+            } else {
+              this.synthesizeCaptureSound(this.ctx);
+            }
+          }
         });
       }
     } catch (e) {
       console.warn('[Sound] playFallbackAudio failed:', e);
+      if (this.ctx && this.ctx.state === 'running') {
+        if (type === 'move') {
+          this.synthesizeMoveSound(this.ctx);
+        } else {
+          this.synthesizeCaptureSound(this.ctx);
+        }
+      }
     }
   }
 
   /** Directly outputs an AudioBuffer via Web Audio API */
   private playBufferDirect(ctx: AudioContext, buffer: AudioBuffer): void {
     try {
+      const LOOKAHEAD = 0.015;
+      const now = ctx.currentTime + LOOKAHEAD;
       const source = ctx.createBufferSource();
-      const gain = ctx.createGain();
       source.buffer = buffer;
-      gain.gain.value = 1.0;
 
-      source.connect(gain);
-      gain.connect(ctx.destination);
-
-      source.start();
+      source.connect(ctx.destination);
+      source.start(now);
 
       source.onended = () => {
         try {
           source.disconnect();
-          gain.disconnect();
         } catch {
           /* already disconnected */
         }
@@ -321,13 +362,13 @@ export class SoundService {
     safeSetItem(AUDIO_CONFIG.storageKeys.soundMuted, String(this.isMuted));
     if (this.isMuted) {
       if (this.ctx) {
-        this.ctx.suspend().catch(() => {});
+        this.ctx.suspend().catch(() => { });
       }
       for (const el of this.activeAudios) {
         try {
           el.pause();
           el.currentTime = 0;
-        } catch {}
+        } catch { }
       }
       this.activeAudios.clear();
     }
@@ -343,13 +384,13 @@ export class SoundService {
     safeSetItem(AUDIO_CONFIG.storageKeys.soundMuted, String(this.isMuted));
     if (this.isMuted) {
       if (this.ctx) {
-        this.ctx.suspend().catch(() => {});
+        this.ctx.suspend().catch(() => { });
       }
       for (const el of this.activeAudios) {
         try {
           el.pause();
           el.currentTime = 0;
-        } catch {}
+        } catch { }
       }
       this.activeAudios.clear();
     }
@@ -377,7 +418,7 @@ export class SoundService {
       }
     } else {
       // AudioContext is suspended. Attempt resume and immediately play MP3 via HTML5 Audio
-      ctx.resume().catch(() => {});
+      ctx.resume().catch(() => { });
       this.playFallbackAudio('move');
     }
   }
@@ -404,7 +445,7 @@ export class SoundService {
       }
     } else {
       // AudioContext is suspended. Attempt resume and immediately play MP3 via HTML5 Audio
-      ctx.resume().catch(() => {});
+      ctx.resume().catch(() => { });
       this.playFallbackAudio('capture');
     }
   }
@@ -456,7 +497,7 @@ export class SoundService {
     if (ctx.state === 'running') {
       executeGoal(ctx);
     } else {
-      ctx.resume().then(() => executeGoal(ctx)).catch(() => {});
+      ctx.resume().then(() => executeGoal(ctx)).catch(() => { });
     }
   }
 
@@ -501,7 +542,7 @@ export class SoundService {
     if (ctx.state === 'running') {
       executeTick(ctx);
     } else {
-      ctx.resume().then(() => executeTick(ctx)).catch(() => {});
+      ctx.resume().then(() => executeTick(ctx)).catch(() => { });
     }
   }
 
@@ -557,7 +598,7 @@ export class SoundService {
     if (ctx.state === 'running') {
       executeVictory(ctx);
     } else {
-      ctx.resume().then(() => executeVictory(ctx)).catch(() => {});
+      ctx.resume().then(() => executeVictory(ctx)).catch(() => { });
     }
   }
 }
