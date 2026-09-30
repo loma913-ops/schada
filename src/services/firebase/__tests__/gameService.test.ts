@@ -17,12 +17,16 @@ import {
   isGameTimedOut,
   startAbandonedGamesCleanupWatcher,
   markGameEloProcessed,
+  computeRankedGameEloResult,
+  reconcilePendingElo,
+  mockStore,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '../gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
 import { registerUser } from '../authService';
+import { localBackend } from '../localProvider';
 
 vi.mock('../config', () => ({
   isFirebaseConfigured: () => false,
@@ -808,6 +812,98 @@ describe('GameService Multiplayer Sync', () => {
     expect(unrankedUpdated?.gamesPlayed).toBe(1);
     expect(unrankedUpdated?.gamesLost).toBe(1);
     expect(unrankedUpdated?.eloRating).toBe(user2.eloRating);
+  });
+
+  it('preserves immutable initial ratings in computeRankedGameEloResult', async () => {
+    const creator = { id: 'p_auth_1', username: 'PlayerOne', elo: 1400, gamesPlayed: 20 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isRanked: true,
+      creator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: 'p_auth_2', username: 'PlayerTwo', elo: 1250, gamesPlayed: 5 });
+
+    let currentGame: GameRoom | null = null;
+    const unsub = subscribeToGame(gameId, (g) => {
+      currentGame = g;
+    });
+
+    expect(currentGame).not.toBeNull();
+    const eloResult = computeRankedGameEloResult(currentGame!, 'blue');
+    expect(eloResult).not.toBeNull();
+    expect(eloResult?.initialBlueElo).toBe(1400);
+    expect(eloResult?.initialGreenElo).toBe(1250);
+    expect(eloResult?.blueDelta).toBeGreaterThan(0);
+    expect(eloResult?.greenDelta).toBeLessThan(0);
+    expect(eloResult?.newBlueElo).toBe(1400 + eloResult!.blueDelta);
+    unsub();
+  });
+
+  it('symmetrically updates both winner and loser in ranked game resolution', async () => {
+    const userA = await registerUser('player_a@example.com', 'password123', 'PlayerA');
+    const userB = await registerUser('player_b@example.com', 'password123', 'PlayerB');
+
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isRanked: true,
+      creator: { id: userA.id, username: userA.username, elo: userA.eloRating, gamesPlayed: userA.gamesPlayed },
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: userB.id, username: userB.username, elo: userB.eloRating, gamesPlayed: userB.gamesPlayed });
+
+    // Blue player resigns -> Green player (userB) wins
+    await resignGameAction(gameId, 'blue');
+
+    const updatedUserA = localBackend.getUserById(userA.id);
+    const updatedUserB = localBackend.getUserById(userB.id);
+
+    expect(updatedUserA).not.toBeNull();
+    expect(updatedUserB).not.toBeNull();
+    expect(updatedUserA!.gamesPlayed).toBe(1);
+    expect(updatedUserA!.gamesLost).toBe(1);
+    expect(updatedUserA!.eloRating).toBeLessThan(userA.eloRating);
+
+    expect(updatedUserB!.gamesPlayed).toBe(1);
+    expect(updatedUserB!.gamesWon).toBe(1);
+    expect(updatedUserB!.eloRating).toBeGreaterThan(userB.eloRating);
+  });
+
+  it('reconciles pending Elo for a user whose game ended without processed rating', async () => {
+    const userA = await registerUser('player_c@example.com', 'password123', 'PlayerC');
+    const userB = await registerUser('player_d@example.com', 'password123', 'PlayerD');
+
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isRanked: true,
+      creator: { id: userA.id, username: userA.username, elo: userA.eloRating, gamesPlayed: userA.gamesPlayed },
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: userB.id, username: userB.username, elo: userB.eloRating, gamesPlayed: userB.gamesPlayed });
+
+    // Mark game completed in mockStore where userB won but only userA was marked processed
+    const game = mockStore.get(gameId);
+    expect(game).not.toBeNull();
+    if (game) {
+      game.status = 'completed';
+      game.winner = 'green';
+      game.processedEloUserIds = [userA.id];
+      mockStore.set(game);
+    }
+
+    // Run reconciliation
+    const reconciled = await reconcilePendingElo(userB.id);
+
+    expect(reconciled).not.toBeNull();
+    expect(reconciled!.gamesPlayed).toBe(1);
+    expect(reconciled!.gamesWon).toBe(1);
+    expect(reconciled!.eloRating).toBeGreaterThan(userB.eloRating);
   });
 });
 

@@ -37,6 +37,7 @@ import {
   createGame,
   joinGame,
   findOpenWaitingGame,
+  reconcilePendingElo,
 } from './services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
 import { safeSetItem } from './services/storage/storageCleanup';
@@ -96,6 +97,21 @@ const MainApp: React.FC = () => {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
+
+  // Reconcile any unapplied completed ranked games for the authenticated user
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    reconcilePendingElo(userId)
+      .then((updatedProfile) => {
+        if (updatedProfile) {
+          refreshUser(updatedProfile);
+        }
+      })
+      .catch((err) => {
+        console.warn('Background elo reconciliation failed:', err);
+      });
+  }, [userId, refreshUser]);
 
   // Note: Stale/abandoned room cleanup is handled passively on-demand or via backend TTL policies,
   // preventing tens of thousands of redundant client sweep queries across active browser tabs.

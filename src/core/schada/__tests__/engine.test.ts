@@ -6,6 +6,9 @@ import {
   executeMove,
   createEmptyBoard,
   isSquareAttacked,
+  isMutualShuffling,
+  areNonGoalHighPiecesBlocked,
+  isPieceObstructedByEnemy,
 } from '../engine';
 import { calculateScoreBreakdown, evaluateGameResult } from '../scoring';
 import { SCHADA_VECTORS, squareToColRow, colRowToSquare } from '../vectors';
@@ -424,6 +427,233 @@ describe('Schada Game Engine', () => {
 
       // Officer cannot jump enemy blocker
       expect(isSquareAttacked(board, 'a3', 'blue')).toBe(false);
+    });
+  });
+
+  describe('Historical Win Conditions Alignment', () => {
+    it('ends the game immediately with elimination when opponent has all pieces captured (0 legal moves)', () => {
+      const board = createEmptyBoard();
+
+      // Blue has 1 Field Officer on a1 targeting b1 (vector [1, 0])
+      board['a1'] = {
+        id: 'blue_fo',
+        type: 'field_officer',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+
+      // Green has only 1 piece left (pawn on b1)
+      board['b1'] = {
+        id: 'green_pawn',
+        type: 'pawn',
+        color: 'green',
+        hasLeftBase: true,
+        hasReachedGoal: false,
+      };
+
+      const state = {
+        board,
+        currentTurn: 'blue' as const,
+        moveHistory: [],
+        capturedPieces: { blue: [], green: [] },
+        positionHistory: ['initial'],
+        isGameOver: false,
+        result: null,
+      };
+
+      // Move a1 -> b1 (capturing green_pawn)
+      const moves = getLegalMovesForSquare(board, 'a1');
+      const captureMove = moves.find((m) => m.to === 'b1')!;
+      expect(captureMove).toBeDefined();
+
+      const nextState = executeMove(state, captureMove);
+
+      expect(nextState.isGameOver).toBe(true);
+      expect(nextState.result?.winReason).toBe('elimination');
+      expect(nextState.result?.winner).toBe('blue');
+    });
+
+    it('ends the game immediately with elimination when next player is completely immobilized', () => {
+      const board = createEmptyBoard();
+
+      // Blue has a piece on b1 (targeting a1 via vector [-1, 0])
+      board['b1'] = {
+        id: 'blue_mover',
+        type: 'pawn',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+
+      // Green has only 1 piece on b8: Officer with hasLeftBase=true
+      // On b8: vectors are [1, 0] -> c8, [-1, 0] -> a8, [0, -2] -> b6 via b7.
+      // Because hasLeftBase is true, lateral moves to rank 8 (c8, a8) are forbidden!
+      board['b8'] = {
+        id: 'green_officer',
+        type: 'officer',
+        color: 'green',
+        hasLeftBase: true,
+        hasReachedGoal: false,
+      };
+
+      // Place Blue piece on b7 to block intermediate square for [0, -2]
+      board['b7'] = {
+        id: 'blue_blocker_b7',
+        type: 'pawn',
+        color: 'blue',
+        hasLeftBase: true,
+        hasReachedGoal: false,
+      };
+
+      const state = {
+        board,
+        currentTurn: 'blue' as const,
+        moveHistory: [],
+        capturedPieces: { blue: [], green: [] },
+        positionHistory: ['initial'],
+        isGameOver: false,
+        result: null,
+      };
+
+      const blueMoves = getLegalMovesForSquare(board, 'b1');
+      const move = blueMoves.find((m) => m.to === 'a1')!;
+      expect(move).toBeDefined();
+      const nextState = executeMove(state, move);
+
+      // Green has 0 legal moves
+      const greenMoves = getAllLegalMoves(nextState.board, 'green');
+      expect(greenMoves.length).toBe(0);
+
+      expect(nextState.isGameOver).toBe(true);
+      expect(nextState.result?.winReason).toBe('elimination');
+    });
+
+    it('triggers goal_reached passively when opponent captures the last outside high piece', () => {
+      const board = createEmptyBoard();
+
+      // Green has 1 Field Officer already safely on goal line (rank 1, e.g. h1)
+      board['h1'] = {
+        id: 'green_fo_goal',
+        type: 'field_officer',
+        color: 'green',
+        hasLeftBase: true,
+        hasReachedGoal: true,
+      };
+
+      // Green has 1 Officer outside goal on a3 (Rank 3 is outside Green's goal line Rank 1)
+      board['a3'] = {
+        id: 'green_o_outside',
+        type: 'officer',
+        color: 'green',
+        hasLeftBase: true,
+        hasReachedGoal: false,
+      };
+
+      // Blue has Field Officer on a1 targeting a3 (vector [0, 2] via a2)
+      board['a1'] = {
+        id: 'blue_fo',
+        type: 'field_officer',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+
+      const state = {
+        board,
+        currentTurn: 'blue' as const,
+        moveHistory: [],
+        capturedPieces: { blue: [], green: [] },
+        positionHistory: ['initial'],
+        isGameOver: false,
+        result: null,
+      };
+
+      const blueMoves = getLegalMovesForSquare(board, 'a1');
+      const captureMove = blueMoves.find((m) => m.to === 'a3')!;
+      expect(captureMove).toBeDefined();
+
+      // Blue captures Green's outside piece on a3.
+      // Now Green's remaining high pieces are ALL on the goal line (h1)!
+      const nextState = executeMove(state, captureMove);
+
+      expect(nextState.isGameOver).toBe(true);
+      expect(nextState.result?.winReason).toBe('goal_reached');
+      // Green has 2 goal points, Blue has 0 goal points -> Green wins!
+      expect(nextState.result?.winner).toBe('green');
+    });
+
+    it('triggers mutual_shuffle when both players make 6 consecutive high-piece lateral moves in base/goal lines', () => {
+      // We simulate 6 consecutive lateral moves by high pieces on Rank 1 (blue base) and Rank 8 (green base)
+      // Rank 1 vectors: lateral moves like a1<->b1 are not available directly unless vectors permit,
+      // so let's set up a clean board where Blue FO on a1 moves to c1 and Green FO on b8 moves to d8
+      const board = createEmptyBoard();
+      board['a1'] = {
+        id: 'b_fo1',
+        type: 'field_officer',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+      board['b8'] = {
+        id: 'g_fo1',
+        type: 'field_officer',
+        color: 'green',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+
+      // Let's create dummy lateral moves within Rank 1 and Rank 8
+      const moves: any[] = [
+        { from: 'a1', to: 'c1', piece: { ...board['a1'] }, intermediateSquares: [], notation: 'FOa1-c1' },
+        { from: 'b8', to: 'd8', piece: { ...board['b8'] }, intermediateSquares: [], notation: 'FOb8-d8' },
+        { from: 'c1', to: 'a1', piece: { ...board['a1'] }, intermediateSquares: [], notation: 'FOc1-a1' },
+        { from: 'd8', to: 'b8', piece: { ...board['b8'] }, intermediateSquares: [], notation: 'FOd8-b8' },
+        { from: 'a1', to: 'c1', piece: { ...board['a1'] }, intermediateSquares: [], notation: 'FOa1-c1' },
+        { from: 'b8', to: 'd8', piece: { ...board['b8'] }, intermediateSquares: [], notation: 'FOb8-d8' },
+      ];
+
+      expect(isMutualShuffling(moves.slice(0, 5))).toBe(false);
+      expect(isMutualShuffling(moves)).toBe(true);
+    });
+
+    it('requires enemy pieces to obstruct high pieces to trigger the blocked condition', () => {
+      const board = createEmptyBoard();
+
+      // Blue officer on a1 (vector [0, 2] -> a3 via a2)
+      board['a1'] = {
+        id: 'blue_o',
+        type: 'officer',
+        color: 'blue',
+        hasLeftBase: true,
+        hasReachedGoal: false,
+      };
+
+      // Blocked solely by a friendly pawn on a2
+      board['a2'] = {
+        id: 'blue_pawn',
+        type: 'pawn',
+        color: 'blue',
+        hasLeftBase: true,
+        hasReachedGoal: false,
+      };
+
+      // Should NOT be blocked because obstruction is purely friendly
+      expect(areNonGoalHighPiecesBlocked(board, 'blue')).toBe(false);
+      expect(isPieceObstructedByEnemy(board, 'a1')).toBe(false);
+
+      // Now change the blocker on a2 to an enemy green pawn
+      board['a2'] = {
+        id: 'green_pawn',
+        type: 'pawn',
+        color: 'green',
+        hasLeftBase: true,
+        hasReachedGoal: false,
+      };
+
+      // Officer on a1 cannot jump enemy pawn on a2, so path to a3 is blocked by enemy
+      expect(isPieceObstructedByEnemy(board, 'a1')).toBe(true);
+      expect(areNonGoalHighPiecesBlocked(board, 'blue')).toBe(true);
     });
   });
 });

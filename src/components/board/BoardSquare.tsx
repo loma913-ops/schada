@@ -35,12 +35,16 @@ export const BoardSquare: React.FC<BoardSquareProps> = memo(({
   const goalRank = piece?.color === 'blue' ? 7 : 0;
   const isInvulnerableInGoal = isHighPiece && row === goalRank;
 
+  const handleClick = React.useCallback(() => {
+    onClick(square);
+  }, [onClick, square]);
+
   return (
     <div
       className={`board-square ${isLight ? 'light' : 'dark'} ${isSelected ? 'selected' : ''} ${
         isLastMove ? 'last-move' : ''
       }`}
-      onClick={() => onClick(square)}
+      onClick={handleClick}
       data-square={square}
     >
       {/* Background vector indicators */}

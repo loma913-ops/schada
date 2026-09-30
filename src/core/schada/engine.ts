@@ -10,6 +10,7 @@ import type {
 import { colRowToSquare, SCHADA_VECTORS, squareToColRow } from './vectors';
 import { evaluateGameResult } from './scoring';
 import { formatMoveNotation } from './notation';
+import { SCHADA_RULES_CONFIG } from './rulesConfig';
 
 export function createEmptyBoard(): BoardMatrix {
   const matrix: Partial<BoardMatrix> = {};
@@ -303,12 +304,83 @@ export function haveAllRemainingHighPiecesReachedGoal(board: BoardMatrix, color:
 }
 
 /**
+ * Checks if any vector movement from a square is obstructed by an enemy piece
+ * (either on an intermediate square or an invulnerable enemy high piece on the goal line).
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(V * P) where V is the maximum number of directional vectors from
+ *   the square (V <= 3) and P is the maximum path length (P <= 3).
+ *   For the fixed 64-square Schada board, this executes in O(1) constant time.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant, perfectly stable regardless of match length.
+ */
+export function isPieceObstructedByEnemy(board: BoardMatrix, square: Square): boolean {
+  const piece = board[square];
+  if (!piece) return false;
+
+  const [col, row] = squareToColRow(square);
+  const color = piece.color;
+  const vectors = SCHADA_VECTORS[square] || [];
+
+  for (const vector of vectors) {
+    const destCol = col + vector.target[0];
+    const destRow = row + vector.target[1];
+
+    if (destCol < 0 || destCol > 7 || destRow < 0 || destRow > 7) {
+      continue;
+    }
+
+    // Check intermediate path
+    for (const [stepDc, stepDr] of vector.path) {
+      const stepSq = colRowToSquare(col + stepDc, row + stepDr);
+      if (!stepSq) continue;
+      const occupant = board[stepSq];
+      if (occupant && occupant.color !== color) {
+        return true; // Enemy piece is obstructing the path
+      }
+    }
+
+    // Check destination square
+    const destSquare = colRowToSquare(destCol, destRow);
+    if (!destSquare) continue;
+    const destPiece = board[destSquare];
+    if (destPiece && destPiece.color !== color) {
+      // Enemy high piece in goal line cannot be captured, obstructing landing
+      const enemyGoalRank = destPiece.color === 'blue' ? 7 : 0;
+      if (
+        (destPiece.type === 'field_officer' || destPiece.type === 'officer') &&
+        destRow === enemyGoalRank
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Checks if a player has any non-goal high pieces that can move, or if they are blocked by enemy pieces.
+ * Per historical rules commentary, obstruction by friendly pieces does not trigger game end.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(N) where N is the fixed number of squares on the board (N = 64).
+ *   Evaluates at most 8 high pieces per side; early exits upon detecting any legal move.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant, guaranteeing zero performance degradation across turns.
  */
 export function areNonGoalHighPiecesBlocked(board: BoardMatrix, color: PieceColor): boolean {
-  const goalRank = color === 'blue' ? 7 : 0;
+  const goalRank =
+    color === 'blue'
+      ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
   let nonGoalHighPiecesCount = 0;
   let hasAnyLegalHighPieceMove = false;
+  let hasEnemyObstruction = false;
 
   for (const [sq, piece] of Object.entries(board)) {
     if (piece && piece.color === color && (piece.type === 'field_officer' || piece.type === 'officer')) {
@@ -320,14 +392,75 @@ export function areNonGoalHighPiecesBlocked(board: BoardMatrix, color: PieceColo
           hasAnyLegalHighPieceMove = true;
           break;
         }
+        if (isPieceObstructedByEnemy(board, sq as Square)) {
+          hasEnemyObstruction = true;
+        }
       }
     }
   }
 
-  // If there are high pieces outside the goal, but NONE of them can make a move, they are blocked.
-  return nonGoalHighPiecesCount > 0 && !hasAnyLegalHighPieceMove;
+  // Blocked only if there are non-goal high pieces, NONE can move, and at least one is blocked by an enemy piece
+  return nonGoalHighPiecesCount > 0 && !hasAnyLegalHighPieceMove && hasEnemyObstruction;
 }
 
+/**
+ * Detects if both players have engaged in mutual shuffling of high pieces
+ * back and forth within their base line or goal line for the threshold number of half-moves.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(K) where K is the mutual shuffle threshold (K = 6).
+ *   Since K is constant, execution completes in O(1) constant time.
+ * - Auxiliary Space Complexity: O(K) for slicing the last K history entries.
+ *
+ * Growth Rate:
+ * - O(1) constant, fully independent of the total move count of the game.
+ */
+export function isMutualShuffling(
+  moveHistory: Move[],
+  threshold = SCHADA_RULES_CONFIG.endConditions.mutualShuffleHalfMovesThreshold
+): boolean {
+  if (!Array.isArray(moveHistory) || moveHistory.length < threshold) return false;
+  const recentMoves = moveHistory.slice(-threshold);
+
+  for (const m of recentMoves) {
+    const isHighPiece = m.piece.type === 'field_officer' || m.piece.type === 'officer';
+    if (!isHighPiece) return false;
+
+    const [, fromRow] = squareToColRow(m.from);
+    const [, toRow] = squareToColRow(m.to);
+    const baseRank =
+      m.piece.color === 'blue'
+        ? SCHADA_RULES_CONFIG.board.blueBaseRankIndex
+        : SCHADA_RULES_CONFIG.board.greenBaseRankIndex;
+    const goalRank =
+      m.piece.color === 'blue'
+        ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
+        : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+
+    const isWithinBase = fromRow === baseRank && toRow === baseRank;
+    const isWithinGoal = fromRow === goalRank && toRow === goalRank;
+
+    if (!isWithinBase && !isWithinGoal) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Executes a validated move on the board, updating piece position, tracking captures,
+ * updating base/goal state flags, and evaluating all terminal win/end conditions.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(N + H) where N = 64 (board scanning for legal moves and end checks)
+ *   and H is the number of moves in positionHistory (for repetition counting).
+ *   Since N is constant and H is at most a few hundred plies, execution is instantaneous.
+ * - Auxiliary Space Complexity: O(1) auxiliary space beyond the new immutable state references.
+ *
+ * Growth Rate:
+ * - O(H) linear with respect to match length, fully sustainable for indefinitely long matches.
+ */
 export function executeMove(state: BoardState, move: Move): BoardState {
   if (state.isGameOver) return state;
 
@@ -353,8 +486,14 @@ export function executeMove(state: BoardState, move: Move): BoardState {
 
   // Update piece attributes
   const [, destRow] = squareToColRow(move.to);
-  const baseRank = currentPiece.color === 'blue' ? 0 : 7;
-  const goalRank = currentPiece.color === 'blue' ? 7 : 0;
+  const baseRank =
+    currentPiece.color === 'blue'
+      ? SCHADA_RULES_CONFIG.board.blueBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.greenBaseRankIndex;
+  const goalRank =
+    currentPiece.color === 'blue'
+      ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
 
   if (destRow !== baseRank) {
     currentPiece.hasLeftBase = true;
@@ -369,27 +508,46 @@ export function executeMove(state: BoardState, move: Move): BoardState {
   const nextTurn: PieceColor = state.currentTurn === 'blue' ? 'green' : 'blue';
   const newPositionHash = generatePositionHash(newBoard, nextTurn);
   const newPositionHistory = [...state.positionHistory, newPositionHash];
+  const newMoveHistory = [...state.moveHistory, move];
 
   // Check end conditions:
   let isGameOver = false;
   let result: GameResult | null = null;
 
-  // 1. Goal reached: If all remaining high pieces of current mover are in goal line
-  if (haveAllRemainingHighPiecesReachedGoal(newBoard, state.currentTurn)) {
+  // 1. Goal reached: If all remaining high pieces of EITHER player have reached their goal line
+  if (
+    haveAllRemainingHighPiecesReachedGoal(newBoard, 'blue') ||
+    haveAllRemainingHighPiecesReachedGoal(newBoard, 'green')
+  ) {
     isGameOver = true;
     result = evaluateGameResult(newBoard, 'goal_reached');
   }
 
-  // 2. Repetition: 3-fold repetition of the same board position
+  // 2. Elimination / No legal moves: Next player has 0 legal moves (all pieces captured or immobilized)
+  if (!isGameOver) {
+    const nextPlayerMoves = getAllLegalMoves(newBoard, nextTurn);
+    if (nextPlayerMoves.length === 0) {
+      isGameOver = true;
+      result = evaluateGameResult(newBoard, 'elimination');
+    }
+  }
+
+  // 3. Repetition: N-fold repetition of the same board position
   if (!isGameOver) {
     const occurrences = newPositionHistory.filter((h) => h === newPositionHash).length;
-    if (occurrences >= 3) {
+    if (occurrences >= SCHADA_RULES_CONFIG.endConditions.threefoldRepetitionThreshold) {
       isGameOver = true;
       result = evaluateGameResult(newBoard, 'repetition');
     }
   }
 
-  // 3. Blocked: Next player's high pieces outside goal cannot move
+  // 4. Mutual Shuffling: consecutive lateral moves by high pieces within base/goal lines
+  if (!isGameOver && isMutualShuffling(newMoveHistory)) {
+    isGameOver = true;
+    result = evaluateGameResult(newBoard, 'mutual_shuffle');
+  }
+
+  // 5. Blocked: Next player's high pieces outside goal cannot move due to enemy obstruction
   if (!isGameOver && areNonGoalHighPiecesBlocked(newBoard, nextTurn)) {
     isGameOver = true;
     result = evaluateGameResult(newBoard, 'blocked');
@@ -398,7 +556,7 @@ export function executeMove(state: BoardState, move: Move): BoardState {
   return {
     board: newBoard,
     currentTurn: nextTurn,
-    moveHistory: [...state.moveHistory, move],
+    moveHistory: newMoveHistory,
     capturedPieces: newCaptured,
     positionHistory: newPositionHistory,
     isGameOver,

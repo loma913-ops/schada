@@ -94,6 +94,7 @@ export function validateGameOverModalConfig(config: GameOverModalConfig): void {
 
   const requiredWinReasons: WinReason[] = [
     'goal_reached',
+    'elimination',
     'timeout',
     'resignation',
     'repetition',
@@ -130,6 +131,7 @@ export const GAME_OVER_MODAL_CONFIG: GameOverModalConfig = {
     closeButtonAriaLabel: 'Close game over modal',
     winReasons: {
       goal_reached: 'All remaining high pieces reached the goal line',
+      elimination: 'Opponent has no legal moves remaining (eliminated / immobilized)',
       timeout: 'Victory on time',
       resignation: 'Opponent resigned',
       repetition: 'Draw by 3-fold repetition',

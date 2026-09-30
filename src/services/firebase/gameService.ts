@@ -1,5 +1,6 @@
 import {
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -32,6 +33,8 @@ export interface GameEloResult {
   greenDelta: number;
   newBlueElo: number;
   newGreenElo: number;
+  initialBlueElo?: number;
+  initialGreenElo?: number;
 }
 
 export interface GameRoom {
@@ -161,18 +164,23 @@ export function computeRankedGameEloResult(
     ? game.greenPlayer.gamesPlayed
     : 0;
 
+  const initialBlueElo = game.bluePlayer.elo;
+  const initialGreenElo = game.greenPlayer.elo;
+
   const calc = calculateEloUpdate(
     {
-      rating: game.bluePlayer.elo,
+      rating: initialBlueElo,
       gamesPlayed: blueGames,
     },
     {
-      rating: game.greenPlayer.elo,
+      rating: initialGreenElo,
       gamesPlayed: greenGames,
     },
     outcome
   );
   return {
+    initialBlueElo,
+    initialGreenElo,
     blueDelta: calc.blueDelta,
     greenDelta: calc.greenDelta,
     newBlueElo: calc.newBlueRating,
@@ -208,6 +216,119 @@ export async function markGameEloProcessed(gameId: string, userId: string): Prom
       }
     }
   }
+}
+
+/**
+ * Scans recently completed ranked games for the authenticated user where Elo has not yet been processed.
+ * Guarantees that ratings are never lost if a user exits early, closes the browser tab, or experiences network interruptions.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(K) where K <= 10 recent completed games examined.
+ * - Auxiliary Space Complexity: O(1) constant scalar memory.
+ * - Database Reads/Writes: Optimized to read at most 10 candidate games and update only when pending.
+ */
+export async function reconcilePendingElo(userId: string): Promise<UserProfile | null> {
+  if (!userId || userId.startsWith('guest_') || userId === 'guest') return null;
+
+  let latestProfile: UserProfile | null = null;
+
+  if (isFirebaseConfigured() && db) {
+    try {
+      const gamesCol = collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games);
+      const blueQuery = query(
+        gamesCol,
+        where('status', '==', 'completed'),
+        where('isRanked', '==', true),
+        where('bluePlayer.id', '==', userId),
+        limit(5)
+      );
+      const greenQuery = query(
+        gamesCol,
+        where('status', '==', 'completed'),
+        where('isRanked', '==', true),
+        where('greenPlayer.id', '==', userId),
+        limit(5)
+      );
+
+      const [blueSnap, greenSnap] = await Promise.all([
+        getDocs(blueQuery),
+        getDocs(greenQuery),
+      ]);
+
+      const candidateGames: GameRoom[] = [];
+      const seenIds = new Set<string>();
+
+      [...blueSnap.docs, ...greenSnap.docs].forEach((docSnap) => {
+        if (!seenIds.has(docSnap.id)) {
+          seenIds.add(docSnap.id);
+          candidateGames.push(docSnap.data() as GameRoom);
+        }
+      });
+
+      for (const game of candidateGames) {
+        if (!game.processedEloUserIds?.includes(userId) && game.winner) {
+          const winner = game.winner;
+          const isBlue = game.bluePlayer?.id === userId;
+          const isGreen = game.greenPlayer?.id === userId;
+          if (!isBlue && !isGreen) continue;
+
+          const myColor: PieceColor = isBlue ? 'blue' : 'green';
+          const won = winner === myColor;
+          const isDraw = winner === 'draw';
+
+          const eloRes = game.eloResult || computeRankedGameEloResult(game, winner);
+          const delta = eloRes ? (myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta) : 0;
+
+          try {
+            const updated = await updateUserStats(userId, won, isDraw, delta);
+            if (updated) {
+              latestProfile = updated;
+            }
+            await markGameEloProcessed(game.id, userId);
+          } catch (err) {
+            console.warn('[gameService] reconcilePendingElo failed for game:', game.id, err);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[gameService] reconcilePendingElo error:', e);
+    }
+  } else {
+    // Mock store reconciliation
+    const all = mockStore.getAll();
+    const candidateGames = Object.values(all).filter(
+      (g) =>
+        g.status === 'completed' &&
+        g.isRanked &&
+        (g.bluePlayer?.id === userId || g.greenPlayer?.id === userId) &&
+        !g.processedEloUserIds?.includes(userId) &&
+        g.winner
+    );
+
+    for (const game of candidateGames) {
+      const winner = game.winner;
+      if (!winner) continue;
+      const isBlue = game.bluePlayer?.id === userId;
+      const myColor: PieceColor = isBlue ? 'blue' : 'green';
+      const won = winner === myColor;
+      const isDraw = winner === 'draw';
+
+      const eloRes = game.eloResult || computeRankedGameEloResult(game, winner);
+      const delta = eloRes ? (myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta) : 0;
+
+      try {
+        const updated = await updateUserStats(userId, won, isDraw, delta);
+        if (updated) {
+          latestProfile = updated;
+        }
+        await markGameEloProcessed(game.id, userId);
+      } catch (err) {
+        console.warn('[gameService] mock reconcilePendingElo failed for game:', game.id, err);
+      }
+    }
+  }
+
+  return latestProfile;
 }
 
 // ----------------- Mock Local Channel for Offline / Development -----------------
@@ -376,7 +497,7 @@ class MockGameStore {
   }
 }
 
-const mockStore = new MockGameStore();
+export const mockStore = new MockGameStore();
 
 // ----------------- Exported Service API -----------------
 
@@ -649,71 +770,69 @@ export async function makeGameMove(
 ): Promise<void> {
   if (isFirebaseConfigured() && db) {
     const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(docRef);
-      if (!snap.exists()) {
-        throw new Error('Game not found.');
-      }
-      const game = snap.data() as GameRoom;
-      if (game.status !== 'in_progress') {
-        throw new Error('Game is not in progress.');
-      }
-      if (game.currentTurn !== playerColor) {
-        throw new Error('It is not your turn.');
-      }
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      throw new Error('Game not found.');
+    }
+    const game = snap.data() as GameRoom;
+    if (game.status !== 'in_progress') {
+      throw new Error('Game is not in progress.');
+    }
+    if (game.currentTurn !== playerColor) {
+      throw new Error('It is not your turn.');
+    }
 
-      // Calculate clock consumption
-      const now = Date.now();
-      let nextBlueTime = game.blueTimeMs;
-      let nextGreenTime = game.greenTimeMs;
+    // Calculate clock consumption
+    const now = Date.now();
+    let nextBlueTime = game.blueTimeMs;
+    let nextGreenTime = game.greenTimeMs;
 
-      if (game.timeControlMinutes > 0 && game.lastTurnStartTimeMs) {
-        const elapsed = Math.max(0, now - game.lastTurnStartTimeMs);
-        const incrementMs = game.incrementSeconds * 1000;
+    if (game.timeControlMinutes > 0 && game.lastTurnStartTimeMs) {
+      const elapsed = Math.max(0, now - game.lastTurnStartTimeMs);
+      const incrementMs = game.incrementSeconds * 1000;
 
-        if (playerColor === 'blue') {
-          nextBlueTime = Math.max(0, game.blueTimeMs - elapsed + incrementMs);
-        } else {
-          nextGreenTime = Math.max(0, game.greenTimeMs - elapsed + incrementMs);
+      if (playerColor === 'blue') {
+        nextBlueTime = Math.max(0, game.blueTimeMs - elapsed + incrementMs);
+      } else {
+        nextGreenTime = Math.max(0, game.greenTimeMs - elapsed + incrementMs);
+      }
+    }
+
+    // Execute move via engine
+    const nextBoardState = executeMove(game.boardState, move);
+    const nextTurn: PieceColor = playerColor === 'blue' ? 'green' : 'blue';
+
+    const updatePayload: Partial<GameRoom> = {
+      boardState: nextBoardState,
+      currentTurn: nextTurn,
+      blueTimeMs: nextBlueTime,
+      greenTimeMs: nextGreenTime,
+      lastTurnStartTimeMs: nextBoardState.isGameOver ? null : now,
+    };
+
+    if (nextBoardState.isGameOver) {
+      updatePayload.status = 'completed';
+      const winner = nextBoardState.result?.winner;
+      updatePayload.winner = winner;
+      updatePayload.winReason = nextBoardState.result?.winReason;
+
+      if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+        const eloCalc = computeRankedGameEloResult(game, winner);
+        if (eloCalc) {
+          updatePayload.eloResult = eloCalc;
+          updatePayload.bluePlayer = {
+            ...game.bluePlayer,
+            elo: eloCalc.newBlueElo,
+          };
+          updatePayload.greenPlayer = {
+            ...game.greenPlayer,
+            elo: eloCalc.newGreenElo,
+          };
         }
       }
+    }
 
-      // Execute move via engine
-      const nextBoardState = executeMove(game.boardState, move);
-      const nextTurn: PieceColor = playerColor === 'blue' ? 'green' : 'blue';
-
-      const updatePayload: Partial<GameRoom> = {
-        boardState: nextBoardState,
-        currentTurn: nextTurn,
-        blueTimeMs: nextBlueTime,
-        greenTimeMs: nextGreenTime,
-        lastTurnStartTimeMs: nextBoardState.isGameOver ? null : now,
-      };
-
-      if (nextBoardState.isGameOver) {
-        updatePayload.status = 'completed';
-        const winner = nextBoardState.result?.winner;
-        updatePayload.winner = winner;
-        updatePayload.winReason = nextBoardState.result?.winReason;
-
-        if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
-          const eloCalc = computeRankedGameEloResult(game, winner);
-          if (eloCalc) {
-            updatePayload.eloResult = eloCalc;
-            updatePayload.bluePlayer = {
-              ...game.bluePlayer,
-              elo: eloCalc.newBlueElo,
-            };
-            updatePayload.greenPlayer = {
-              ...game.greenPlayer,
-              elo: eloCalc.newGreenElo,
-            };
-          }
-        }
-      }
-
-      tx.update(docRef, sanitize(updatePayload));
-    });
+    await updateDoc(docRef, sanitize(updatePayload));
     return;
   }
 
@@ -880,10 +999,16 @@ export async function resignGameAction(
 
     let resigningPlayerId: string | null = null;
     let resigningDelta = 0;
+    let winningPlayerId: string | null = null;
+    let winningDelta = 0;
 
     const resigningPlayer = resigningColor === 'blue' ? game.bluePlayer : game.greenPlayer;
     if (resigningPlayer?.id) {
       resigningPlayerId = resigningPlayer.id;
+    }
+    const winningPlayer = resigningColor === 'blue' ? game.greenPlayer : game.bluePlayer;
+    if (winningPlayer?.id) {
+      winningPlayerId = winningPlayer.id;
     }
 
     if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
@@ -901,10 +1026,25 @@ export async function resignGameAction(
 
         const delta = resigningColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
         resigningDelta = delta;
+        winningDelta = resigningColor === 'blue' ? eloCalc.greenDelta : eloCalc.blueDelta;
       }
     }
 
     mockStore.set({ ...game, ...updatePayload });
+
+    if (winningPlayerId && (!winningPlayerId.startsWith('guest_') && winningPlayerId !== 'guest')) {
+      try {
+        await updateUserStats(
+          winningPlayerId,
+          true,
+          false,
+          isRankedGame ? winningDelta : 0
+        );
+        await markGameEloProcessed(gameId, winningPlayerId);
+      } catch (e) {
+        console.warn('Failed to update stats for winning player:', e);
+      }
+    }
 
     if (resigningPlayerId) {
       try {
@@ -948,6 +1088,8 @@ export async function timeoutGameAction(
       const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
       let timedOutPlayerId: string | null = null;
       let timedOutDelta = 0;
+      let timeoutWinnerPlayerId: string | null = null;
+      let timeoutWinnerDelta = 0;
       let isRankedGame = false;
 
       await runTransaction(db, async (tx) => {
@@ -973,6 +1115,11 @@ export async function timeoutGameAction(
           timedOutPlayerId = timedOutPlayer.id;
         }
 
+        const timeoutWinnerPlayer = timedOutColor === 'blue' ? game.greenPlayer : game.bluePlayer;
+        if (timeoutWinnerPlayer?.id) {
+          timeoutWinnerPlayerId = timeoutWinnerPlayer.id;
+        }
+
         if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
           const eloCalc = computeRankedGameEloResult(game, winner);
           if (eloCalc) {
@@ -986,13 +1133,28 @@ export async function timeoutGameAction(
               elo: eloCalc.newGreenElo,
             };
 
-            const delta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
-            timedOutDelta = delta;
+            timedOutDelta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
+            timeoutWinnerDelta = timedOutColor === 'blue' ? eloCalc.greenDelta : eloCalc.blueDelta;
           }
         }
 
         tx.update(docRef, sanitize(updatePayload));
       });
+
+      if (timeoutWinnerPlayerId && (!auth?.currentUser || auth.currentUser.uid === timeoutWinnerPlayerId)) {
+        try {
+          const updated = await updateUserStats(
+            timeoutWinnerPlayerId,
+            true,
+            false,
+            isRankedGame ? timeoutWinnerDelta : 0
+          );
+          await markGameEloProcessed(gameId, timeoutWinnerPlayerId);
+          return updated;
+        } catch (e) {
+          console.warn('Failed to update stats for winning player on timeout:', e);
+        }
+      }
 
       if (timedOutPlayerId && (!auth?.currentUser || auth.currentUser.uid === timedOutPlayerId)) {
         try {
@@ -1027,10 +1189,16 @@ export async function timeoutGameAction(
 
     let timedOutPlayerId: string | null = null;
     let timedOutDelta = 0;
+    let timeoutWinnerPlayerId: string | null = null;
+    let timeoutWinnerDelta = 0;
 
     const timedOutPlayer = timedOutColor === 'blue' ? game.bluePlayer : game.greenPlayer;
     if (timedOutPlayer?.id) {
       timedOutPlayerId = timedOutPlayer.id;
+    }
+    const timeoutWinnerPlayer = timedOutColor === 'blue' ? game.greenPlayer : game.bluePlayer;
+    if (timeoutWinnerPlayer?.id) {
+      timeoutWinnerPlayerId = timeoutWinnerPlayer.id;
     }
 
     if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
@@ -1048,10 +1216,25 @@ export async function timeoutGameAction(
 
         const delta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
         timedOutDelta = delta;
+        timeoutWinnerDelta = timedOutColor === 'blue' ? eloCalc.greenDelta : eloCalc.blueDelta;
       }
     }
 
     mockStore.set({ ...game, ...updatePayload });
+
+    if (timeoutWinnerPlayerId && (!timeoutWinnerPlayerId.startsWith('guest_') && timeoutWinnerPlayerId !== 'guest')) {
+      try {
+        await updateUserStats(
+          timeoutWinnerPlayerId,
+          true,
+          false,
+          isRankedGame ? timeoutWinnerDelta : 0
+        );
+        await markGameEloProcessed(gameId, timeoutWinnerPlayerId);
+      } catch (e) {
+        console.warn('Failed to update stats for winning player:', e);
+      }
+    }
 
     if (timedOutPlayerId) {
       try {

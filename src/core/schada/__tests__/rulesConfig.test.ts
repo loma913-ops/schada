@@ -60,4 +60,17 @@ describe('SCHADA_RULES_CONFIG', () => {
       /Invalid board dimensions/
     );
   });
+
+  it('throws descriptive error if end conditions are invalid or missing', () => {
+    const invalidEndConfig: SchadaRulesConfig = {
+      ...SCHADA_RULES_CONFIG,
+      endConditions: {
+        threefoldRepetitionThreshold: 2, // invalid
+        mutualShuffleHalfMovesThreshold: 6,
+      },
+    };
+    expect(() => validateRulesConfig(invalidEndConfig)).toThrowError(
+      /Invalid end conditions/
+    );
+  });
 });

@@ -1,61 +1,103 @@
 /**
- * SoundService – Web Audio API + HTML5 Audio hybrid sound engine for Schada.
+ * SoundService – Web Audio API + MP3 Audio Engine for Schada.
  *
- * Provides guaranteed, zero-latency playback for moves and captures:
- * 1. Pre-decoded uncompressed PCM WAV buffers (zero-delay attack transient).
- * 2. Synchronous AudioContext resume on user gesture.
- * 3. Never drops sounds if AudioContext is transitioning/suspended; schedules immediately.
- * 4. Preloaded HTML5 Audio element fallback so audio never drops under any browser state.
+ * Guarantees zero-latency, cross-platform audio playback across desktop and mobile:
+ * 1. Background eager pre-fetching and decoding of MP3 audio buffers.
+ * 2. Unlocks and resumes AudioContext cleanly across desktop user activation gestures.
+ * 3. Never truncates sounds on suspended AudioContext; falls back immediately to HTML5 MP3 Audio playback.
+ * 4. Fresh HTML5 Audio playback avoids pool exhaustion and ended-state freezes in Chromium.
+ * 5. High-fidelity synthetic fallback ensures piece move and capture sounds always play audibly.
+ * 6. Automatically restores audio session when tabs become visible or active.
  */
 
-import { safeSetItem } from '../storage/storageCleanup';
+import { safeGetItem, safeSetItem } from '../storage/storageCleanup';
+import { SOUND_ASSET_PATHS } from './soundAssets';
 
-class SoundService {
+export class SoundService {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
   private moveBuffer: AudioBuffer | null = null;
   private captureBuffer: AudioBuffer | null = null;
   private isDecoding: boolean = false;
 
-  // Preloaded HTMLAudioElements for instant fallback
-  private moveAudioElement: HTMLAudioElement | null = null;
-  private captureAudioElement: HTMLAudioElement | null = null;
+  // Background ArrayBuffer pre-fetch promises
+  private moveArrayBufferPromise: Promise<ArrayBuffer | null> | null = null;
+  private captureArrayBufferPromise: Promise<ArrayBuffer | null> | null = null;
+
+  // Active audio elements for instant cleanup on mute
+  private activeAudios: Set<HTMLAudioElement> = new Set();
 
   // Sound deduplication timestamps
   private lastMoveSoundTime: number = 0;
+  private lastCaptureSoundTime: number = 0;
   private lastVictorySoundTime: number = 0;
 
   constructor() {
     if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem('schada_sound_muted');
+      const saved = safeGetItem('schada_sound_muted');
       this.isMuted = saved === 'true';
     }
 
     if (typeof window !== 'undefined') {
-      // Pre-instantiate audio elements from cached static assets
-      try {
-        this.moveAudioElement = new Audio('/sounds/move.mp3');
-        this.captureAudioElement = new Audio('/sounds/capture.mp3');
-        this.moveAudioElement.preload = 'auto';
-        this.captureAudioElement.preload = 'auto';
-      } catch {
-        // Audio elements not supported in this environment
-      }
+      // 1. Pre-fetch audio MP3 array buffers immediately into memory
+      this.startArrayBufferPrefetch();
 
-      // Eagerly initialize and resume AudioContext on user gestures
-      const handleUserGesture = () => {
+      // 2. Eagerly initialize and resume AudioContext on user gestures
+      const unlockAudio = () => {
         const ctx = this.ensureContext();
         if (ctx && ctx.state === 'suspended') {
           ctx.resume().catch(() => {});
         }
       };
 
-      window.addEventListener('pointerdown', handleUserGesture, { capture: true, passive: true });
-      window.addEventListener('keydown', handleUserGesture, { capture: true, passive: true });
-      window.addEventListener('click', handleUserGesture, { capture: true, passive: true });
+      const activationEvents = [
+        'pointerdown',
+        'mousedown',
+        'touchstart',
+        'touchend',
+        'keydown',
+        'click',
+      ];
+      activationEvents.forEach((evt) => {
+        window.addEventListener(evt, unlockAudio, { capture: true, passive: true });
+      });
+
+      // 3. Resume audio hardware when tab becomes visible
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            const ctx = this.ensureContext();
+            if (ctx && ctx.state === 'suspended') {
+              ctx.resume().catch(() => {});
+            }
+          }
+        });
+      }
     }
   }
 
+  /** Starts eager background fetch of MP3 audio assets as ArrayBuffers */
+  private startArrayBufferPrefetch(): void {
+    if (typeof fetch === 'undefined') return;
+
+    this.moveArrayBufferPromise = this.fetchRawAudio(SOUND_ASSET_PATHS.move);
+    this.captureArrayBufferPromise = this.fetchRawAudio(SOUND_ASSET_PATHS.capture);
+  }
+
+  /** Fetches audio bytes */
+  private async fetchRawAudio(url: string): Promise<ArrayBuffer | null> {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        return await res.arrayBuffer();
+      }
+    } catch {
+      // Fetch failed or offline
+    }
+    return null;
+  }
+
+  /** Lazily creates and initializes AudioContext */
   private ensureContext(): AudioContext | null {
     if (this.isMuted || typeof window === 'undefined') return null;
     if (this.ctx && this.ctx.state !== 'closed') return this.ctx;
@@ -74,26 +116,44 @@ class SoundService {
     }
   }
 
+  /** Decodes pre-fetched ArrayBuffers or fetches fresh if needed */
   private async loadBuffers(ctx: AudioContext): Promise<void> {
     if ((this.moveBuffer && this.captureBuffer) || this.isDecoding) return;
     this.isDecoding = true;
 
     try {
-      const [moveRes, capRes] = await Promise.all([
-        fetch('/sounds/move.mp3'),
-        fetch('/sounds/capture.mp3'),
-      ]);
-      const [moveArr, capArr] = await Promise.all([
-        moveRes.arrayBuffer(),
-        capRes.arrayBuffer(),
-      ]);
+      let moveArr: ArrayBuffer | null = null;
+      let capArr: ArrayBuffer | null = null;
 
-      const [mBuf, cBuf] = await Promise.all([
-        ctx.decodeAudioData(moveArr),
-        ctx.decodeAudioData(capArr),
-      ]);
-      this.moveBuffer = mBuf;
-      this.captureBuffer = cBuf;
+      try {
+        if (this.moveArrayBufferPromise) {
+          moveArr = await this.moveArrayBufferPromise;
+        }
+      } catch {
+        moveArr = null;
+      }
+
+      try {
+        if (this.captureArrayBufferPromise) {
+          capArr = await this.captureArrayBufferPromise;
+        }
+      } catch {
+        capArr = null;
+      }
+
+      if (!moveArr) {
+        moveArr = await this.fetchRawAudio(SOUND_ASSET_PATHS.move);
+      }
+      if (!capArr) {
+        capArr = await this.fetchRawAudio(SOUND_ASSET_PATHS.capture);
+      }
+
+      if (moveArr && !this.moveBuffer) {
+        this.moveBuffer = await ctx.decodeAudioData(moveArr.slice(0));
+      }
+      if (capArr && !this.captureBuffer) {
+        this.captureBuffer = await ctx.decodeAudioData(capArr.slice(0));
+      }
     } catch (e) {
       console.warn('[Sound] decodeAudioData error:', e);
     } finally {
@@ -101,29 +161,178 @@ class SoundService {
     }
   }
 
-  /** Plays an HTMLAudioElement clone to guarantee playback */
-  private playAudioElement(type: 'move' | 'capture'): void {
-    if (this.isMuted) return;
+  /** Synthesizes authentic wooden chess piece move tap with dual-component transient */
+  private synthesizeMoveSound(ctx: AudioContext): void {
     try {
-      const template = type === 'move' ? this.moveAudioElement : this.captureAudioElement;
-      if (template) {
-        const clone = template.cloneNode(true) as HTMLAudioElement;
-        clone.volume = 1.0;
-        const playPromise = clone.play();
-        if (playPromise) {
-          playPromise.catch(() => {});
+      const now = ctx.currentTime;
+      // High-frequency transient impact
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(450, now);
+      osc1.frequency.exponentialRampToValueAtTime(110, now + 0.04);
+      gain1.gain.setValueAtTime(0.35, now);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.045);
+
+      // Low wooden body resonance
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(160, now);
+      osc2.frequency.exponentialRampToValueAtTime(55, now + 0.06);
+      gain2.gain.setValueAtTime(0.4, now);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now);
+      osc2.stop(now + 0.065);
+
+      osc1.onended = () => {
+        try {
+          osc1.disconnect();
+          gain1.disconnect();
+          osc2.disconnect();
+          gain2.disconnect();
+        } catch {
+          // ignore
         }
+      };
+    } catch (e) {
+      console.warn('[Sound] synthesizeMoveSound error:', e);
+    }
+  }
+
+  /** Synthesizes authentic piece capture impact with two-stage strike sound */
+  private synthesizeCaptureSound(ctx: AudioContext): void {
+    try {
+      const now = ctx.currentTime;
+      // First impact: piece striking piece
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(620, now);
+      osc1.frequency.exponentialRampToValueAtTime(180, now + 0.035);
+      gain1.gain.setValueAtTime(0.4, now);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.04);
+
+      // Second impact: piece settling on board square
+      const t2 = now + 0.022;
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(200, t2);
+      osc2.frequency.exponentialRampToValueAtTime(65, t2 + 0.055);
+      gain2.gain.setValueAtTime(0.45, t2);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.055);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(t2);
+      osc2.stop(t2 + 0.06);
+
+      osc2.onended = () => {
+        try {
+          osc1.disconnect();
+          gain1.disconnect();
+          osc2.disconnect();
+          gain2.disconnect();
+        } catch {
+          // ignore
+        }
+      };
+    } catch (e) {
+      console.warn('[Sound] synthesizeCaptureSound error:', e);
+    }
+  }
+
+  /** Plays an MP3 audio element reliably without pool exhaustion */
+  private playFallbackAudio(type: 'move' | 'capture'): void {
+    if (this.isMuted) return;
+
+    // If AudioContext is actively running, synthesize sound directly
+    if (this.ctx && this.ctx.state === 'running') {
+      try {
+        if (type === 'move') {
+          this.synthesizeMoveSound(this.ctx);
+        } else {
+          this.synthesizeCaptureSound(this.ctx);
+        }
+        return;
+      } catch {
+        // Fall through to HTMLAudioElement
+      }
+    }
+
+    if (typeof Audio === 'undefined') return;
+
+    try {
+      const src = type === 'move' ? SOUND_ASSET_PATHS.move : SOUND_ASSET_PATHS.capture;
+      const audio = new Audio(src);
+      audio.volume = 1.0;
+      this.activeAudios.add(audio);
+
+      audio.onended = () => {
+        this.activeAudios.delete(audio);
+      };
+
+      const playPromise = audio.play();
+      if (playPromise) {
+        playPromise.catch(() => {
+          this.activeAudios.delete(audio);
+        });
       }
     } catch (e) {
-      console.warn('[Sound] playAudioElement failed:', e);
+      console.warn('[Sound] playFallbackAudio failed:', e);
+    }
+  }
+
+  /** Directly outputs an AudioBuffer via Web Audio API */
+  private playBufferDirect(ctx: AudioContext, buffer: AudioBuffer): void {
+    try {
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      source.buffer = buffer;
+      gain.gain.value = 1.0;
+
+      source.connect(gain);
+      gain.connect(ctx.destination);
+
+      source.start();
+
+      source.onended = () => {
+        try {
+          source.disconnect();
+          gain.disconnect();
+        } catch {
+          /* already disconnected */
+        }
+      };
+    } catch (e) {
+      console.warn('[Sound] Web Audio playBufferDirect failed:', e);
     }
   }
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
     safeSetItem('schada_sound_muted', String(this.isMuted));
-    if (this.isMuted && this.ctx) {
-      this.ctx.suspend().catch(() => {});
+    if (this.isMuted) {
+      if (this.ctx) {
+        this.ctx.suspend().catch(() => {});
+      }
+      for (const el of this.activeAudios) {
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {}
+      }
+      this.activeAudios.clear();
     }
     return this.isMuted;
   }
@@ -132,54 +341,48 @@ class SoundService {
     return this.isMuted;
   }
 
+  public setMuted(muted: boolean): void {
+    this.isMuted = muted;
+    safeSetItem('schada_sound_muted', String(this.isMuted));
+    if (this.isMuted) {
+      if (this.ctx) {
+        this.ctx.suspend().catch(() => {});
+      }
+      for (const el of this.activeAudios) {
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {}
+      }
+      this.activeAudios.clear();
+    }
+  }
+
   /** Authentic wooden piece placement on a board */
   public playMove(): void {
     if (this.isMuted) return;
 
     const now = Date.now();
-    if (now - this.lastMoveSoundTime < 60) return;
+    if (now - this.lastMoveSoundTime < 40) return;
     this.lastMoveSoundTime = now;
 
     const ctx = this.ensureContext();
     if (!ctx) {
-      this.playAudioElement('move');
+      this.playFallbackAudio('move');
       return;
     }
 
-    // Synchronously trigger resume in case it was auto-suspended
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
-
-    if (this.moveBuffer) {
-      try {
-        const source = ctx.createBufferSource();
-        const gain = ctx.createGain();
-        source.buffer = this.moveBuffer;
-        gain.gain.value = 1.0;
-
-        source.connect(gain);
-        gain.connect(ctx.destination);
-
-        // start() without parameters plays immediately on current hardware time
-        source.start();
-
-        source.onended = () => {
-          try {
-            source.disconnect();
-            gain.disconnect();
-          } catch {
-            /* already disconnected */
-          }
-        };
-        return;
-      } catch (e) {
-        console.warn('[Sound] Web Audio playMove failed, using fallback:', e);
+    if (ctx.state === 'running') {
+      if (this.moveBuffer) {
+        this.playBufferDirect(ctx, this.moveBuffer);
+      } else {
+        this.synthesizeMoveSound(ctx);
       }
+    } else {
+      // AudioContext is suspended. Attempt resume and immediately play MP3 via HTML5 Audio
+      ctx.resume().catch(() => {});
+      this.playFallbackAudio('move');
     }
-
-    // If buffer is still decoding or failed, use preloaded Audio element
-    this.playAudioElement('move');
   }
 
   /** Authentic wooden piece capture hit */
@@ -187,80 +390,102 @@ class SoundService {
     if (this.isMuted) return;
 
     const now = Date.now();
-    if (now - this.lastMoveSoundTime < 60) return;
-    this.lastMoveSoundTime = now;
+    if (now - this.lastCaptureSoundTime < 40) return;
+    this.lastCaptureSoundTime = now;
 
     const ctx = this.ensureContext();
     if (!ctx) {
-      this.playAudioElement('capture');
+      this.playFallbackAudio('capture');
       return;
     }
 
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
-
-    if (this.captureBuffer) {
-      try {
-        const source = ctx.createBufferSource();
-        const gain = ctx.createGain();
-        source.buffer = this.captureBuffer;
-        gain.gain.value = 1.0;
-
-        source.connect(gain);
-        gain.connect(ctx.destination);
-
-        source.start();
-
-        source.onended = () => {
-          try {
-            source.disconnect();
-            gain.disconnect();
-          } catch {
-            /* already disconnected */
-          }
-        };
-        return;
-      } catch (e) {
-        console.warn('[Sound] Web Audio playCapture failed, using fallback:', e);
+    if (ctx.state === 'running') {
+      if (this.captureBuffer) {
+        this.playBufferDirect(ctx, this.captureBuffer);
+      } else {
+        this.synthesizeCaptureSound(ctx);
       }
+    } else {
+      // AudioContext is suspended. Attempt resume and immediately play MP3 via HTML5 Audio
+      ctx.resume().catch(() => {});
+      this.playFallbackAudio('capture');
     }
-
-    this.playAudioElement('capture');
   }
 
-  // Harmonious chime when a high piece enters the goal line
+  /** Harmonious chime when a high piece enters the goal line */
   public playGoal(): void {
     if (this.isMuted) return;
     const ctx = this.ensureContext();
     if (!ctx) return;
 
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+    const executeGoal = (activeCtx: AudioContext) => {
+      try {
+        const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5 major triad
+        const now = activeCtx.currentTime;
+
+        freqs.forEach((freq, idx) => {
+          const osc = activeCtx.createOscillator();
+          const gain = activeCtx.createGain();
+
+          const startT = now + idx * 0.06;
+          const endT = startT + 0.38;
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, startT);
+
+          gain.gain.setValueAtTime(0.2, startT);
+          gain.gain.linearRampToValueAtTime(0.0001, endT);
+
+          osc.connect(gain);
+          gain.connect(activeCtx.destination);
+
+          osc.start(startT);
+          osc.stop(endT);
+
+          osc.onended = () => {
+            try {
+              osc.disconnect();
+              gain.disconnect();
+            } catch {
+              /* already gone */
+            }
+          };
+        });
+      } catch (e) {
+        console.warn('[Sound] playGoal error:', e);
+      }
+    };
+
+    if (ctx.state === 'running') {
+      executeGoal(ctx);
+    } else {
+      ctx.resume().then(() => executeGoal(ctx)).catch(() => {});
     }
+  }
 
-    try {
-      const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5 major triad
-      const now = ctx.currentTime;
+  /** Low clock countdown tick (< 30 seconds) */
+  public playClockTick(): void {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
 
-      freqs.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        const startT = now + idx * 0.06;
-        const endT = startT + 0.38;
+    const executeTick = (activeCtx: AudioContext) => {
+      try {
+        const now = activeCtx.currentTime;
+        const osc = activeCtx.createOscillator();
+        const gain = activeCtx.createGain();
 
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startT);
+        osc.frequency.setValueAtTime(800, now);
 
-        gain.gain.setValueAtTime(0.2, startT);
-        gain.gain.linearRampToValueAtTime(0.0001, endT);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0.0001, now + 0.03);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(activeCtx.destination);
 
-        osc.start(startT);
-        osc.stop(endT);
+        osc.start(now);
+        osc.stop(now + 0.035);
 
         osc.onended = () => {
           try {
@@ -270,53 +495,19 @@ class SoundService {
             /* already gone */
           }
         };
-      });
-    } catch (e) {
-      console.warn('[Sound] playGoal:', e);
+      } catch (e) {
+        console.warn('[Sound] playClockTick error:', e);
+      }
+    };
+
+    if (ctx.state === 'running') {
+      executeTick(ctx);
+    } else {
+      ctx.resume().then(() => executeTick(ctx)).catch(() => {});
     }
   }
 
-  // Low clock countdown tick (< 30 seconds)
-  public playClockTick(): void {
-    if (this.isMuted) return;
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
-
-    try {
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, now);
-
-      gain.gain.setValueAtTime(0.1, now);
-      gain.gain.linearRampToValueAtTime(0.0001, now + 0.03);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.035);
-
-      osc.onended = () => {
-        try {
-          osc.disconnect();
-          gain.disconnect();
-        } catch {
-          /* already gone */
-        }
-      };
-    } catch (e) {
-      console.warn('[Sound] playClockTick:', e);
-    }
-  }
-
-  // Victory fanfare
+  /** Victory fanfare */
   public playVictory(): void {
     if (this.isMuted) return;
 
@@ -327,44 +518,48 @@ class SoundService {
     const ctx = this.ensureContext();
     if (!ctx) return;
 
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
+    const executeVictory = (activeCtx: AudioContext) => {
+      try {
+        const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+        const now = activeCtx.currentTime;
 
-    try {
-      const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
-      const now = ctx.currentTime;
+        notes.forEach((freq, idx) => {
+          const osc = activeCtx.createOscillator();
+          const gain = activeCtx.createGain();
 
-      notes.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+          const startT = now + idx * 0.1;
+          const endT = startT + 0.35;
 
-        const startT = now + idx * 0.1;
-        const endT = startT + 0.35;
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, startT);
 
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, startT);
+          gain.gain.setValueAtTime(0.2, startT);
+          gain.gain.linearRampToValueAtTime(0.0001, endT);
 
-        gain.gain.setValueAtTime(0.2, startT);
-        gain.gain.linearRampToValueAtTime(0.0001, endT);
+          osc.connect(gain);
+          gain.connect(activeCtx.destination);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+          osc.start(startT);
+          osc.stop(endT);
 
-        osc.start(startT);
-        osc.stop(endT);
+          osc.onended = () => {
+            try {
+              osc.disconnect();
+              gain.disconnect();
+            } catch {
+              /* already gone */
+            }
+          };
+        });
+      } catch (e) {
+        console.warn('[Sound] playVictory error:', e);
+      }
+    };
 
-        osc.onended = () => {
-          try {
-            osc.disconnect();
-            gain.disconnect();
-          } catch {
-            /* already gone */
-          }
-        };
-      });
-    } catch (e) {
-      console.warn('[Sound] playVictory:', e);
+    if (ctx.state === 'running') {
+      executeVictory(ctx);
+    } else {
+      ctx.resume().then(() => executeVictory(ctx)).catch(() => {});
     }
   }
 }

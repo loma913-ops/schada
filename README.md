@@ -33,7 +33,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
   - High pieces can shuffle along their base line, but once they leave it, they **cannot return**.
   - Once high pieces reach their goal line (Rank 8 for Blue, Rank 1 for Green), they **cannot leave**, and are **immune to enemy capture**.
 - **Victory & Scoring**:
-  - The game concludes when all surviving high pieces of a player reach their goal line, upon 3-fold repetition, or when all high pieces are immobilized.
+  - The game concludes when all surviving high pieces of a player reach their goal line, upon opponent piece elimination or immobilization (no legal moves), 3-fold repetition, 6-ply mutual high-piece base/goal shuffling, or when high pieces outside the goal are blocked by enemy pieces.
   - Scoring is determined by goal line points ($\text{Field Officer} = 2, \text{Officer} = 1$).
   - Tiebreakers are calculated based on surviving high pieces outside the goal line and fractional rank distance ($2/7$ for Field Officers, $1/7$ for Officers).
 
@@ -41,16 +41,19 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 
 ## 2. Key Features
 
-- **8-Tier AI Bot Engine**: Play against computer opponents ranging from **Novice (100 Elo)** to **Master (2400 Elo)**. The engine features Alpha-Beta minimax with iterative deepening, Zobrist transposition tables, quiescence search, move ordering heuristics, distance-to-goal tables, and opening books—all offloaded to background **Web Workers** for 60fps UI responsiveness.
-- **Move History Navigator & Replay Controls**: Interactive move stepping (`|<<`, `<`, `>`, `>>|`) and keyboard shortcuts (`ArrowLeft`, `ArrowRight`, `Home`, `End`) allowing players to review any board position during or after a match without disrupting live game state.
-- **Comprehensive Match Stats & Post-Game Elo Summary**: Detailed game-over modal presenting rating point changes (+/- deltas), updated ratings, provisional badges, and game resolution reasons with cross-client synchronization directly derived from server-authoritative match results.
-- **Competitive Integrity & Matchmaking Separation**: Guest accounts can create and join casual rooms freely, while rated matchmaking and leaderboard ranking are reserved for authenticated accounts. Quick Pair matchmaking strictly enforces rated vs. unranked room segregation, guaranteeing that rated searchers are never paired into unrated or guest-hosted matches.
-- **Lichess-Inspired Minimalist UX**: Two-column responsive arena with an expanded 420px control panel, digital countdown clocks and low-time warnings for timed matches, algebraic move notation, streamlined in-game action controls, optimistic zero-latency move dispatch, and complete dark/light theme support.
-- **Mobile Portrait Orientation Lock**: Automatic orientation detection and an interactive lock overlay ensuring an optimal vertical board aspect ratio without coordinate clipping on mobile devices.
-- **Zero-Friction Deployment Recovery**: Built-in chunk failure detection and debounced auto-reload service that updates client sessions automatically following production deployments, eliminating stale cache and cookie errors.
-- **Procedural Sound Engine with Audio Deduplication**: Synthesized piece clacks, capture chimes, goal fanfares, and low-time countdown alerts generated via the **Web Audio API** with zero external audio assets, hardware-time scheduling, and debounce protections against audio thread echo.
-- **Optimized Firestore & Presence Architecture**: Scalable, low-overhead database access patterns that strictly minimize network reads and writes.
-- **PWA & Offline-First Architecture**: Built with service worker support and a local backend provider for instant offline and guest play, persisting profiles, match history, and social lists in browser storage with full schema validation and zero cloud dependencies.
+- **8-Tier AI Bot Engine**: MiniMax bot opponents (100–2400 Elo) running in Web Workers.
+- **Historical End-Condition Engine**: Bilateral goal reached, piece elimination, 3-fold repetition, mutual shuffle, and enemy blockades.
+- **Move History Navigator & Replay Controls**: Stepping controls and keyboard shortcuts to review board positions.
+- **Comprehensive Match Stats & Post-Game Elo Summary**: Game-over modal with synchronized rating point deltas and match details.
+- **Competitive Integrity & Matchmaking Separation**: Strict rated and casual matchmaking separation for authenticated users and guests.
+- **Lichess-Inspired Minimalist UX**: Responsive arena with clocks, notation, controls, and dark/light mode.
+- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves with lightweight atomic Firestore updates and snapshot reconciliation.
+- **Cross-Platform Hybrid Audio Engine**: Web Audio API with realistic synthesized fallbacks and zero-latency desktop and mobile playback.
+- **Authoritative Symmetrical Elo Engine**: Immutable initial/final Elo ratings and deltas stored in match documents for symmetrical cross-client synchronization.
+- **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
+- **Zero-Friction Deployment Recovery**: Automatic chunk failure detection and session refresh post-deployment.
+- **Optimized Firestore CRUD Architecture**: Direct atomic updates without heavy locks and throttled presence updates.
+- **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 
 ---
 

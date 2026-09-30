@@ -97,8 +97,16 @@ export async function updateUserStats(
   localBackend.updateStats(userId, won, isDraw, eloDelta);
 
   // 2. If Firebase is active and the authenticated user owns this profile record
-  if (isFirebaseConfigured() && db && auth?.currentUser?.uid === userId) {
-    try {
+  if (isFirebaseConfigured() && db && auth) {
+    if (typeof (auth as any).authStateReady === 'function') {
+      try {
+        await (auth as any).authStateReady();
+      } catch {
+        // ignore
+      }
+    }
+    if (auth.currentUser?.uid === userId) {
+      try {
       const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId);
       const updatedProfile = await runTransaction(db, async (tx) => {
         const snap = await tx.get(userDocRef);
@@ -138,17 +146,18 @@ export async function updateUserStats(
         } as UserProfile;
       });
 
-      if (updatedProfile) {
-        persistCachedProfile(updatedProfile);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(
-            new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: updatedProfile })
-          );
+        if (updatedProfile) {
+          persistCachedProfile(updatedProfile);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: updatedProfile })
+            );
+          }
+          return updatedProfile;
         }
-        return updatedProfile;
+      } catch (e) {
+        console.warn('Could not update Firestore user stats:', e);
       }
-    } catch (e) {
-      console.warn('Could not update Firestore user stats:', e);
     }
   }
 

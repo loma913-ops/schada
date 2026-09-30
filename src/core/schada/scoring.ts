@@ -1,13 +1,33 @@
 import type { BoardMatrix, PieceColor, ScoreBreakdown, GameResult, WinReason } from './types';
 import { squareToColRow } from './vectors';
+import { SCHADA_RULES_CONFIG } from './rulesConfig';
 
+/**
+ * Calculates score breakdown for a player color.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(N) where N is the fixed number of squares on the board (N = 64).
+ *   Since the board size is invariant, this executes in O(1) constant time.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant, prioritizing stable bounded scaling over unbounded resource consumption.
+ */
 export function calculateScoreBreakdown(board: BoardMatrix, color: PieceColor): ScoreBreakdown {
-  const goalRank = color === 'blue' ? 7 : 0; // 0-indexed: blue goal is rank 8 (row 7), green goal is rank 1 (row 0)
-  const baseRank = color === 'blue' ? 0 : 7;
+  const goalRank =
+    color === 'blue'
+      ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+  const baseRank =
+    color === 'blue'
+      ? SCHADA_RULES_CONFIG.board.blueBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.greenBaseRankIndex;
 
   let goalScore = 0;
   let outsideGoalHighPiecesScore = 0;
   let rankDistanceScore = 0;
+
+  const scoringConfig = SCHADA_RULES_CONFIG.scoring;
 
   for (const [sq, piece] of Object.entries(board)) {
     if (!piece || piece.color !== color) continue;
@@ -16,19 +36,23 @@ export function calculateScoreBreakdown(board: BoardMatrix, color: PieceColor): 
 
     if (piece.type === 'field_officer') {
       if (row === goalRank) {
-        goalScore += 2;
+        goalScore += scoringConfig.fieldOfficerGoalPoints;
       } else {
-        outsideGoalHighPiecesScore += 2;
+        outsideGoalHighPiecesScore += scoringConfig.fieldOfficerSurvivingPoints;
         const distanceFromBase = Math.abs(row - baseRank);
-        rankDistanceScore += (distanceFromBase * 2) / 7;
+        rankDistanceScore +=
+          (distanceFromBase * scoringConfig.fieldOfficerRankDistanceNumerator) /
+          scoringConfig.rankDistanceDenominator;
       }
     } else if (piece.type === 'officer') {
       if (row === goalRank) {
-        goalScore += 1;
+        goalScore += scoringConfig.officerGoalPoints;
       } else {
-        outsideGoalHighPiecesScore += 1;
+        outsideGoalHighPiecesScore += scoringConfig.officerSurvivingPoints;
         const distanceFromBase = Math.abs(row - baseRank);
-        rankDistanceScore += (distanceFromBase * 1) / 7;
+        rankDistanceScore +=
+          (distanceFromBase * scoringConfig.officerRankDistanceNumerator) /
+          scoringConfig.rankDistanceDenominator;
       }
     }
   }

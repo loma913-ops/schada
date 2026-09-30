@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -19,7 +19,7 @@ import {
 } from '@/services/firebase/gameService';
 import { Arena, type ArenaPlayer } from './Arena';
 import type { PlayerEloUpdate } from './GameOverModal';
-import type { Move, PieceColor } from '@/core/schada/types';
+import type { BoardState, Move, PieceColor } from '@/core/schada/types';
 import { Copy, Check, ArrowLeft, Loader2, Cpu } from 'lucide-react';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { updateUserStats } from '@/services/firebase/authService';
@@ -29,7 +29,7 @@ import { safeSetItem } from '@/services/storage/storageCleanup';
 
 export const GameRoomView: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
-  const { user, refreshUser } = useAuth();
+  const { user, isLoading: authLoading, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   const [game, setGame] = useState<GameRoom | null>(null);
@@ -50,6 +50,7 @@ export const GameRoomView: React.FC = () => {
 
   // Track if elo was updated for this game
   const eloUpdatedRef = useRef(false);
+  const eloUpdatePromiseRef = useRef<Promise<void> | null>(null);
 
   // 1. Subscribe to real-time game updates
   useEffect(() => {
@@ -108,7 +109,7 @@ export const GameRoomView: React.FC = () => {
 
   // 2. Determine player identity and join
   useEffect(() => {
-    if (!gameId || !game || hasJoined) return;
+    if (!gameId || !game || hasJoined || authLoading) return;
 
     const existingToken = getLocalSessionToken(gameId);
     const guestIdKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId;
@@ -213,16 +214,21 @@ export const GameRoomView: React.FC = () => {
       ? localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId)
       : null;
 
-  const isBlue = Boolean(
-    (sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken) ||
-    (user && game?.bluePlayer && game.bluePlayer.id === user.id) ||
-    (guestId && game?.bluePlayer && game.bluePlayer.id === guestId)
-  );
-  const isGreen = Boolean(
-    (sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken) ||
-    (user && game?.greenPlayer && game.greenPlayer.id === user.id) ||
-    (guestId && game?.greenPlayer && game.greenPlayer.id === guestId)
-  );
+  // Determine user's role and color:
+  // For authenticated users, identity is strictly determined by user.id
+  // For guests, fallback to session token or guest ID
+  const isBlue = user
+    ? Boolean(game?.bluePlayer && game.bluePlayer.id === user.id)
+    : Boolean(
+        (sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken) ||
+        (guestId && game?.bluePlayer && game.bluePlayer.id === guestId)
+      );
+  const isGreen = user
+    ? Boolean(game?.greenPlayer && game.greenPlayer.id === user.id)
+    : Boolean(
+        (sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken) ||
+        (guestId && game?.greenPlayer && game.greenPlayer.id === guestId)
+      );
 
   // Maintain local session token synchronization if seated player token exists in room document
   useEffect(() => {
@@ -255,47 +261,61 @@ export const GameRoomView: React.FC = () => {
   }, []);
 
   // Handle game completion & ranked rating updates
+  const applyUserEloUpdates = useCallback(
+    async (completedGameState?: BoardState): Promise<void> => {
+      if (!game || eloUpdatedRef.current || !user || !gameId) return;
+      if (game.processedEloUserIds?.includes(user.id)) return;
+
+      const isGameOver = completedGameState?.isGameOver || game.boardState.isGameOver;
+      const outcome = completedGameState?.result?.winner || game.winner;
+      if (!isGameOver || !outcome) return;
+
+      // Player identity is strictly determined by user.id matching the seated player
+      const isUserBlue = game.bluePlayer?.id === user.id;
+      const isUserGreen = game.greenPlayer?.id === user.id;
+
+      if (!isUserBlue && !isUserGreen) return;
+
+      eloUpdatedRef.current = true;
+
+      const myColor: PieceColor = isUserBlue ? 'blue' : 'green';
+      const won = outcome === myColor;
+      const isDraw = outcome === 'draw';
+
+      let delta = 0;
+      if (game.isRanked && game.bluePlayer && game.greenPlayer) {
+        const eloRes = game.eloResult || computeRankedGameEloResult(game, outcome);
+        if (eloRes) {
+          delta = myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta;
+        }
+      }
+
+      const updatePromise = (async () => {
+        try {
+          const updatedProfile = await updateUserStats(user.id, won, isDraw, delta);
+          if (updatedProfile) {
+            refreshUser(updatedProfile);
+          }
+          await markGameEloProcessed(gameId, user.id);
+        } catch (err) {
+          console.error('Failed to update stats on game completion:', err);
+          eloUpdatedRef.current = false;
+        }
+      })();
+
+      eloUpdatePromiseRef.current = updatePromise;
+      await updatePromise;
+    },
+    [game, user, gameId, refreshUser]
+  );
+
   useEffect(() => {
     if (!game || !game.boardState.isGameOver || eloUpdatedRef.current) return;
     if (!user) return;
     if (game.processedEloUserIds?.includes(user.id)) return;
 
-    const outcome = game.winner;
-    if (!outcome) return;
-
-    const isUserBlue = userColor === 'blue' || game.bluePlayer?.id === user.id;
-    const isUserGreen = userColor === 'green' || game.greenPlayer?.id === user.id;
-
-    if (!isUserBlue && !isUserGreen) return;
-
-    eloUpdatedRef.current = true;
-
-    const myColor: PieceColor = isUserBlue ? 'blue' : 'green';
-    const won = outcome === myColor;
-    const isDraw = outcome === 'draw';
-
-    let delta = 0;
-    if (game.isRanked && game.bluePlayer && game.greenPlayer) {
-      const eloRes = game.eloResult || computeRankedGameEloResult(game, outcome);
-      if (eloRes) {
-        delta = myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta;
-      }
-    }
-
-    updateUserStats(user.id, won, isDraw, delta)
-      .then(async (updatedProfile) => {
-        if (updatedProfile) {
-          refreshUser(updatedProfile);
-        }
-        if (gameId) {
-          await markGameEloProcessed(gameId, user.id);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to update stats on game completion:', err);
-        eloUpdatedRef.current = false;
-      });
-  }, [game, user, gameId, refreshUser, userColor]);
+    applyUserEloUpdates();
+  }, [game, user, applyUserEloUpdates]);
 
   if (loading) {
     return (
@@ -396,7 +416,7 @@ export const GameRoomView: React.FC = () => {
     ? {
         id: game.bluePlayer.id,
         username: game.bluePlayer.username,
-        elo: game.eloResult ? (game.bluePlayer.elo - game.eloResult.blueDelta) : game.bluePlayer.elo,
+        elo: eloResult?.initialBlueElo ?? (game.eloResult ? (game.bluePlayer.elo - game.eloResult.blueDelta) : game.bluePlayer.elo),
         gamesPlayed: blueGames,
       }
     : { id: 'blue', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
@@ -405,7 +425,7 @@ export const GameRoomView: React.FC = () => {
     ? {
         id: game.greenPlayer.id,
         username: game.greenPlayer.username,
-        elo: game.eloResult ? (game.greenPlayer.elo - game.eloResult.greenDelta) : game.greenPlayer.elo,
+        elo: eloResult?.initialGreenElo ?? (game.eloResult ? (game.greenPlayer.elo - game.eloResult.greenDelta) : game.greenPlayer.elo),
         gamesPlayed: greenGames,
       }
     : { id: 'green', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
@@ -459,9 +479,20 @@ export const GameRoomView: React.FC = () => {
             console.error('Failed to timeout game:', err);
           }
         }}
+        onGameComplete={(completedState) => {
+          applyUserEloUpdates(completedState);
+        }}
         onExit={async () => {
+          const isGameOver = Boolean(game.boardState.isGameOver || game.status === 'completed');
           if (game.status === 'waiting' && gameId) {
             await abandonGame(gameId);
+          } else if (isGameOver) {
+            // Await any in-flight or pending Elo update before unmounting
+            if (eloUpdatePromiseRef.current) {
+              await eloUpdatePromiseRef.current;
+            } else if (!eloUpdatedRef.current) {
+              await applyUserEloUpdates();
+            }
           } else if (game.status === 'in_progress' && userColor && !isSpectator && gameId) {
             const updated = await resignGameAction(gameId, userColor);
             if (updated) {

@@ -119,19 +119,40 @@ export const Arena: React.FC<ArenaProps> = ({
   gameStateRef.current = gameState;
 
   const prevMoveCountRef = useRef<number>(gameState.moveHistory.length);
+  const lastAudibleMoveIndexRef = useRef<number>(
+    (syncedGameState || initialState).moveHistory.length - 1
+  );
 
   // Sync external state from Firestore/multiplayer if provided
   useEffect(() => {
     if (syncedGameState) {
-      if (syncedGameState.moveHistory.length > prevMoveCountRef.current) {
-        const latestMove = syncedGameState.moveHistory[syncedGameState.moveHistory.length - 1];
+      const incomingLen = syncedGameState.moveHistory.length;
+      const currentLocalLen = gameStateRef.current.moveHistory.length;
+
+      // If incoming synced state is older than our local optimistic state, ignore it (awaiting server ack)
+      if (incomingLen < currentLocalLen) {
+        return;
+      }
+
+      // If incoming state contains new opponent moves beyond what we have already played/heard
+      if (incomingLen > lastAudibleMoveIndexRef.current + 1) {
+        const latestMove = syncedGameState.moveHistory[incomingLen - 1];
         if (latestMove.captured) {
           soundService.playCapture();
         } else {
           soundService.playMove();
         }
+        if (latestMove.piece.type !== 'pawn') {
+          const destRow = parseInt(latestMove.to[1], 10) - 1;
+          const goalRow = latestMove.piece.color === 'blue' ? 7 : 0;
+          if (destRow === goalRow) {
+            soundService.playGoal();
+          }
+        }
       }
-      prevMoveCountRef.current = syncedGameState.moveHistory.length;
+
+      lastAudibleMoveIndexRef.current = Math.max(lastAudibleMoveIndexRef.current, incomingLen - 1);
+      prevMoveCountRef.current = incomingLen;
       setGameState(syncedGameState);
     }
   }, [syncedGameState]);
@@ -196,6 +217,18 @@ export const Arena: React.FC<ArenaProps> = ({
   useEffect(() => {
     greenTimeRef.current = greenTime;
   }, [greenTime]);
+
+  useEffect(() => {
+    if (typeof syncedBlueTimeMs === 'number') {
+      setBlueTime((prev) => (Math.abs(prev - syncedBlueTimeMs) > 1500 ? syncedBlueTimeMs : prev));
+    }
+  }, [syncedBlueTimeMs]);
+
+  useEffect(() => {
+    if (typeof syncedGreenTimeMs === 'number') {
+      setGreenTime((prev) => (Math.abs(prev - syncedGreenTimeMs) > 1500 ? syncedGreenTimeMs : prev));
+    }
+  }, [syncedGreenTimeMs]);
 
   const lastTickRef = useRef<number>(Date.now());
 
@@ -281,7 +314,11 @@ export const Arena: React.FC<ArenaProps> = ({
       }
 
       const nextState = executeMove(currentState, move);
+      const newMoveIndex = nextState.moveHistory.length - 1;
+      lastAudibleMoveIndexRef.current = newMoveIndex;
       prevMoveCountRef.current = nextState.moveHistory.length;
+      prevHistoryLenRef.current = nextState.moveHistory.length;
+      setViewMoveIndex(newMoveIndex);
       setGameState(nextState);
       customMakeMove(move);
       return;
@@ -295,6 +332,11 @@ export const Arena: React.FC<ArenaProps> = ({
     }
 
     const nextState = executeMove(currentState, move);
+    const newMoveIndex = nextState.moveHistory.length - 1;
+    lastAudibleMoveIndexRef.current = newMoveIndex;
+    prevMoveCountRef.current = nextState.moveHistory.length;
+    prevHistoryLenRef.current = nextState.moveHistory.length;
+    setViewMoveIndex(newMoveIndex);
 
     // If a high piece reached goal, chime!
     if (move.piece.type !== 'pawn') {

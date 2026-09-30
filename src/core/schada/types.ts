@@ -36,6 +36,7 @@ export type GameStatus = 'waiting' | 'in_progress' | 'completed' | 'abandoned';
 
 export type WinReason =
   | 'goal_reached'
+  | 'elimination'
   | 'timeout'
   | 'resignation'
   | 'repetition'

@@ -1,2 +1,10 @@
-// Audio assets are served as static files from /public/sounds/
-// soundService.ts loads them via fetch('/sounds/move.mp3') and '/sounds/capture.mp3'
+/**
+ * Audio Asset Paths & Configuration for Schada.
+ *
+ * Provides static asset paths for MP3 sound effects.
+ */
+
+export const SOUND_ASSET_PATHS = {
+  move: '/sounds/move.mp3',
+  capture: '/sounds/capture.mp3',
+} as const;

@@ -59,6 +59,26 @@ describe('GAME_OVER_MODAL_CONFIG validation and configuration', () => {
     );
   });
 
+  it('validates elimination win reason presence and non-emptiness', () => {
+    expect(GAME_OVER_MODAL_CONFIG.copy.winReasons.elimination).toBe(
+      'Opponent has no legal moves remaining (eliminated / immobilized)'
+    );
+
+    const invalidConfig: GameOverModalConfig = {
+      ...GAME_OVER_MODAL_CONFIG,
+      copy: {
+        ...GAME_OVER_MODAL_CONFIG.copy,
+        winReasons: {
+          ...GAME_OVER_MODAL_CONFIG.copy.winReasons,
+          elimination: '',
+        },
+      },
+    };
+    expect(() => validateGameOverModalConfig(invalidConfig)).toThrowError(
+      'GameOverModalConfigError: Invalid copy.winReasons.elimination: expected non-empty string.'
+    );
+  });
+
   it('throws GameOverModalConfigError if reviewButtonText is missing or empty', () => {
     const invalidConfig: GameOverModalConfig = {
       ...GAME_OVER_MODAL_CONFIG,
