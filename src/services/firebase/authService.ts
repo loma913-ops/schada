@@ -92,11 +92,13 @@ export async function setUserOnlineStatus(
  * and the local provider. Clamps ratings using the central ELO_CONFIG.minimumRating.
  *
  * Algorithmic Complexity:
- * - Time Complexity: O(1) Firestore document transaction / localStorage key-value update.
+ * - Time Complexity: O(1) constant time document read followed by O(1) atomic field update.
  * - Auxiliary Space Complexity: O(1) scalar allocations.
  *
  * Growth Rate:
  * - O(1) constant: independent of total database size or user base growth rate.
+ * - Concurrency Resilience: Eliminates optimistic concurrency locking preconditions, preventing
+ *   failed-precondition collisions with concurrent presence heartbeats and status writes.
  */
 export async function updateUserStats(
   userId: string,
@@ -118,46 +120,42 @@ export async function updateUserStats(
     }
     if (auth.currentUser?.uid === userId) {
       try {
-      const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId);
-      const updatedProfile = await runTransaction(db, async (tx) => {
-        const snap = await tx.get(userDocRef);
-        if (!snap.exists()) return null;
+        const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId);
+        const snap = await getDoc(userDocRef);
+        if (snap.exists()) {
+          const data = snap.data() as UserProfile;
+          const currentGamesPlayed = data.gamesPlayed || 0;
+          const currentGamesWon = data.gamesWon || 0;
+          const currentGamesLost = data.gamesLost || 0;
+          const currentGamesDrawn = data.gamesDrawn || 0;
+          const currentElo = typeof data.eloRating === 'number'
+            ? data.eloRating
+            : ELO_CONFIG.defaultStartingRating;
 
-        const data = snap.data() as UserProfile;
-        const currentGamesPlayed = data.gamesPlayed || 0;
-        const currentGamesWon = data.gamesWon || 0;
-        const currentGamesLost = data.gamesLost || 0;
-        const currentGamesDrawn = data.gamesDrawn || 0;
-        const currentElo = typeof data.eloRating === 'number'
-          ? data.eloRating
-          : ELO_CONFIG.defaultStartingRating;
+          const newElo = Math.max(ELO_CONFIG.minimumRating, currentElo + eloDelta);
+          const newGamesPlayed = currentGamesPlayed + 1;
+          const newGamesWon = isDraw ? currentGamesWon : won ? currentGamesWon + 1 : currentGamesWon;
+          const newGamesLost = isDraw ? currentGamesLost : !won ? currentGamesLost + 1 : currentGamesLost;
+          const newGamesDrawn = isDraw ? currentGamesDrawn + 1 : currentGamesDrawn;
 
-        const newElo = Math.max(ELO_CONFIG.minimumRating, currentElo + eloDelta);
-        const newGamesPlayed = currentGamesPlayed + 1;
-        const newGamesWon = isDraw ? currentGamesWon : won ? currentGamesWon + 1 : currentGamesWon;
-        const newGamesLost = isDraw ? currentGamesLost : !won ? currentGamesLost + 1 : currentGamesLost;
-        const newGamesDrawn = isDraw ? currentGamesDrawn + 1 : currentGamesDrawn;
+          await updateDoc(userDocRef, {
+            eloRating: newElo,
+            gamesPlayed: newGamesPlayed,
+            gamesWon: newGamesWon,
+            gamesLost: newGamesLost,
+            gamesDrawn: newGamesDrawn,
+            updatedAt: serverTimestamp(),
+          });
 
-        tx.update(userDocRef, {
-          eloRating: newElo,
-          gamesPlayed: newGamesPlayed,
-          gamesWon: newGamesWon,
-          gamesLost: newGamesLost,
-          gamesDrawn: newGamesDrawn,
-          updatedAt: serverTimestamp(),
-        });
+          const updatedProfile: UserProfile = {
+            ...data,
+            eloRating: newElo,
+            gamesPlayed: newGamesPlayed,
+            gamesWon: newGamesWon,
+            gamesLost: newGamesLost,
+            gamesDrawn: newGamesDrawn,
+          };
 
-        return {
-          ...data,
-          eloRating: newElo,
-          gamesPlayed: newGamesPlayed,
-          gamesWon: newGamesWon,
-          gamesLost: newGamesLost,
-          gamesDrawn: newGamesDrawn,
-        } as UserProfile;
-      });
-
-        if (updatedProfile) {
           persistCachedProfile(updatedProfile);
           if (typeof window !== 'undefined') {
             window.dispatchEvent(

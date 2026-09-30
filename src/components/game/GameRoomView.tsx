@@ -460,23 +460,27 @@ export const GameRoomView: React.FC = () => {
         onResign={async () => {
           if (!userColor || game.status === 'waiting') return;
           try {
+            eloUpdatedRef.current = true;
             const updated = await resignGameAction(gameId!, userColor);
             if (updated) {
               refreshUser(updated);
             }
           } catch (err) {
             console.error('Failed to resign game:', err);
+            eloUpdatedRef.current = false;
           }
         }}
         onTimeout={async (timedOutColor) => {
           if (game.status === 'waiting') return;
           try {
+            eloUpdatedRef.current = true;
             const updated = await timeoutGameAction(gameId!, timedOutColor);
             if (updated) {
               refreshUser(updated);
             }
           } catch (err) {
             console.error('Failed to timeout game:', err);
+            eloUpdatedRef.current = false;
           }
         }}
         onGameComplete={(completedState) => {

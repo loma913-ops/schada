@@ -963,6 +963,11 @@ export async function resignGameAction(
           }
         }
 
+        const currentProcessed = Array.isArray(game.processedEloUserIds) ? game.processedEloUserIds : [];
+        if (resigningPlayerId && !currentProcessed.includes(resigningPlayerId)) {
+          updatePayload.processedEloUserIds = [...currentProcessed, resigningPlayerId];
+        }
+
         tx.update(docRef, sanitize(updatePayload));
       });
 
@@ -1136,6 +1141,12 @@ export async function timeoutGameAction(
             timedOutDelta = timedOutColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
             timeoutWinnerDelta = timedOutColor === 'blue' ? eloCalc.greenDelta : eloCalc.blueDelta;
           }
+        }
+
+        const currentProcessed = Array.isArray(game.processedEloUserIds) ? game.processedEloUserIds : [];
+        const callerId = auth?.currentUser?.uid;
+        if (callerId && (callerId === timedOutPlayerId || callerId === timeoutWinnerPlayerId) && !currentProcessed.includes(callerId)) {
+          updatePayload.processedEloUserIds = [...currentProcessed, callerId];
         }
 
         tx.update(docRef, sanitize(updatePayload));
