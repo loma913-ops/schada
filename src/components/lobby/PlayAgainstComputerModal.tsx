@@ -3,6 +3,8 @@ import { X, Play } from 'lucide-react';
 import type { PieceColor } from '@/core/schada/types';
 import { getBotTier } from '@/core/bot/botTiers';
 import { BOT_ENGINE_CONFIG } from '@/core/bot/botConfig';
+import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
+
 
 interface PlayAgainstComputerModalProps {
   isOpen: boolean;
@@ -83,7 +85,7 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
         <div className="form-group">
           <label className="form-label">Time Control (Minutes per player)</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
-            {[1, 3, 5, 10, 0].map((m) => (
+            {FORMAT_CONFIG.modalSelectableMinutes.map((m) => (
               <button
                 key={m}
                 type="button"
@@ -102,7 +104,7 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
           <div className="form-group">
             <label className="form-label">Increment per move</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
-              {[0, 1, 2, 3, 5].map((sec) => (
+              {FORMAT_CONFIG.modalSelectableIncrements.map((sec) => (
                 <button
                   key={sec}
                   type="button"
@@ -116,6 +118,7 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
             </div>
           </div>
         )}
+
 
         {/* Bot Strength / Difficulty Level */}
         {(() => {

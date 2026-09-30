@@ -54,6 +54,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Zero-Friction Deployment Recovery**: Automatic chunk failure detection and session refresh post-deployment.
 - **Optimized Firestore CRUD Architecture**: Direct atomic updates without heavy locks and throttled presence updates.
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
+- **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
 
 ---
 
@@ -247,6 +248,7 @@ schada/
 ├── src/
 │   ├── core/
 │   │   ├── bot/                    # 8-tier AI bot engine
+│   │   │   ├── botConfig.ts        # Centralized bot search, heuristic weights & tier parameters
 │   │   │   ├── fastBoard.ts        # Typed-array (Uint8Array) high-speed board representation
 │   │   │   ├── search.ts           # Alpha-Beta minimax, PVS, iterative deepening, quiescence
 │   │   │   ├── evaluator.ts        # Material, pacing paradox, centrality & tiebreak evaluation
@@ -257,15 +259,18 @@ schada/
 │   │   │   └── botWorkerClient.ts  # Worker lifecycle manager and promise-based dispatcher
 │   │   ├── schada/                 # Pure rules engine, movement vectors, scoring, and replay
 │   │   │   ├── engine.ts           # Move validation, board transformations, legal move generation
+│   │   │   ├── rulesConfig.ts      # Authoritative 1936 rules, piece counts, scoring & board constants
+│   │   │   ├── formatConfig.ts     # Match time controls, preset options & friend challenge defaults
 │   │   │   ├── vectors.ts          # Authoritative 64-square movement matrix (paths and targets)
 │   │   │   ├── replay.ts           # Non-destructive move history navigator and position replay
 │   │   │   └── scoring.ts          # Goal-line points and fractional tiebreaker calculations
 │   │   └── elo/                    # Dynamic K-factor Elo calculations and post-game deltas
 │   ├── services/
-│   │   ├── audio/                  # Procedural Web Audio API sound synthesizer
+│   │   ├── audio/                  # Procedural Web Audio API sound synthesizer and audioConfig
 │   │   ├── deployment/             # Chunk load error detector and debounced auto-reload service
+│   │   ├── device/                 # Haptics feedback vibration patterns and hapticsConfig
 │   │   ├── orientation/            # Mobile device orientation detector and portrait lock
-│   │   └── firebase/               # Firebase auth, presence, matchmaking, and offline mock fallback
+│   │   └── firebase/               # Firebase auth, presence, matchmaking, and scale configuration
 │   ├── components/
 │   │   ├── board/                  # SVG board rendering, piece icons, vector lines, square highlights
 │   │   ├── game/                   # Arena layout, player cards, digital clocks, move navigator, game over modal

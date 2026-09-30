@@ -12,6 +12,7 @@
 
 import { safeGetItem, safeSetItem } from '../storage/storageCleanup';
 import { SOUND_ASSET_PATHS } from './soundAssets';
+import { AUDIO_CONFIG } from './audioConfig';
 
 export class SoundService {
   private ctx: AudioContext | null = null;
@@ -34,7 +35,7 @@ export class SoundService {
 
   constructor() {
     if (typeof localStorage !== 'undefined') {
-      const saved = safeGetItem('schada_sound_muted');
+      const saved = safeGetItem(AUDIO_CONFIG.storageKeys.soundMuted);
       this.isMuted = saved === 'true';
     }
 
@@ -50,15 +51,7 @@ export class SoundService {
         }
       };
 
-      const activationEvents = [
-        'pointerdown',
-        'mousedown',
-        'touchstart',
-        'touchend',
-        'keydown',
-        'click',
-      ];
-      activationEvents.forEach((evt) => {
+      AUDIO_CONFIG.userActivationEvents.forEach((evt) => {
         window.addEventListener(evt, unlockAudio, { capture: true, passive: true });
       });
 
@@ -165,31 +158,33 @@ export class SoundService {
   private synthesizeMoveSound(ctx: AudioContext): void {
     try {
       const now = ctx.currentTime;
+      const { moveTransient, moveBody } = AUDIO_CONFIG.synthesis;
+
       // High-frequency transient impact
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.type = 'triangle';
-      osc1.frequency.setValueAtTime(450, now);
-      osc1.frequency.exponentialRampToValueAtTime(110, now + 0.04);
-      gain1.gain.setValueAtTime(0.35, now);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+      osc1.frequency.setValueAtTime(moveTransient.startFreq, now);
+      osc1.frequency.exponentialRampToValueAtTime(moveTransient.endFreq, now + moveTransient.duration);
+      gain1.gain.setValueAtTime(moveTransient.startGain, now);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + moveTransient.duration);
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
       osc1.start(now);
-      osc1.stop(now + 0.045);
+      osc1.stop(now + moveTransient.stopDelay);
 
       // Low wooden body resonance
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(160, now);
-      osc2.frequency.exponentialRampToValueAtTime(55, now + 0.06);
-      gain2.gain.setValueAtTime(0.4, now);
-      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+      osc2.frequency.setValueAtTime(moveBody.startFreq, now);
+      osc2.frequency.exponentialRampToValueAtTime(moveBody.endFreq, now + moveBody.duration);
+      gain2.gain.setValueAtTime(moveBody.startGain, now);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + moveBody.duration);
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
       osc2.start(now);
-      osc2.stop(now + 0.065);
+      osc2.stop(now + moveBody.stopDelay);
 
       osc1.onended = () => {
         try {
@@ -210,32 +205,34 @@ export class SoundService {
   private synthesizeCaptureSound(ctx: AudioContext): void {
     try {
       const now = ctx.currentTime;
+      const { captureImpact1, captureImpact2 } = AUDIO_CONFIG.synthesis;
+
       // First impact: piece striking piece
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.type = 'triangle';
-      osc1.frequency.setValueAtTime(620, now);
-      osc1.frequency.exponentialRampToValueAtTime(180, now + 0.035);
-      gain1.gain.setValueAtTime(0.4, now);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
+      osc1.frequency.setValueAtTime(captureImpact1.startFreq, now);
+      osc1.frequency.exponentialRampToValueAtTime(captureImpact1.endFreq, now + captureImpact1.duration);
+      gain1.gain.setValueAtTime(captureImpact1.startGain, now);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + captureImpact1.duration);
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
       osc1.start(now);
-      osc1.stop(now + 0.04);
+      osc1.stop(now + captureImpact1.stopDelay);
 
       // Second impact: piece settling on board square
-      const t2 = now + 0.022;
+      const t2 = now + captureImpact2.startDelay;
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(200, t2);
-      osc2.frequency.exponentialRampToValueAtTime(65, t2 + 0.055);
-      gain2.gain.setValueAtTime(0.45, t2);
-      gain2.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.055);
+      osc2.frequency.setValueAtTime(captureImpact2.startFreq, t2);
+      osc2.frequency.exponentialRampToValueAtTime(captureImpact2.endFreq, t2 + captureImpact2.duration);
+      gain2.gain.setValueAtTime(captureImpact2.startGain, t2);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, t2 + captureImpact2.duration);
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
       osc2.start(t2);
-      osc2.stop(t2 + 0.06);
+      osc2.stop(t2 + captureImpact2.stopDelay);
 
       osc2.onended = () => {
         try {
@@ -321,7 +318,7 @@ export class SoundService {
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
-    safeSetItem('schada_sound_muted', String(this.isMuted));
+    safeSetItem(AUDIO_CONFIG.storageKeys.soundMuted, String(this.isMuted));
     if (this.isMuted) {
       if (this.ctx) {
         this.ctx.suspend().catch(() => {});
@@ -343,7 +340,7 @@ export class SoundService {
 
   public setMuted(muted: boolean): void {
     this.isMuted = muted;
-    safeSetItem('schada_sound_muted', String(this.isMuted));
+    safeSetItem(AUDIO_CONFIG.storageKeys.soundMuted, String(this.isMuted));
     if (this.isMuted) {
       if (this.ctx) {
         this.ctx.suspend().catch(() => {});
@@ -363,7 +360,7 @@ export class SoundService {
     if (this.isMuted) return;
 
     const now = Date.now();
-    if (now - this.lastMoveSoundTime < 40) return;
+    if (now - this.lastMoveSoundTime < AUDIO_CONFIG.debounce.moveDebounceMs) return;
     this.lastMoveSoundTime = now;
 
     const ctx = this.ensureContext();
@@ -390,7 +387,7 @@ export class SoundService {
     if (this.isMuted) return;
 
     const now = Date.now();
-    if (now - this.lastCaptureSoundTime < 40) return;
+    if (now - this.lastCaptureSoundTime < AUDIO_CONFIG.debounce.captureDebounceMs) return;
     this.lastCaptureSoundTime = now;
 
     const ctx = this.ensureContext();
@@ -420,20 +417,20 @@ export class SoundService {
 
     const executeGoal = (activeCtx: AudioContext) => {
       try {
-        const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5 major triad
+        const { triadFrequencies, staggerStep, duration, gain: targetGain } = AUDIO_CONFIG.synthesis.goalChime;
         const now = activeCtx.currentTime;
 
-        freqs.forEach((freq, idx) => {
+        triadFrequencies.forEach((freq, idx) => {
           const osc = activeCtx.createOscillator();
           const gain = activeCtx.createGain();
 
-          const startT = now + idx * 0.06;
-          const endT = startT + 0.38;
+          const startT = now + idx * staggerStep;
+          const endT = startT + duration;
 
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, startT);
 
-          gain.gain.setValueAtTime(0.2, startT);
+          gain.gain.setValueAtTime(targetGain, startT);
           gain.gain.linearRampToValueAtTime(0.0001, endT);
 
           osc.connect(gain);
@@ -471,21 +468,22 @@ export class SoundService {
 
     const executeTick = (activeCtx: AudioContext) => {
       try {
+        const { freq, gain: tickGain, duration, stopDelay } = AUDIO_CONFIG.synthesis.clockTick;
         const now = activeCtx.currentTime;
         const osc = activeCtx.createOscillator();
         const gain = activeCtx.createGain();
 
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.setValueAtTime(freq, now);
 
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.linearRampToValueAtTime(0.0001, now + 0.03);
+        gain.gain.setValueAtTime(tickGain, now);
+        gain.gain.linearRampToValueAtTime(0.0001, now + duration);
 
         osc.connect(gain);
         gain.connect(activeCtx.destination);
 
         osc.start(now);
-        osc.stop(now + 0.035);
+        osc.stop(now + stopDelay);
 
         osc.onended = () => {
           try {
@@ -512,7 +510,7 @@ export class SoundService {
     if (this.isMuted) return;
 
     const now = Date.now();
-    if (now - this.lastVictorySoundTime < 2000) return;
+    if (now - this.lastVictorySoundTime < AUDIO_CONFIG.debounce.victoryDebounceMs) return;
     this.lastVictorySoundTime = now;
 
     const ctx = this.ensureContext();
@@ -520,20 +518,20 @@ export class SoundService {
 
     const executeVictory = (activeCtx: AudioContext) => {
       try {
-        const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+        const { noteFrequencies, staggerStep, duration, gain: victoryGain } = AUDIO_CONFIG.synthesis.victoryFanfare;
         const now = activeCtx.currentTime;
 
-        notes.forEach((freq, idx) => {
+        noteFrequencies.forEach((freq, idx) => {
           const osc = activeCtx.createOscillator();
           const gain = activeCtx.createGain();
 
-          const startT = now + idx * 0.1;
-          const endT = startT + 0.35;
+          const startT = now + idx * staggerStep;
+          const endT = startT + duration;
 
           osc.type = 'triangle';
           osc.frequency.setValueAtTime(freq, startT);
 
-          gain.gain.setValueAtTime(0.2, startT);
+          gain.gain.setValueAtTime(victoryGain, startT);
           gain.gain.linearRampToValueAtTime(0.0001, endT);
 
           osc.connect(gain);
@@ -563,5 +561,6 @@ export class SoundService {
     }
   }
 }
+
 
 export const soundService = new SoundService();

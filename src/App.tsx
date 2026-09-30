@@ -31,7 +31,9 @@ const CustomGameModal = lazy(() => import('./components/lobby/CustomGameModal').
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { ELO_CONFIG } from './core/elo/eloConfig';
+import { FORMAT_CONFIG } from './core/schada/formatConfig';
 import { localBackend, type UserProfile } from './services/firebase/localProvider';
+
 import { updateUserStats } from './services/firebase/authService';
 import {
   createGame,
@@ -244,10 +246,20 @@ const MainApp: React.FC = () => {
     setFriendsOpen(false);
 
     setActiveMatch({
-      bluePlayer: { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed || 0 },
-      greenPlayer: { id: friend.id, username: friend.username, elo: friend.eloRating, gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed },
-      timeControlMinutes: 5,
-      incrementSeconds: 0,
+      bluePlayer: {
+        id: user.id,
+        username: user.username,
+        elo: user.eloRating,
+        gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+      },
+      greenPlayer: {
+        id: friend.id,
+        username: friend.username,
+        elo: friend.eloRating,
+        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+      },
+      timeControlMinutes: FORMAT_CONFIG.defaultFriendChallenge.minutes,
+      incrementSeconds: FORMAT_CONFIG.defaultFriendChallenge.increment,
       isRanked: true,
       userColor: 'blue',
       isComputer: false,
@@ -257,31 +269,42 @@ const MainApp: React.FC = () => {
 
   // Custom Match Creation (Player vs Player) - Routes to Multiplayer Room
   const handleCreateCustom = async (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => {
-    let guestId = localStorage.getItem('schada_guest_id');
+    const { guestId: guestIdKey, guestName: guestNameKey } =
+      MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
+    let guestId = localStorage.getItem(guestIdKey);
     if (!guestId) {
       guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      safeSetItem('schada_guest_id', guestId);
+      safeSetItem(guestIdKey, guestId);
     }
 
     const creator = user
-      ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed }
+      ? {
+          id: user.id,
+          username: user.username,
+          elo: user.eloRating,
+          gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        }
       : {
-        id: guestId,
-        username:
-          localStorage.getItem('schada_guest_name') ||
-          MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName,
-        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
-      };
+          id: guestId,
+          username: (() => {
+            const stored = localStorage.getItem(guestNameKey);
+            return stored && stored.trim().length > 0
+              ? stored
+              : MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
+          })(),
+          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+        };
 
     const result = await createGame({
       timeControlMinutes: minutes,
       incrementSeconds: minutes === 0 ? 0 : increment,
       isRanked: isRanked && Boolean(user),
-      colorPref: colorPref || 'random',
+      colorPref: colorPref ?? 'random',
       isPrivate: false,
       creator,
     });
+
 
     navigate(`/game/${result.gameId}`);
   };

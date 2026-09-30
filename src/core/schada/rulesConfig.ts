@@ -25,6 +25,11 @@ export interface SchadaRulesConfig {
     readonly officersCount: number;
     readonly pawnsCount: number;
     readonly totalPiecesPerPlayer: number;
+    readonly materialDisplayWeights: {
+      readonly fieldOfficer: number;
+      readonly officer: number;
+      readonly pawn: number;
+    };
   };
   readonly scoring: {
     readonly fieldOfficerGoalPoints: number;
@@ -45,6 +50,7 @@ export interface SchadaRulesConfig {
     readonly greenBaseRankIndex: number;
     readonly greenGoalRankIndex: number;
     readonly openingLegalMoveCount: number;
+    readonly defaultOrientation: 'blue' | 'green';
   };
   readonly endConditions: {
     readonly threefoldRepetitionThreshold: number;
@@ -82,6 +88,18 @@ export function validateRulesConfig(config: SchadaRulesConfig): void {
     );
   }
 
+  if (
+    !army.materialDisplayWeights ||
+    typeof army.materialDisplayWeights.fieldOfficer !== 'number' ||
+    army.materialDisplayWeights.fieldOfficer <= 0 ||
+    typeof army.materialDisplayWeights.officer !== 'number' ||
+    army.materialDisplayWeights.officer <= 0 ||
+    typeof army.materialDisplayWeights.pawn !== 'number' ||
+    army.materialDisplayWeights.pawn <= 0
+  ) {
+    throw new SchadaRulesConfigError('Invalid army materialDisplayWeights: must have positive numeric weights.');
+  }
+
   if (!scoring || scoring.fieldOfficerGoalPoints !== 2 || scoring.officerGoalPoints !== 1 || scoring.pawnGoalPoints !== 0) {
     throw new SchadaRulesConfigError(
       'Invalid scoring points. Expected Field Officer=2, Officer=1, Pawn=0.'
@@ -91,6 +109,12 @@ export function validateRulesConfig(config: SchadaRulesConfig): void {
   if (!board || board.totalSquares !== board.rankCount * board.fileCount || board.totalSquares !== 64) {
     throw new SchadaRulesConfigError(
       `Invalid board dimensions. Expected 8x8 = 64 squares, received ${board?.rankCount}x${board?.fileCount} = ${board?.totalSquares}.`
+    );
+  }
+
+  if (board.defaultOrientation !== 'blue' && board.defaultOrientation !== 'green') {
+    throw new SchadaRulesConfigError(
+      `Invalid board defaultOrientation: expected "blue" or "green", received ${String(board?.defaultOrientation)}.`
     );
   }
 
@@ -125,6 +149,11 @@ export const SCHADA_RULES_CONFIG: SchadaRulesConfig = Object.freeze({
     officersCount: 4,
     pawnsCount: 8,
     totalPiecesPerPlayer: 16,
+    materialDisplayWeights: {
+      fieldOfficer: 3,
+      officer: 2,
+      pawn: 1,
+    },
   },
   scoring: {
     fieldOfficerGoalPoints: 2,
@@ -145,6 +174,7 @@ export const SCHADA_RULES_CONFIG: SchadaRulesConfig = Object.freeze({
     greenBaseRankIndex: 7, // Rank 8
     greenGoalRankIndex: 0, // Rank 1
     openingLegalMoveCount: 14,
+    defaultOrientation: 'blue' as const,
   },
   endConditions: {
     threefoldRepetitionThreshold: 3,

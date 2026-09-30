@@ -1,4 +1,5 @@
 import type { PieceColor } from '../schada/types';
+import { SCHADA_RULES_CONFIG } from '../schada/rulesConfig';
 import {
   FastBoard,
   EMPTY,
@@ -32,8 +33,9 @@ export interface ScoreBreakdownFast {
  */
 export function calculateFastScore(board: FastBoard, color: PieceColor): ScoreBreakdownFast {
   const isBlue = color === 'blue';
-  const goalRank = isBlue ? 7 : 0;
-  const baseRank = isBlue ? 0 : 7;
+  const goalRank = isBlue ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+  const baseRank = isBlue ? SCHADA_RULES_CONFIG.board.blueBaseRankIndex : SCHADA_RULES_CONFIG.board.greenBaseRankIndex;
+  const scoring = SCHADA_RULES_CONFIG.scoring;
 
   let goalScore = 0;
   let outsideHighScore = 0;
@@ -50,19 +52,19 @@ export function calculateFastScore(board: FastBoard, color: PieceColor): ScoreBr
 
     if (isFO) {
       if (row === goalRank) {
-        goalScore += 2;
+        goalScore += scoring.fieldOfficerGoalPoints;
       } else {
-        outsideHighScore += 2;
+        outsideHighScore += scoring.fieldOfficerSurvivingPoints;
         const distFromBase = Math.abs(row - baseRank);
-        rankDistanceScore += (distFromBase * 2) / 7;
+        rankDistanceScore += (distFromBase * scoring.fieldOfficerRankDistanceNumerator) / scoring.rankDistanceDenominator;
       }
     } else if (isO) {
       if (row === goalRank) {
-        goalScore += 1;
+        goalScore += scoring.officerGoalPoints;
       } else {
-        outsideHighScore += 1;
+        outsideHighScore += scoring.officerSurvivingPoints;
         const distFromBase = Math.abs(row - baseRank);
-        rankDistanceScore += (distFromBase * 1) / 7;
+        rankDistanceScore += (distFromBase * scoring.officerRankDistanceNumerator) / scoring.rankDistanceDenominator;
       }
     }
   }
@@ -190,7 +192,7 @@ export function evaluateBoard(
     }
 
     // Distance to Goal for high pieces outside goal (Levels 3+)
-    if (tier.level >= 3 && (isFO || isO) && !inGoal) {
+    if (tier.level >= BOT_ENGINE_CONFIG.searchParameters.distanceHeuristicsMinTier && (isFO || isO) && !inGoal) {
       let dist = 0;
       if (isPieceBlue) {
         dist = isFO ? DISTANCE_TABLES.blueLeaping[idx] : DISTANCE_TABLES.blueSliding[idx];
@@ -203,7 +205,7 @@ export function evaluateBoard(
         if (isFriendly) myDistanceScore -= weights.trappedDistancePenalty;
         else oppDistanceScore -= weights.trappedDistancePenalty;
       } else {
-        const progress = (8 - dist) * distWeight;
+        const progress = (SCHADA_RULES_CONFIG.board.rankCount - dist) * distWeight;
         if (isFriendly) myDistanceScore += progress;
         else oppDistanceScore += progress;
       }
@@ -246,13 +248,13 @@ export function evaluateBoard(
 
     if (myHighRemaining === 1 && pointMargin < 0) {
       score -= weights.pacingTrailingPenalty;
-    } else if (myHighRemaining === 1 && pointMargin > 1.0) {
+    } else if (myHighRemaining === 1 && pointMargin > BOT_ENGINE_CONFIG.searchParameters.pacingLeadingMarginThreshold) {
       score += weights.pacingLeadingBonus;
     }
   }
 
   // Fractional tiebreaker bonus for Expert/Master (Levels 7-8)
-  if (tier.level >= 7) {
+  if (tier.level >= BOT_ENGINE_CONFIG.searchParameters.fractionalTiebreakMinTier) {
     const myScore = calculateFastScore(board, evalColor);
     const oppColor = isEvalBlue ? 'green' : 'blue';
     const oppScore = calculateFastScore(board, oppColor);

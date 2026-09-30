@@ -14,11 +14,19 @@ import { GameControls } from './GameControls';
 import { GameOverModal, type PlayerEloUpdate } from './GameOverModal';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
+import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 
 /** Pure helper - defined at module scope so it is never re-created on render. */
 function getMaterialValue(pieces: Piece[]): number {
+  const weights = SCHADA_RULES_CONFIG.army.materialDisplayWeights;
   return pieces.reduce(
-    (sum, p) => sum + (p.type === 'field_officer' ? 3 : p.type === 'officer' ? 2 : 1),
+    (sum, p) =>
+      sum +
+      (p.type === 'field_officer'
+        ? weights.fieldOfficer
+        : p.type === 'officer'
+          ? weights.officer
+          : weights.pawn),
     0
   );
 }
@@ -220,13 +228,15 @@ export const Arena: React.FC<ArenaProps> = ({
 
   useEffect(() => {
     if (typeof syncedBlueTimeMs === 'number') {
-      setBlueTime((prev) => (Math.abs(prev - syncedBlueTimeMs) > 1500 ? syncedBlueTimeMs : prev));
+      const threshold = MULTIPLAYER_SCALE_CONFIG.matchmaking.clockSyncJitterThresholdMs;
+      setBlueTime((prev) => (Math.abs(prev - syncedBlueTimeMs) > threshold ? syncedBlueTimeMs : prev));
     }
   }, [syncedBlueTimeMs]);
 
   useEffect(() => {
     if (typeof syncedGreenTimeMs === 'number') {
-      setGreenTime((prev) => (Math.abs(prev - syncedGreenTimeMs) > 1500 ? syncedGreenTimeMs : prev));
+      const threshold = MULTIPLAYER_SCALE_CONFIG.matchmaking.clockSyncJitterThresholdMs;
+      setGreenTime((prev) => (Math.abs(prev - syncedGreenTimeMs) > threshold ? syncedGreenTimeMs : prev));
     }
   }, [syncedGreenTimeMs]);
 

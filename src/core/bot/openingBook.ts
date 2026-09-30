@@ -583,8 +583,8 @@ export function shouldTierUseOpeningBook(
     return false;
   }
 
-  if (level === 2) {
-    // Level 2 has 30% chance to deviate / blunder in opening
+  if (level === config.tier2DeviateLevel) {
+    // Level 2 has configurable chance to deviate / blunder in opening
     return Math.random() < config.tier2BookProbability;
   }
 

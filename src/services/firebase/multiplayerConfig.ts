@@ -54,6 +54,7 @@ export interface MatchmakingConfig {
   readonly friendBatchLookupSize: number;
   readonly leaderboardLimit: number;
   readonly leaderboardCacheTtlMs: number;
+  readonly clockSyncJitterThresholdMs: number;
 }
 
 export interface MultiplayerCollectionsConfig {
@@ -62,6 +63,7 @@ export interface MultiplayerCollectionsConfig {
   readonly games: string;
   readonly guestSessions: string;
   readonly lobbyStats: string;
+  readonly lobbyStatsDocId: string;
   readonly friendRequests: string;
   readonly userFriends: string;
 }
@@ -73,6 +75,7 @@ export interface StorageLimitsConfig {
   readonly emergencyRetainedTokens: number;
   readonly testStorageKey: string;
   readonly firestoreKeyPrefix: string;
+  readonly legacyActiveSessions: string;
 }
 
 export interface MultiplayerScaleConfig {
@@ -342,13 +345,19 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
+  if (typeof matchmaking.clockSyncJitterThresholdMs !== 'number' || matchmaking.clockSyncJitterThresholdMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.clockSyncJitterThresholdMs: expected positive number, received ${matchmaking.clockSyncJitterThresholdMs}.`
+    );
+  }
+
   const { collections } = config;
   if (!collections || typeof collections !== 'object') {
     throw new MultiplayerConfigError('Collections configuration section is missing or invalid.');
   }
 
-  const { users, usernames, games, guestSessions, lobbyStats, friendRequests, userFriends } = collections;
-  const collectionEntries = { users, usernames, games, guestSessions, lobbyStats, friendRequests, userFriends };
+  const { users, usernames, games, guestSessions, lobbyStats, lobbyStatsDocId, friendRequests, userFriends } = collections;
+  const collectionEntries = { users, usernames, games, guestSessions, lobbyStats, lobbyStatsDocId, friendRequests, userFriends };
   for (const [colName, val] of Object.entries(collectionEntries)) {
     if (typeof val !== 'string' || val.trim().length === 0) {
       throw new MultiplayerConfigError(`Invalid collections.${colName}: expected non-empty string.`);
@@ -390,6 +399,10 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
 
   if (typeof storageLimits.firestoreKeyPrefix !== 'string' || storageLimits.firestoreKeyPrefix.trim().length === 0) {
     throw new MultiplayerConfigError('Invalid storageLimits.firestoreKeyPrefix: expected non-empty string.');
+  }
+
+  if (typeof storageLimits.legacyActiveSessions !== 'string' || storageLimits.legacyActiveSessions.trim().length === 0) {
+    throw new MultiplayerConfigError('Invalid storageLimits.legacyActiveSessions: expected non-empty string.');
   }
 }
 
@@ -439,6 +452,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     friendBatchLookupSize: 30,
     leaderboardLimit: 50,
     leaderboardCacheTtlMs: 5 * 60 * 1000,
+    clockSyncJitterThresholdMs: 1500,
   }),
   collections: Object.freeze({
     users: 'users',
@@ -446,6 +460,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     games: 'games',
     guestSessions: 'guest_sessions',
     lobbyStats: 'stats',
+    lobbyStatsDocId: 'lobby',
     friendRequests: 'friendRequests',
     userFriends: 'userFriends',
   }),
@@ -456,6 +471,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     emergencyRetainedTokens: 5,
     testStorageKey: '__schada_storage_test__',
     firestoreKeyPrefix: 'firestore_',
+    legacyActiveSessions: 'schada_active_sessions',
   }),
 });
 

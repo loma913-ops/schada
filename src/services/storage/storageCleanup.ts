@@ -123,7 +123,7 @@ export function cleanupBrowserStorage(emergency: boolean = false): void {
     // 4. Prune stale active presence sessions
     const sessionKeys = [
       MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.activeSessions,
-      'schada_active_sessions', // legacy key support
+      MULTIPLAYER_SCALE_CONFIG.storageLimits.legacyActiveSessions,
     ];
     for (const activeSessionsKey of sessionKeys) {
       const rawSessions = localStorage.getItem(activeSessionsKey);

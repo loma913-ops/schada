@@ -11,6 +11,7 @@ import {
 } from './fastBoard';
 import { evaluateBoard, evaluateTerminalWin, TERMINAL_WIN, TERMINAL_LOSS } from './evaluator';
 import { BOT_ENGINE_CONFIG, type BotTierConfig } from './botConfig';
+import { SCHADA_RULES_CONFIG } from '../schada/rulesConfig';
 import { DISTANCE_TABLES } from './distanceTables';
 
 const TT_SIZE = BOT_ENGINE_CONFIG.searchParameters.transpositionTableSize;
@@ -26,7 +27,7 @@ const ZOBRIST_FLAGS = new Uint32Array(64 * 4);
 let ZOBRIST_TURN = 0;
 
 (() => {
-  let seed = 0x853c49e6;
+  let seed = BOT_ENGINE_CONFIG.searchParameters.zobristSeed;
   function rand(): number {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed;
@@ -154,7 +155,7 @@ function scoreMoveForOrdering(
   const isHigh = move.piece === BLUE_FO || move.piece === BLUE_O || move.piece === GREEN_FO || move.piece === GREEN_O;
   const destRow = Math.floor(move.to / 8);
   const isBlue = move.piece <= 3;
-  const goalRow = isBlue ? 7 : 0;
+  const goalRow = isBlue ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
   if (isHigh && destRow === goalRow) {
     return sp.goalEntryBonus;
   }
@@ -410,7 +411,7 @@ export function searchBestMove(
   if (legalMoves.length === 0) return null;
 
   // Level 1: Opportunistic greedy captures, else pick random non-goal-shuffling moves
-  if (tier.level === 1) {
+  if (tier.level === BOT_ENGINE_CONFIG.defaultLevel) {
     const captures = legalMoves.filter((m) => m.captured !== EMPTY);
     if (captures.length > 0 && Math.random() > tier.blunderRate) {
       captures.sort((a, b) => getPieceMaterialScore(b.captured) - getPieceMaterialScore(a.captured));
@@ -420,7 +421,7 @@ export function searchBestMove(
     const nonGoalShuffle = legalMoves.filter((m) => {
       const isHigh = m.piece === BLUE_FO || m.piece === BLUE_O || m.piece === GREEN_FO || m.piece === GREEN_O;
       const fromRow = Math.floor(m.from / 8);
-      const goalRow = m.piece <= 3 ? 7 : 0;
+      const goalRow = m.piece <= 3 ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
       return !(isHigh && fromRow === goalRow);
     });
     const pool = nonGoalShuffle.length > 0 ? nonGoalShuffle : legalMoves;
@@ -429,7 +430,7 @@ export function searchBestMove(
   }
 
   // Level 2: 1-ply Minimax with blunder noise
-  if (tier.level === 2) {
+  if (tier.level === BOT_ENGINE_CONFIG.searchParameters.blunderProneMinTier) {
     const scoredMoves = legalMoves.map((m) => {
       board.makeMove(m);
       const evalScore = -evaluateBoard(board, board.currentTurn, tier, 1);

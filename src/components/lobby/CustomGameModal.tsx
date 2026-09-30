@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Play } from 'lucide-react';
 import type { PieceColor } from '@/core/schada/types';
 import { useAuth } from '@/context/AuthContext';
+import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
 
 interface CustomGameModalProps {
   isOpen: boolean;
@@ -17,8 +18,9 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
   const { user } = useAuth();
   const isGuest = !user;
 
-  const [minutes, setMinutes] = useState(5);
-  const [increment, setIncrement] = useState(0);
+  const [minutes, setMinutes] = useState(FORMAT_CONFIG.defaultMatchMinutes);
+  const [increment, setIncrement] = useState(FORMAT_CONFIG.defaultIncrementSeconds);
+
   const [isRanked, setIsRanked] = useState(!isGuest);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
   const [loading, setLoading] = useState(false);
@@ -52,7 +54,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
         <div className="form-group">
           <label className="form-label">Time Control (Minutes per player)</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
-            {[1, 3, 5, 10, 0].map((m) => (
+            {FORMAT_CONFIG.modalSelectableMinutes.map((m) => (
               <button
                 key={m}
                 type="button"
@@ -71,7 +73,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
           <div className="form-group">
             <label className="form-label">Increment per move</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
-              {[0, 1, 2, 3, 5].map((sec) => (
+              {FORMAT_CONFIG.modalSelectableIncrements.map((sec) => (
                 <button
                   key={sec}
                   type="button"
@@ -85,6 +87,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
             </div>
           </div>
         )}
+
 
         {/* Match Type (Ranked vs Casual) */}
         <div className="form-group">

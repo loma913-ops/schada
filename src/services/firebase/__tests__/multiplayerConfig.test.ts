@@ -298,5 +298,38 @@ describe('MultiplayerScaleConfig validation', () => {
     expect(() => validateMultiplayerScaleConfig(emptyTestStorageKey as MultiplayerScaleConfig)).toThrowError(
       /Invalid storageLimits.testStorageKey/
     );
+
+    const invalidClockSync = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        clockSyncJitterThresholdMs: 0,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidClockSync as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.clockSyncJitterThresholdMs/
+    );
+
+    const emptyLobbyStatsDocId = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      collections: {
+        ...MULTIPLAYER_SCALE_CONFIG.collections,
+        lobbyStatsDocId: '   ',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyLobbyStatsDocId as MultiplayerScaleConfig)).toThrowError(
+      /Invalid collections.lobbyStatsDocId/
+    );
+
+    const emptyLegacySessions = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      storageLimits: {
+        ...MULTIPLAYER_SCALE_CONFIG.storageLimits,
+        legacyActiveSessions: '',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyLegacySessions as MultiplayerScaleConfig)).toThrowError(
+      /Invalid storageLimits.legacyActiveSessions/
+    );
   });
 });

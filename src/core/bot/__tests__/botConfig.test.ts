@@ -194,6 +194,55 @@ describe('Bot Configuration Validator & Error Handling', () => {
       openingBook: { ...BOT_ENGINE_CONFIG.openingBook, bookThinkingDelayMs: -10 },
     };
     expect(() => validateBotConfig(invalidDelay)).toThrow(BotConfigError);
+
+    const invalidDeviateLevel: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      openingBook: { ...BOT_ENGINE_CONFIG.openingBook, tier2DeviateLevel: 9 },
+    };
+    expect(() => validateBotConfig(invalidDeviateLevel)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidDeviateLevel)).toThrow(/openingBook.tier2DeviateLevel must be an integer between 1 and 8/);
+  });
+
+  it('throws BotConfigError if zobristSeed, tier thresholds, or pacing margin are invalid', () => {
+    const invalidZobrist: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      searchParameters: {
+        ...BOT_ENGINE_CONFIG.searchParameters,
+        zobristSeed: NaN,
+      },
+    };
+    expect(() => validateBotConfig(invalidZobrist)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidZobrist)).toThrow(/zobristSeed must be a valid number/);
+
+    const invalidTierThreshold: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      searchParameters: {
+        ...BOT_ENGINE_CONFIG.searchParameters,
+        distanceHeuristicsMinTier: 0,
+      },
+    };
+    expect(() => validateBotConfig(invalidTierThreshold)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidTierThreshold)).toThrow(/Search tier thresholds must be integers between 1 and 8/);
+
+    const invalidFloatThreshold: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      searchParameters: {
+        ...BOT_ENGINE_CONFIG.searchParameters,
+        distanceHeuristicsMinTier: 2.5,
+      },
+    };
+    expect(() => validateBotConfig(invalidFloatThreshold)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidFloatThreshold)).toThrow(/Search tier thresholds must be integers between 1 and 8/);
+
+    const invalidFloatDeviate: BotEngineConfig = {
+      ...BOT_ENGINE_CONFIG,
+      openingBook: {
+        ...BOT_ENGINE_CONFIG.openingBook,
+        tier2DeviateLevel: 2.5,
+      },
+    };
+    expect(() => validateBotConfig(invalidFloatDeviate)).toThrow(BotConfigError);
+    expect(() => validateBotConfig(invalidFloatDeviate)).toThrow(/openingBook.tier2DeviateLevel must be an integer between 1 and 8/);
   });
 });
 

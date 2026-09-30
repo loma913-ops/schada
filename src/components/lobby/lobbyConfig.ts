@@ -44,6 +44,17 @@ export interface LobbyConfig {
   readonly defaultFilters: LobbyFilterState;
 }
 
+/**
+ * Validates canonical lobby configuration at startup.
+ * Throws LobbyConfigError if configuration is missing, null, or contains invalid parameters.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time, checking static numeric cutoffs.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant, perfectly stable across application lifetime.
+ */
 export function validateLobbyConfig(config: LobbyConfig): void {
   if (!config) {
     throw new LobbyConfigError('Configuration object is missing or null.');
@@ -156,6 +167,13 @@ validateLobbyConfig(LOBBY_CONFIG);
  * Safely parses serialized filter preferences from local storage.
  * Performs deep field-by-field validation, preventing corrupted state
  * from breaking the UI.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time, bounded JSON parse of fixed schema filter properties.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant, independent of lobby activity.
  */
 export function parseStoredLobbyFilters(
   savedJson: string | null,
@@ -207,6 +225,13 @@ export function parseStoredLobbyFilters(
  * Categorizes a time control into bullet, blitz, rapid, or classical.
  * Uses the standard estimated game duration formula:
  * Estimated = minutes + (increment * estimatedMovesPerGame) / secondsPerMinute.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time arithmetic calculation.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant, fully scalable with zero heap allocation.
  */
 export function determineTimeCategory(
   minutes: number,
@@ -216,11 +241,13 @@ export function determineTimeCategory(
   if (typeof minutes !== 'number' || minutes < 0 || isNaN(minutes)) {
     throw new TypeError(`Invalid minutes: expected non-negative number, received ${minutes}.`);
   }
-  const inc = typeof increment === 'number' && !isNaN(increment) && increment >= 0 ? increment : 0;
+  if (typeof increment !== 'number' || increment < 0 || isNaN(increment)) {
+    throw new TypeError(`Invalid increment: expected non-negative number, received ${increment}.`);
+  }
 
   if (minutes === 0) return 'classical';
 
-  const estimated = minutes + (inc * config.estimatedMovesPerGame) / config.secondsPerMinute;
+  const estimated = minutes + (increment * config.estimatedMovesPerGame) / config.secondsPerMinute;
   if (estimated < config.bulletCutoffMinutes) return 'bullet';
   if (estimated < config.blitzCutoffMinutes) return 'blitz';
   if (estimated < config.rapidCutoffMinutes) return 'rapid';
@@ -229,15 +256,25 @@ export function determineTimeCategory(
 
 /**
  * Formats a time control pair into a human-readable display string.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time string formatting.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant, zero non-trivial allocation overhead.
  */
 export function formatTimeControlDisplay(minutes: number, increment: number): string {
   if (typeof minutes !== 'number' || isNaN(minutes) || minutes < 0) {
     throw new TypeError(`Invalid minutes: expected non-negative number, received ${minutes}.`);
   }
-  const inc = typeof increment === 'number' && !isNaN(increment) && increment >= 0 ? increment : 0;
+  if (typeof increment !== 'number' || isNaN(increment) || increment < 0) {
+    throw new TypeError(`Invalid increment: expected non-negative number, received ${increment}.`);
+  }
 
   if (minutes === 0) return '∞';
-  if (minutes === 0.5) return `½+${inc}`;
-  if (minutes === 1.5) return `1.5+${inc}`;
-  return `${minutes}+${inc}`;
+  if (minutes === 0.5) return `½+${increment}`;
+  if (minutes === 1.5) return `1.5+${increment}`;
+  return `${minutes}+${increment}`;
 }
+

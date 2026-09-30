@@ -24,6 +24,7 @@ describe('SCHADA_RULES_CONFIG', () => {
     const invalidArmyConfig: SchadaRulesConfig = {
       ...SCHADA_RULES_CONFIG,
       army: {
+        ...SCHADA_RULES_CONFIG.army,
         fieldOfficersCount: 5, // invalid
         officersCount: 4,
         pawnsCount: 8,
@@ -71,6 +72,36 @@ describe('SCHADA_RULES_CONFIG', () => {
     };
     expect(() => validateRulesConfig(invalidEndConfig)).toThrowError(
       /Invalid end conditions/
+    );
+  });
+
+  it('throws descriptive error if material display weights are non-positive or missing', () => {
+    const invalidWeightsConfig: SchadaRulesConfig = {
+      ...SCHADA_RULES_CONFIG,
+      army: {
+        ...SCHADA_RULES_CONFIG.army,
+        materialDisplayWeights: {
+          fieldOfficer: 0,
+          officer: 2,
+          pawn: 1,
+        },
+      },
+    };
+    expect(() => validateRulesConfig(invalidWeightsConfig)).toThrowError(
+      /Invalid army materialDisplayWeights/
+    );
+  });
+
+  it('throws descriptive error if defaultOrientation is invalid', () => {
+    const invalidOrientationConfig: SchadaRulesConfig = {
+      ...SCHADA_RULES_CONFIG,
+      board: {
+        ...SCHADA_RULES_CONFIG.board,
+        defaultOrientation: 'red' as any,
+      },
+    };
+    expect(() => validateRulesConfig(invalidOrientationConfig)).toThrowError(
+      /Invalid board defaultOrientation/
     );
   });
 });

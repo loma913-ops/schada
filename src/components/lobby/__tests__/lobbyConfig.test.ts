@@ -131,6 +131,12 @@ describe('LobbyConfig validation and helpers', () => {
       expect(() => determineTimeCategory(-1, 0)).toThrowError(TypeError);
       expect(() => determineTimeCategory(NaN, 0)).toThrowError(TypeError);
     });
+
+    it('throws on negative or invalid increment input', () => {
+      expect(() => determineTimeCategory(5, -1)).toThrowError(TypeError);
+      expect(() => determineTimeCategory(5, NaN)).toThrowError(TypeError);
+      expect(() => determineTimeCategory(5, 'invalid' as any)).toThrowError(TypeError);
+    });
   });
 
   describe('formatTimeControlDisplay', () => {
@@ -146,5 +152,12 @@ describe('LobbyConfig validation and helpers', () => {
       expect(() => formatTimeControlDisplay(-5, 0)).toThrowError(TypeError);
       expect(() => formatTimeControlDisplay(NaN, 0)).toThrowError(TypeError);
     });
+
+    it('throws on negative or invalid increment input', () => {
+      expect(() => formatTimeControlDisplay(5, -1)).toThrowError(TypeError);
+      expect(() => formatTimeControlDisplay(5, NaN)).toThrowError(TypeError);
+      expect(() => formatTimeControlDisplay(5, 'invalid' as any)).toThrowError(TypeError);
+    });
   });
 });
+

@@ -23,14 +23,24 @@ import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { LOCAL_CONFIG } from './localConfig';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { safeSetItem } from '../storage/storageCleanup';
+import { AUTH_CONFIG } from './authConfig';
 
 export function validateUsernameFormat(username: string): { valid: boolean; error?: string } {
   const trimmed = username.trim();
-  if (trimmed.length < 3 || trimmed.length > 20) {
-    return { valid: false, error: 'Username must be between 3 and 20 characters.' };
+  if (
+    trimmed.length < AUTH_CONFIG.minUsernameLength ||
+    trimmed.length > AUTH_CONFIG.maxUsernameLength
+  ) {
+    return {
+      valid: false,
+      error: `Username must be between ${AUTH_CONFIG.minUsernameLength} and ${AUTH_CONFIG.maxUsernameLength} characters.`,
+    };
   }
-  if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
-    return { valid: false, error: 'Username can only contain letters, numbers, and underscores.' };
+  if (!AUTH_CONFIG.usernameRegex.test(trimmed)) {
+    return {
+      valid: false,
+      error: `Username can only contain ${AUTH_CONFIG.usernameRegexDescription}.`,
+    };
   }
   return { valid: true };
 }
@@ -69,12 +79,13 @@ export async function setUserOnlineStatus(
   }
 
   const currentUid = typeof localStorage !== 'undefined'
-    ? localStorage.getItem('schada_mock_current_user_id')
+    ? localStorage.getItem(LOCAL_CONFIG.storageKeys.currentUserId)
     : null;
   if (currentUid) {
     localBackend.setUserStatus(currentUid, status);
   }
 }
+
 
 /**
  * Updates a user's Elo rating and match statistics across Firestore (if authenticated owner)

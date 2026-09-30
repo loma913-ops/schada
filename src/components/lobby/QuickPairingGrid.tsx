@@ -2,13 +2,9 @@ import React, { useState } from 'react';
 import { Cpu, Users, Settings2, Share2 } from 'lucide-react';
 import { OnlinePlayersCount } from './OnlinePlayersCount';
 
-export interface TimeControlOption {
-  display: string;
-  name: string;
-  minutes: number;
-  increment: number;
-  type: 'bullet' | 'blitz' | 'rapid' | 'classical';
-}
+import { FORMAT_CONFIG, type TimeControlPreset } from '@/core/schada/formatConfig';
+
+export type TimeControlOption = TimeControlPreset;
 
 interface QuickPairingGridProps {
   onSelectTimeControl: (minutes: number, increment: number, isRanked: boolean) => Promise<void> | void;
@@ -18,19 +14,8 @@ interface QuickPairingGridProps {
   onOpenCreateRoomModal: () => void;
 }
 
-export const TIME_CONTROL_PRESETS: TimeControlOption[] = [
-  { display: '1+0', name: 'Bullet', minutes: 1, increment: 0, type: 'bullet' },
-  { display: '2+1', name: 'Bullet', minutes: 2, increment: 1, type: 'bullet' },
-  { display: '3+0', name: 'Blitz', minutes: 3, increment: 0, type: 'blitz' },
-  { display: '3+2', name: 'Blitz', minutes: 3, increment: 2, type: 'blitz' },
-  { display: '5+0', name: 'Blitz', minutes: 5, increment: 0, type: 'blitz' },
-  { display: '5+3', name: 'Blitz', minutes: 5, increment: 3, type: 'blitz' },
-  { display: '10+0', name: 'Rapid', minutes: 10, increment: 0, type: 'rapid' },
-  { display: '10+5', name: 'Rapid', minutes: 10, increment: 5, type: 'rapid' },
-  { display: '15+10', name: 'Rapid', minutes: 15, increment: 10, type: 'rapid' },
-  { display: '30+0', name: 'Classical', minutes: 30, increment: 0, type: 'classical' },
-  { display: '30+20', name: 'Classical', minutes: 30, increment: 20, type: 'classical' },
-];
+export const TIME_CONTROL_PRESETS: readonly TimeControlOption[] = FORMAT_CONFIG.presets;
+
 
 export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
   onSelectTimeControl,

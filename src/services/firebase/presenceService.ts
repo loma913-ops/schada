@@ -720,7 +720,11 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
 
   if (isFirebaseConfigured() && db) {
     try {
-      const statsDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.lobbyStats, 'lobby');
+      const statsDocRef = doc(
+        db,
+        MULTIPLAYER_SCALE_CONFIG.collections.lobbyStats,
+        MULTIPLAYER_SCALE_CONFIG.collections.lobbyStatsDocId
+      );
 
       let lastServerCountsRefreshTime = 0;
       let inFlightRefreshPromise: Promise<void> | null = null;

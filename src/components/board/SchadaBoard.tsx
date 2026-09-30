@@ -4,6 +4,7 @@ import { colRowToSquare } from '@/core/schada/vectors';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
 import { BoardSquare } from './BoardSquare';
 import { haptics } from '@/services/device/haptics';
+import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 
 interface SchadaBoardProps {
   board: BoardMatrix;
@@ -15,7 +16,9 @@ interface SchadaBoardProps {
   disabled?: boolean;
 }
 
-export function getBoardSquaresForOrientation(orientation: 'blue' | 'green' = 'blue'): Square[] {
+export function getBoardSquaresForOrientation(
+  orientation: 'blue' | 'green' = SCHADA_RULES_CONFIG.board.defaultOrientation
+): Square[] {
   const result: Square[] = [];
   const rows = orientation === 'blue' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
   const cols = orientation === 'blue' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -38,7 +41,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = memo(({
   disabled = false,
 }) => {
   // Ensure board orientation defaults to player's pieces at bottom
-  const orientation: 'blue' | 'green' = propOrientation ?? playerColor ?? 'blue';
+  const orientation: 'blue' | 'green' = propOrientation ?? playerColor ?? SCHADA_RULES_CONFIG.board.defaultOrientation;
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
 
   // Compute legal moves for currently selected square

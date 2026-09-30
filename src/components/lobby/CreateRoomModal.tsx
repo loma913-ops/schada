@@ -3,7 +3,9 @@ import { X, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createGame } from '@/services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { safeSetItem } from '@/services/storage/storageCleanup';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
+import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
 import { useNavigate } from 'react-router-dom';
 
 interface CreateRoomModalProps {
@@ -16,8 +18,8 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
   const navigate = useNavigate();
   const isGuest = !user;
 
-  const [timeControl, setTimeControl] = useState<number>(5);
-  const [increment, setIncrement] = useState<number>(0);
+  const [timeControl, setTimeControl] = useState<number>(FORMAT_CONFIG.defaultMatchMinutes);
+  const [increment, setIncrement] = useState<number>(FORMAT_CONFIG.defaultIncrementSeconds);
   const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
   const [isPrivate, setIsPrivate] = useState<boolean>(false);
   const [isRanked, setIsRanked] = useState<boolean>(!isGuest);
@@ -25,24 +27,40 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
 
   const effectiveIsRanked = !isGuest && isRanked;
 
-
   if (!isOpen) return null;
 
   const handleCreate = async () => {
     setLoading(true);
     try {
+      const { guestId: guestIdKey, guestName: guestNameKey } =
+        MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
+      let guestId = localStorage.getItem(guestIdKey);
+      if (!guestId) {
+        guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
+        safeSetItem(guestIdKey, guestId);
+      }
+      const storedGuestName = localStorage.getItem(guestNameKey);
+      const guestName =
+        storedGuestName && storedGuestName.trim().length > 0
+          ? storedGuestName
+          : MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
+
       const creator = user
-        ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed ?? 0 }
+        ? {
+            id: user.id,
+            username: user.username,
+            elo: user.eloRating,
+            gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+          }
         : {
-          id: 'guest_' + Math.random().toString(36).substring(2, 7),
-          username:
-            localStorage.getItem('schada_guest_name') ||
-            MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName,
-          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
-        };
+            id: guestId,
+            username: guestName,
+            elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+            gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+          };
 
       const result = await createGame({
+
         timeControlMinutes: timeControl,
         incrementSeconds: increment,
         isRanked: effectiveIsRanked,
@@ -101,7 +119,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
             <div className="form-group">
               <label className="form-label">Time Control (Minutes per player)</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
-                {[1, 3, 5, 10, 0].map((m) => (
+                {FORMAT_CONFIG.modalSelectableMinutes.map((m) => (
                   <button
                     key={m}
                     type="button"
@@ -120,7 +138,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
               <div className="form-group">
                 <label className="form-label">Increment per move</label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
-                  {[0, 1, 2, 3, 5].map((sec) => (
+                  {FORMAT_CONFIG.modalSelectableIncrements.map((sec) => (
                     <button
                       key={sec}
                       type="button"
@@ -134,6 +152,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                 </div>
               </div>
             )}
+
 
             {/* Match Type (Ranked vs Casual) */}
             <div className="form-group">

@@ -52,6 +52,11 @@ export interface SearchParametersConfig {
   readonly timeoutCheckIntervalMask: number;
   readonly mvvLvaVictimMultiplier: number;
   readonly blunderPoolMaxCandidates: number;
+  readonly zobristSeed: number;
+  readonly distanceHeuristicsMinTier: number;
+  readonly pacingLeadingMarginThreshold: number;
+  readonly fractionalTiebreakMinTier: number;
+  readonly blunderProneMinTier: number;
 }
 
 export interface TimeManagementConfig {
@@ -70,8 +75,10 @@ export interface OpeningBookConfig {
   readonly maxPlies: number;
   readonly tier2BookProbability: number;
   readonly minTier: number;
+  readonly tier2DeviateLevel: number;
   readonly bookThinkingDelayMs: number;
 }
+
 
 export interface BotTierConfig {
   readonly level: number;
@@ -191,6 +198,28 @@ export function validateBotConfig(config: BotEngineConfig): void {
     throw new BotConfigError('searchParameters.blunderPoolMaxCandidates must be at least 2.');
   }
 
+  if (typeof searchParameters.zobristSeed !== 'number' || !Number.isFinite(searchParameters.zobristSeed)) {
+    throw new BotConfigError('searchParameters.zobristSeed must be a valid number.');
+  }
+
+  if (
+    !Number.isInteger(searchParameters.distanceHeuristicsMinTier) ||
+    searchParameters.distanceHeuristicsMinTier < 1 ||
+    searchParameters.distanceHeuristicsMinTier > 8 ||
+    !Number.isInteger(searchParameters.fractionalTiebreakMinTier) ||
+    searchParameters.fractionalTiebreakMinTier < 1 ||
+    searchParameters.fractionalTiebreakMinTier > 8 ||
+    !Number.isInteger(searchParameters.blunderProneMinTier) ||
+    searchParameters.blunderProneMinTier < 1 ||
+    searchParameters.blunderProneMinTier > 8
+  ) {
+    throw new BotConfigError('Search tier thresholds must be integers between 1 and 8.');
+  }
+
+  if (searchParameters.pacingLeadingMarginThreshold <= 0) {
+    throw new BotConfigError('searchParameters.pacingLeadingMarginThreshold must be positive.');
+  }
+
   // Validate Time Management
   if (timeManagement.clockDivisor <= 0) {
     throw new BotConfigError('clockDivisor must be positive.');
@@ -224,6 +253,14 @@ export function validateBotConfig(config: BotEngineConfig): void {
 
   if (openingBook.minTier < 1 || openingBook.minTier > 8) {
     throw new BotConfigError('openingBook.minTier must be between 1 and 8.');
+  }
+
+  if (
+    !Number.isInteger(openingBook.tier2DeviateLevel) ||
+    openingBook.tier2DeviateLevel < 1 ||
+    openingBook.tier2DeviateLevel > 8
+  ) {
+    throw new BotConfigError('openingBook.tier2DeviateLevel must be an integer between 1 and 8.');
   }
 
   if (openingBook.bookThinkingDelayMs < 0) {
@@ -310,6 +347,11 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
     timeoutCheckIntervalMask: 1023,
     mvvLvaVictimMultiplier: 10,
     blunderPoolMaxCandidates: 5,
+    zobristSeed: 0x853c49e6,
+    distanceHeuristicsMinTier: 3,
+    pacingLeadingMarginThreshold: 1.0,
+    fractionalTiebreakMinTier: 7,
+    blunderProneMinTier: 2,
   }),
   timeManagement: Object.freeze({
     clockDivisor: 25,
@@ -326,6 +368,7 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
     maxPlies: 4,
     tier2BookProbability: 0.70,
     minTier: 2,
+    tier2DeviateLevel: 2,
     bookThinkingDelayMs: 0,
   }),
   tiers: Object.freeze({
