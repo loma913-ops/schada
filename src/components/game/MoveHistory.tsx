@@ -63,13 +63,15 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
 
   return (
     <div className="move-history-container">
-      <MoveNavigator
-        currentIndex={currentMoveIndex}
-        totalMoves={history.length}
-        onNavigate={onNavigateMove}
-        config={config}
-      />
-      <div className="move-history-header">{config.historyCopy.headerTitle}</div>
+      <div className="move-history-sticky-top">
+        <MoveNavigator
+          currentIndex={currentMoveIndex}
+          totalMoves={history.length}
+          onNavigate={onNavigateMove}
+          config={config}
+        />
+        <div className="move-history-header">{config.historyCopy.headerTitle}</div>
+      </div>
       <div className="move-history-list" ref={listRef}>
         {movePairs.length === 0 ? (
           <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>

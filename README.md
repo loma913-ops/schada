@@ -102,6 +102,7 @@ Schada includes a non-destructive move navigation engine (`src/core/schada/repla
   - `Home`: Jump to starting position.
   - `End`: Jump to live position.
 - **Non-Destructive Inspection**: Navigating historical plies allows full inspection of captured pieces, board coordinates, and move annotations. Once a player is ready to make a move, navigating back to live mode immediately re-enables interactive piece movement.
+- **Sticky Controls (Desktop & Mobile)**: Navigation controls and match status remain pinned and sticky at the top across desktop panels and mobile notation sheets, ensuring controls never scroll out of sight during move review.
 - **Post-Game Game Review**: Following match completion, the Game Over modal can be closed via the 'Review' action, 'X' button, backdrop click, or `Escape` key, permitting full board inspection, move navigation, and board flipping. Players can reopen match results at any time via the 'Results' button or exit to the lobby via 'Lobby'.
 
 ---

@@ -10,6 +10,7 @@ import { RotateCcw, Flag, ListOrdered, X, ArrowLeft, Trophy } from 'lucide-react
 import { SchadaBoard } from '../board/SchadaBoard';
 import { PlayerCard } from './PlayerCard';
 import { MoveHistory } from './MoveHistory';
+import { MoveNavigator } from './MoveNavigator';
 import { GameControls } from './GameControls';
 import { GameOverModal, type PlayerEloUpdate } from './GameOverModal';
 import { calculateEloUpdate } from '@/core/elo/eloService';
@@ -604,6 +605,15 @@ export const Arena: React.FC<ArenaProps> = ({
             </button>
           </div>
 
+          {/* Mobile Move Navigation Controls */}
+          <div className="mobile-move-navigator">
+            <MoveNavigator
+              currentIndex={viewMoveIndex}
+              totalMoves={gameState.moveHistory.length}
+              onNavigate={setViewMoveIndex}
+            />
+          </div>
+
           <button
             className={`mobile-action-btn mobile-action-btn-moves ${mobileHistoryOpen ? 'active' : ''}`}
             onClick={() => setMobileHistoryOpen(true)}
@@ -619,7 +629,7 @@ export const Arena: React.FC<ArenaProps> = ({
       {/* Right Column: Game Controls, Move History, Status (Desktop) */}
       <div className="arena-panel-col">
         {/* Match Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="arena-match-header">
           <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             {timeControlMinutes > 0 ? `${timeControlMinutes}+${incrementSeconds}` : 'Unlimited'} •{' '}
             <span style={{ color: isRanked ? 'var(--accent-gold)' : 'var(--text-secondary)' }}>
@@ -670,6 +680,22 @@ export const Arena: React.FC<ArenaProps> = ({
               >
                 <X size={18} />
               </button>
+            </div>
+            {/* Match Header in Mobile Sheet */}
+            <div className="arena-match-header mobile">
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {timeControlMinutes > 0 ? `${timeControlMinutes}+${incrementSeconds}` : 'Unlimited'} •{' '}
+                <span style={{ color: isRanked ? 'var(--accent-gold)' : 'var(--text-secondary)' }}>
+                  {isSpectator ? 'Spectating' : isComputer ? `${getBotTier(botLevel).name} (Lvl ${botLevel})` : isRanked ? 'Ranked' : 'Casual'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {gameState.isGameOver ? (
+                  <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>GAME OVER</span>
+                ) : (
+                  <>Turn: <strong style={{ color: displayedGameState.currentTurn === 'blue' ? 'var(--piece-blue)' : 'var(--piece-green)' }}>{displayedGameState.currentTurn.toUpperCase()}</strong></>
+                )}
+              </div>
             </div>
             <div className="mobile-sheet-body">
               <MoveHistory
