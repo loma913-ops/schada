@@ -105,23 +105,23 @@ describe('Storage Sanitation & Quota Management Service', () => {
     expect(tokenCount).toBe(STORAGE_LIMITS.emergencyRetainedTokens);
   });
 
-  it('prunes mock games to maxMockGames limit keeping newest games', () => {
-    const mockGames: Record<string, any> = {};
+  it('prunes local games to maxLocalGames limit keeping newest games', () => {
+    const localGames: Record<string, any> = {};
     for (let i = 1; i <= 10; i++) {
-      mockGames[`game_${i}`] = {
+      localGames[`game_${i}`] = {
         id: `game_${i}`,
         createdAt: i * 1000,
         updatedAt: i * 1000,
       };
     }
 
-    localStorage.setItem('schada_mock_games', JSON.stringify(mockGames));
+    localStorage.setItem('schada_local_games', JSON.stringify(localGames));
 
     cleanupBrowserStorage();
 
-    const stored = JSON.parse(localStorage.getItem('schada_mock_games') || '{}');
+    const stored = JSON.parse(localStorage.getItem('schada_local_games') || '{}');
     const keys = Object.keys(stored);
-    expect(keys.length).toBe(STORAGE_LIMITS.maxMockGames);
+    expect(keys.length).toBe(STORAGE_LIMITS.maxLocalGames);
     // Should preserve games 6 to 10
     expect(stored['game_10']).toBeDefined();
     expect(stored['game_1']).toBeUndefined();
@@ -152,7 +152,7 @@ describe('Storage Sanitation & Quota Management Service', () => {
 
   it('handles QuotaExceededError by performing emergency purge and retrying', () => {
     localStorage.setItem('firestore_clients_test', 'junk');
-    localStorage.setItem('schada_mock_games', JSON.stringify({ g1: { id: 'g1' } }));
+    localStorage.setItem('schada_local_games', JSON.stringify({ g1: { id: 'g1' } }));
 
     let callCount = 0;
     const originalSetItem = localStorage.setItem.bind(localStorage);
@@ -170,8 +170,8 @@ describe('Storage Sanitation & Quota Management Service', () => {
     expect(success).toBe(true);
     expect(callCount).toBe(2);
     expect(localStorage.getItem('new_key')).toBe('new_value');
-    // Emergency purge should have wiped firestore keys and mock games
+    // Emergency purge should have wiped firestore keys and local games
     expect(localStorage.getItem('firestore_clients_test')).toBeNull();
-    expect(localStorage.getItem('schada_mock_games')).toBeNull();
+    expect(localStorage.getItem('schada_local_games')).toBeNull();
   });
 });

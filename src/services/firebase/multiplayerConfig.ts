@@ -12,7 +12,7 @@ export interface PresenceStorageKeys {
   readonly authCachedUid: string;
   readonly authCachedProfile: string;
   readonly cachedLobbyStats: string;
-  readonly mockGames: string;
+  readonly localGames: string;
   readonly guestId: string;
   readonly guestName: string;
   readonly guestConfirmed: string;
@@ -69,7 +69,7 @@ export interface MultiplayerCollectionsConfig {
 }
 
 export interface StorageLimitsConfig {
-  readonly maxMockGames: number;
+  readonly maxLocalGames: number;
   readonly maxPlayerTokens: number;
   readonly maxSessionAgeMs: number;
   readonly emergencyRetainedTokens: number;
@@ -185,7 +185,7 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     authCachedUid,
     authCachedProfile,
     cachedLobbyStats,
-    mockGames,
+    localGames,
     guestId,
     guestName,
     guestConfirmed,
@@ -197,7 +197,7 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     authCachedUid,
     authCachedProfile,
     cachedLobbyStats,
-    mockGames,
+    localGames,
     guestId,
     guestName,
     guestConfirmed,
@@ -369,9 +369,9 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     throw new MultiplayerConfigError('Storage limits configuration section is missing or invalid.');
   }
 
-  if (typeof storageLimits.maxMockGames !== 'number' || storageLimits.maxMockGames <= 0) {
+  if (typeof storageLimits.maxLocalGames !== 'number' || storageLimits.maxLocalGames <= 0) {
     throw new MultiplayerConfigError(
-      `Invalid storageLimits.maxMockGames: expected positive number, received ${storageLimits.maxMockGames}.`
+      `Invalid storageLimits.maxLocalGames: expected positive number, received ${storageLimits.maxLocalGames}.`
     );
   }
 
@@ -426,7 +426,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
       authCachedUid: 'schada_auth_cached_uid',
       authCachedProfile: 'schada_auth_cached_profile',
       cachedLobbyStats: 'schada_cached_lobby_stats',
-      mockGames: 'schada_mock_games',
+      localGames: 'schada_local_games',
       guestId: 'schada_guest_id',
       guestName: 'schada_guest_name',
       guestConfirmed: 'schada_guest_confirmed',
@@ -465,7 +465,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     userFriends: 'userFriends',
   }),
   storageLimits: Object.freeze({
-    maxMockGames: 5,
+    maxLocalGames: 5,
     maxPlayerTokens: 100,
     maxSessionAgeMs: 60 * 1000,
     emergencyRetainedTokens: 5,

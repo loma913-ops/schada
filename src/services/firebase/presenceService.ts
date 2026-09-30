@@ -37,7 +37,7 @@ export interface SessionHeartbeat {
 
 export const SESSION_STORAGE_ID_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.sessionStorageId;
 export const ACTIVE_SESSIONS_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.activeSessions;
-export const MOCK_GAMES_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.mockGames;
+export const LOCAL_GAMES_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.localGames;
 export const AUTH_CACHED_UID_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedUid;
 export const CACHED_LOBBY_STATS_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.cachedLobbyStats;
 
@@ -87,9 +87,9 @@ export function isCurrentClientRegistered(): { isRegistered: boolean; userId: st
   if (uid) {
     return { isRegistered: true, userId: uid };
   }
-  const mockUser = localBackend.getCurrentUser();
-  if (mockUser) {
-    return { isRegistered: true, userId: mockUser.id };
+  const localUser = localBackend.getCurrentUser();
+  if (localUser) {
+    return { isRegistered: true, userId: localUser.id };
   }
   return { isRegistered: false, userId: null };
 }
@@ -479,7 +479,7 @@ export function getLocalSessionStats(): { registeredUsersCount: number; guestSes
  */
 export function getLocalActiveGamesCount(): number {
   try {
-    const rawGames = typeof localStorage !== 'undefined' ? localStorage.getItem(MOCK_GAMES_STORAGE_KEY) : null;
+    const rawGames = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_GAMES_STORAGE_KEY) : null;
     if (!rawGames) return 0;
     const games = JSON.parse(rawGames) as Record<string, GameRoom>;
     return Object.values(games).filter((g) => {
@@ -692,7 +692,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
   const handleStorage = (e: StorageEvent) => {
     if (
       e.key === ACTIVE_SESSIONS_STORAGE_KEY ||
-      e.key === MOCK_GAMES_STORAGE_KEY ||
+      e.key === LOCAL_GAMES_STORAGE_KEY ||
       e.key === CACHED_LOBBY_STATS_STORAGE_KEY ||
       e.key === LOCAL_CONFIG.storageKeys.currentUserId ||
       e.key === LOCAL_CONFIG.storageKeys.users

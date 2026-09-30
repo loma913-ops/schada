@@ -15,9 +15,6 @@ export class LocalConfigError extends Error {
   }
 }
 
-// Backward-compatible error alias
-export const MockConfigError = LocalConfigError;
-export type MockConfigError = LocalConfigError;
 
 export interface LocalStorageKeys {
   readonly users: string;
@@ -26,14 +23,13 @@ export interface LocalStorageKeys {
   readonly friends: string;
 }
 
-export type MockStorageKeys = LocalStorageKeys;
 
 export interface LocalEvents {
   readonly userStatusChanged: string;
   readonly profileUpdated: string;
+  readonly gameSyncChannel: string;
 }
 
-export type MockEvents = LocalEvents;
 
 export interface LocalConfig {
   readonly storageKeys: LocalStorageKeys;
@@ -41,7 +37,6 @@ export interface LocalConfig {
   readonly defaultUsers: Record<string, UserProfile>;
 }
 
-export type MockConfig = LocalConfig;
 
 /**
  * Validates the LocalConfig.
@@ -82,6 +77,10 @@ export function validateLocalConfig(config: LocalConfig): void {
     throw new LocalConfigError('Invalid events.profileUpdated: expected non-empty string.');
   }
 
+  if (typeof config.events.gameSyncChannel !== 'string' || config.events.gameSyncChannel.trim().length === 0) {
+    throw new LocalConfigError('Invalid events.gameSyncChannel: expected non-empty string.');
+  }
+
   if (!config.defaultUsers || typeof config.defaultUsers !== 'object') {
     throw new LocalConfigError('Invalid defaultUsers: expected configuration object.');
   }
@@ -93,8 +92,6 @@ export function validateLocalConfig(config: LocalConfig): void {
   }
 }
 
-// Backward-compatible validator alias
-export const validateMockConfig = validateLocalConfig;
 
 export const LOCAL_CONFIG: LocalConfig = Object.freeze({
   storageKeys: Object.freeze({
@@ -106,6 +103,7 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
   events: Object.freeze({
     userStatusChanged: 'schada_user_status_changed',
     profileUpdated: 'schada_profile_updated',
+    gameSyncChannel: 'schada_game_sync_channel',
   }),
   defaultUsers: Object.freeze({
     'mock-grandmaster': Object.freeze({
@@ -152,9 +150,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
     }),
   }),
 });
-
-// Backward-compatible constant alias
-export const MOCK_CONFIG = LOCAL_CONFIG;
 
 // Immediately validate local configuration at module load time
 validateLocalConfig(LOCAL_CONFIG);

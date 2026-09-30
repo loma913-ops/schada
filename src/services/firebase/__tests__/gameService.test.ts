@@ -19,7 +19,7 @@ import {
   markGameEloProcessed,
   computeRankedGameEloResult,
   reconcilePendingElo,
-  mockStore,
+  localGameStore,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '../gameService';
@@ -122,7 +122,7 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + gameId);
     await joinGame(gameId, { id: 'p2', username: 'GreenPlayer', elo: 1200 });
 
-    // In mockStore, retrieve game to get blue's legal move
+    // In localGameStore, retrieve game to get blue's legal move
     const openRooms = await getOpenRooms();
     // Let's get move for blue pawn at e2 or FO at a1
     const p1Move = getLegalMovesForSquare(openRooms[0]?.boardState?.board || ({} as any), 'a1')[0] || {
@@ -337,11 +337,11 @@ describe('GameService Multiplayer Sync', () => {
 
     await abandonGame(gameId);
 
-    // Manually manipulate the stored mock game abandonedAt to exceed expiry
-    const raw = localStorage.getItem('schada_mock_games');
+    // Manually manipulate the stored local game abandonedAt to exceed expiry
+    const raw = localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.localGames);
     const parsed = JSON.parse(raw || '{}');
     parsed[gameId].abandonedAt = Date.now() - (MULTIPLAYER_SCALE_CONFIG.matchmaking.abandonedGameExpiryMs + 60_000);
-    localStorage.setItem('schada_mock_games', JSON.stringify(parsed));
+    localStorage.setItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.localGames, JSON.stringify(parsed));
 
     let fetchedGame: GameRoom | null = null;
     const unsub = subscribeToGame(gameId, (g) => {
@@ -548,10 +548,10 @@ describe('GameService Multiplayer Sync', () => {
     await joinGame(gameId, { id: 'p2', username: 'Player2', elo: 1200 });
 
     // Game is now in_progress. Simulate time elapsed exceeding 1 minute
-    const raw = localStorage.getItem('schada_mock_games');
+    const raw = localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.localGames);
     const parsed = JSON.parse(raw || '{}');
     parsed[gameId].lastTurnStartTimeMs = Date.now() - 70000; // 70s elapsed on 60s clock
-    localStorage.setItem('schada_mock_games', JSON.stringify(parsed));
+    localStorage.setItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.localGames, JSON.stringify(parsed));
 
     // sortLobbyRooms should filter out the expired game
     const currentRooms = [parsed[gameId]];
@@ -887,14 +887,14 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + gameId);
     await joinGame(gameId, { id: userB.id, username: userB.username, elo: userB.eloRating, gamesPlayed: userB.gamesPlayed });
 
-    // Mark game completed in mockStore where userB won but only userA was marked processed
-    const game = mockStore.get(gameId);
+    // Mark game completed in localGameStore where userB won but only userA was marked processed
+    const game = localGameStore.get(gameId);
     expect(game).not.toBeNull();
     if (game) {
       game.status = 'completed';
       game.winner = 'green';
       game.processedEloUserIds = [userA.id];
-      mockStore.set(game);
+      localGameStore.set(game);
     }
 
     // Run reconciliation

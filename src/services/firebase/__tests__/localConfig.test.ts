@@ -1,11 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   LOCAL_CONFIG,
-  MOCK_CONFIG,
   LocalConfigError,
-  MockConfigError,
   validateLocalConfig,
-  validateMockConfig,
   type LocalConfig,
 } from '../localConfig';
 
@@ -15,13 +12,8 @@ describe('localConfig', () => {
     expect(LOCAL_CONFIG.storageKeys.users).toBe('schada_mock_users');
     expect(LOCAL_CONFIG.events.userStatusChanged).toBe('schada_user_status_changed');
     expect(LOCAL_CONFIG.events.profileUpdated).toBe('schada_profile_updated');
+    expect(LOCAL_CONFIG.events.gameSyncChannel).toBe('schada_game_sync_channel');
     expect(Object.keys(LOCAL_CONFIG.defaultUsers).length).toBe(3);
-  });
-
-  it('supports backward-compatible aliases', () => {
-    expect(MOCK_CONFIG).toBe(LOCAL_CONFIG);
-    expect(MockConfigError).toBe(LocalConfigError);
-    expect(validateMockConfig).toBe(validateLocalConfig);
   });
 
   it('throws when config is null or undefined', () => {
@@ -77,6 +69,16 @@ describe('localConfig', () => {
         },
       })
     ).toThrow('Invalid events.profileUpdated: expected non-empty string.');
+
+    expect(() =>
+      validateLocalConfig({
+        ...LOCAL_CONFIG,
+        events: {
+          ...LOCAL_CONFIG.events,
+          gameSyncChannel: '   ',
+        },
+      })
+    ).toThrow('Invalid events.gameSyncChannel: expected non-empty string.');
   });
 
   it('throws on invalid defaultUsers', () => {

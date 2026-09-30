@@ -270,7 +270,15 @@ schada/
 │   │   ├── deployment/             # Chunk load error detector and debounced auto-reload service
 │   │   ├── device/                 # Haptics feedback vibration patterns and hapticsConfig
 │   │   ├── orientation/            # Mobile device orientation detector and portrait lock
-│   │   └── firebase/               # Firebase auth, presence, matchmaking, and scale configuration
+│   │   └── firebase/               # Firebase auth, modular game service, presence, and matchmaking
+│   │       ├── gameService.ts      # Multiplayer game orchestration facade
+│   │       ├── gameTypes.ts        # Match room and player type definitions
+│   │       ├── gameTransitions.ts  # Authoritative move, resignation & timeout state transitions
+│   │       ├── gameClock.ts        # Fischer increment clock math and timeout detection
+│   │       ├── gameElo.ts          # Ranked Elo calculation and pending rating reconciliation
+│   │       ├── localGameStore.ts   # Multi-tab BroadcastChannel local offline store
+│   │       ├── lobbyService.ts     # Room discovery, sorting and matchmaking queries
+│   │       └── gameCleanupService.ts # Stale and abandoned match garbage collection
 │   ├── components/
 │   │   ├── board/                  # SVG board rendering, piece icons, vector lines, square highlights
 │   │   ├── game/                   # Arena layout, player cards, digital clocks, move navigator, game over modal
