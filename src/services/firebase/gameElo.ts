@@ -5,6 +5,7 @@ import {
   collection,
   query,
   where,
+  orderBy,
   limit,
   getDocs,
 } from 'firebase/firestore';
@@ -100,36 +101,65 @@ export async function markGameEloProcessed(gameId: string, userId: string): Prom
  * Guarantees that ratings are never lost if a user exits early, closes the browser tab, or experiences network interruptions.
  *
  * Algorithmic Complexity (Big O):
- * - Time Complexity: O(K) where K <= 10 recent completed games examined.
+ * - Time Complexity: O(K) where K <= reconcileEloBatchLimit recent completed games examined.
  * - Auxiliary Space Complexity: O(1) constant scalar memory.
- * - Database Reads/Writes: Optimized to read at most 10 candidate games and update only when pending.
+ * - Database Reads/Writes: Optimized to read at most reconcileEloBatchLimit candidate games and update only when pending.
+ * - In-flight deduplication: Concurrent calls coalesce into a single execution, preventing race conditions.
+ * - Self-healing query: Attempts ordered index query; falls back silently if composite index is still building.
  */
+let inFlightReconcilePromise: Promise<UserProfile | null> | null = null;
+
 export async function reconcilePendingElo(userId: string): Promise<UserProfile | null> {
   if (!userId || userId.startsWith('guest_') || userId === 'guest') return null;
+
+  // In-flight deduplication: reuse existing promise if one is already running for this call stack
+  if (inFlightReconcilePromise) return inFlightReconcilePromise;
+
+  inFlightReconcilePromise = _runReconcilePendingElo(userId).finally(() => {
+    inFlightReconcilePromise = null;
+  });
+  return inFlightReconcilePromise;
+}
+
+async function _runReconcilePendingElo(userId: string): Promise<UserProfile | null> {
 
   let latestProfile: UserProfile | null = null;
 
   if (isFirebaseConfigured() && db) {
     try {
       const gamesCol = collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games);
-      const blueQuery = query(
-        gamesCol,
-        where('status', '==', 'completed'),
-        where('isRanked', '==', true),
-        where('bluePlayer.id', '==', userId),
-        limit(5)
-      );
-      const greenQuery = query(
-        gamesCol,
-        where('status', '==', 'completed'),
-        where('isRanked', '==', true),
-        where('greenPlayer.id', '==', userId),
-        limit(5)
-      );
+      const batchLimit = MULTIPLAYER_SCALE_CONFIG.matchmaking.reconcileEloBatchLimit;
+
+      // Attempt ordered query (most recent games first) for efficient reconciliation.
+      // Falls back to unordered query if the composite index is not yet built.
+      async function runQuery(field: 'bluePlayer.id' | 'greenPlayer.id') {
+        try {
+          return await getDocs(query(
+            gamesCol,
+            where('status', '==', 'completed'),
+            where('isRanked', '==', true),
+            where(field, '==', userId),
+            orderBy('createdAt', 'desc'),
+            limit(batchLimit)
+          ));
+        } catch (err: any) {
+          if (err?.code === 'failed-precondition') {
+            // Composite index not yet built — fall back to unordered query
+            return await getDocs(query(
+              gamesCol,
+              where('status', '==', 'completed'),
+              where('isRanked', '==', true),
+              where(field, '==', userId),
+              limit(batchLimit)
+            ));
+          }
+          throw err;
+        }
+      }
 
       const [blueSnap, greenSnap] = await Promise.all([
-        getDocs(blueQuery),
-        getDocs(greenQuery),
+        runQuery('bluePlayer.id'),
+        runQuery('greenPlayer.id'),
       ]);
 
       const candidateGames: GameRoom[] = [];

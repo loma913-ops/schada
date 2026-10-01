@@ -18,6 +18,9 @@ export interface PresenceStorageKeys {
   readonly guestConfirmed: string;
   readonly guestIsPatron: string;
   readonly playerTokenPrefix: string;
+  readonly cachedLeaderboard: string;
+  readonly cachedLeaderboardTime: string;
+  readonly legacyFriendsMigratedPrefix: string;
 }
 
 export interface PresenceConfig {
@@ -33,6 +36,10 @@ export interface PresenceConfig {
   readonly friendFreshnessThresholdMs: number;
   readonly staleGuestPruneIntervalMs: number;
   readonly staleGuestCutoffMs: number;
+  readonly friendsPollIntervalMs: number;
+  readonly friendsCacheTtlMs: number;
+  readonly usernameSearchCacheTtlMs: number;
+  readonly serverCountsCooldownMs: number;
   readonly storageKeys: PresenceStorageKeys;
 }
 
@@ -56,6 +63,7 @@ export interface MatchmakingConfig {
   readonly leaderboardLimit: number;
   readonly leaderboardCacheTtlMs: number;
   readonly clockSyncJitterThresholdMs: number;
+  readonly reconcileEloBatchLimit: number;
 }
 
 export interface MultiplayerCollectionsConfig {
@@ -176,6 +184,30 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
+  if (typeof presence.friendsPollIntervalMs !== 'number' || presence.friendsPollIntervalMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.friendsPollIntervalMs: expected positive number, received ${presence.friendsPollIntervalMs}.`
+    );
+  }
+
+  if (typeof presence.friendsCacheTtlMs !== 'number' || presence.friendsCacheTtlMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.friendsCacheTtlMs: expected positive number, received ${presence.friendsCacheTtlMs}.`
+    );
+  }
+
+  if (typeof presence.usernameSearchCacheTtlMs !== 'number' || presence.usernameSearchCacheTtlMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.usernameSearchCacheTtlMs: expected positive number, received ${presence.usernameSearchCacheTtlMs}.`
+    );
+  }
+
+  if (typeof presence.serverCountsCooldownMs !== 'number' || presence.serverCountsCooldownMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.serverCountsCooldownMs: expected positive number, received ${presence.serverCountsCooldownMs}.`
+    );
+  }
+
   if (!presence.storageKeys || typeof presence.storageKeys !== 'object') {
     throw new MultiplayerConfigError('Presence storageKeys configuration section is missing or invalid.');
   }
@@ -192,6 +224,9 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     guestConfirmed,
     guestIsPatron,
     playerTokenPrefix,
+    cachedLeaderboard,
+    cachedLeaderboardTime,
+    legacyFriendsMigratedPrefix,
   } = presence.storageKeys;
   const storageKeyEntries = {
     sessionStorageId,
@@ -205,6 +240,9 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     guestConfirmed,
     guestIsPatron,
     playerTokenPrefix,
+    cachedLeaderboard,
+    cachedLeaderboardTime,
+    legacyFriendsMigratedPrefix,
   };
   for (const [keyName, val] of Object.entries(storageKeyEntries)) {
     if (typeof val !== 'string' || val.trim().length === 0) {
@@ -354,6 +392,16 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
+  if (
+    typeof matchmaking.reconcileEloBatchLimit !== 'number' ||
+    matchmaking.reconcileEloBatchLimit <= 0 ||
+    matchmaking.reconcileEloBatchLimit > 50
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.reconcileEloBatchLimit: expected number between 1 and 50, received ${matchmaking.reconcileEloBatchLimit}.`
+    );
+  }
+
   const { collections } = config;
   if (!collections || typeof collections !== 'object') {
     throw new MultiplayerConfigError('Collections configuration section is missing or invalid.');
@@ -423,6 +471,10 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     friendFreshnessThresholdMs: 45_000,
     staleGuestPruneIntervalMs: 5 * 60 * 1000,
     staleGuestCutoffMs: 15 * 60 * 1000,
+    friendsPollIntervalMs: 12_000,
+    friendsCacheTtlMs: 10_000,
+    usernameSearchCacheTtlMs: 60_000,
+    serverCountsCooldownMs: 10_000,
     storageKeys: Object.freeze({
       sessionStorageId: 'schada_client_session_id',
       activeSessions: 'schada_active_sessions_v2',
@@ -435,6 +487,9 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
       guestConfirmed: 'schada_guest_confirmed',
       guestIsPatron: 'schada_guest_is_patron',
       playerTokenPrefix: 'schada_player_token_',
+      cachedLeaderboard: 'schada_cached_leaderboard',
+      cachedLeaderboardTime: 'schada_cached_leaderboard_time',
+      legacyFriendsMigratedPrefix: 'schada_friends_migrated_',
     }),
   }),
   matchmaking: Object.freeze({
@@ -457,6 +512,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     leaderboardLimit: 50,
     leaderboardCacheTtlMs: 5 * 60 * 1000,
     clockSyncJitterThresholdMs: 1500,
+    reconcileEloBatchLimit: 5,
   }),
   collections: Object.freeze({
     users: 'users',

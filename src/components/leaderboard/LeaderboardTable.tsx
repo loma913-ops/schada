@@ -6,62 +6,108 @@ import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Trophy, Medal } from 'lucide-react';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
+import { safeGetItem, safeSetItem } from '@/services/storage/storageCleanup';
 
-const LEADERBOARD_CACHE_TTL_MS = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardCacheTtlMs;
+const CACHE_TTL_MS = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardCacheTtlMs;
 const LEADERBOARD_LIMIT = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit;
-let cachedLeaderboard: UserProfile[] | null = null;
-let cachedLeaderboardTime = 0;
+const CACHE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.cachedLeaderboard;
+const CACHE_TIME_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.cachedLeaderboardTime;
+
+function readLocalCache(): { players: UserProfile[]; time: number } | null {
+  try {
+    const raw = safeGetItem(CACHE_KEY);
+    const rawTime = safeGetItem(CACHE_TIME_KEY);
+    if (!raw || !rawTime) return null;
+    const players = JSON.parse(raw) as UserProfile[];
+    const time = parseInt(rawTime, 10);
+    if (!Array.isArray(players) || isNaN(time)) return null;
+    return { players, time };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalCache(players: UserProfile[]): void {
+  const now = Date.now();
+  safeSetItem(CACHE_KEY, JSON.stringify(players));
+  safeSetItem(CACHE_TIME_KEY, String(now));
+}
+
+function evictLocalCache(): void {
+  try {
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_TIME_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 /**
  * Global Leaderboard Table displaying top-ranked players by Elo.
  *
  * Algorithmic Complexity (Big O):
- * - Cache Hit Time Complexity: O(1) instant in-memory retrieval with zero database read cost.
+ * - Cache Hit Time Complexity: O(1) instant localStorage retrieval with zero database read cost.
  * - Cache Miss Time Complexity: O(log N + L) Firestore indexed range query where N is total users
  *   and L = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit (L <= 50).
  * - Auxiliary Space Complexity: O(L) for cached player profiles.
  * - Growth Rate: Strictly sub-linear ceiling O(L) independent of total global user accounts.
+ * - Cache Invalidation: Immediate eviction on profileUpdated event or Elo discrepancy detection.
  */
 export const LeaderboardTable: React.FC = () => {
-  const [players, setPlayers] = useState<UserProfile[]>(() => cachedLeaderboard || []);
-  const [loading, setLoading] = useState(() => !cachedLeaderboard || Date.now() - cachedLeaderboardTime >= LEADERBOARD_CACHE_TTL_MS);
+  const cached = readLocalCache();
+  const [players, setPlayers] = useState<UserProfile[]>(() => cached?.players ?? []);
+  const [loading, setLoading] = useState(() => !cached || Date.now() - cached.time >= CACHE_TTL_MS);
 
-  useEffect(() => {
-    const now = Date.now();
-    if (cachedLeaderboard && now - cachedLeaderboardTime < LEADERBOARD_CACHE_TTL_MS) {
-      setPlayers(cachedLeaderboard);
-      setLoading(false);
-      return;
-    }
-
-    async function fetchLeaderboard() {
-      setLoading(true);
-      try {
-        if (isFirebaseConfigured() && db) {
-          const q = query(
-            collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
-            orderBy('eloRating', 'desc'),
-            limit(LEADERBOARD_LIMIT)
-          );
-          const snap = await getDocs(q);
-          const list = snap.docs.map((d) => d.data() as UserProfile);
-          cachedLeaderboard = list;
-          cachedLeaderboardTime = Date.now();
-          setPlayers(list);
-        } else {
-          const mockList = localBackend.getLeaderboard();
-          cachedLeaderboard = mockList;
-          cachedLeaderboardTime = Date.now();
-          setPlayers(mockList);
-        }
-      } catch (e) {
-        console.error('Failed to fetch leaderboard:', e);
-        setPlayers(localBackend.getLeaderboard());
-      } finally {
+  const fetchLeaderboard = async (skipCacheCheck = false) => {
+    if (!skipCacheCheck) {
+      const now = Date.now();
+      const hit = readLocalCache();
+      if (hit && now - hit.time < CACHE_TTL_MS) {
+        setPlayers(hit.players);
         setLoading(false);
+        return;
       }
     }
+
+    setLoading(true);
+    try {
+      if (isFirebaseConfigured() && db) {
+        const q = query(
+          collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
+          orderBy('eloRating', 'desc'),
+          orderBy('gamesPlayed', 'desc'),
+          limit(LEADERBOARD_LIMIT)
+        );
+        const snap = await getDocs(q);
+        const list = snap.docs.map((d) => d.data() as UserProfile);
+        writeLocalCache(list);
+        setPlayers(list);
+      } else {
+        const mockList = localBackend.getLeaderboard();
+        writeLocalCache(mockList);
+        setPlayers(mockList);
+      }
+    } catch (e) {
+      console.error('Failed to fetch leaderboard:', e);
+      setPlayers(localBackend.getLeaderboard());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchLeaderboard();
+
+    // Immediate invalidation when the authenticated user's profile updates
+    const handleProfileUpdated = () => {
+      evictLocalCache();
+      fetchLeaderboard(true);
+    };
+
+    window.addEventListener('schada_profile_updated', handleProfileUpdated);
+    return () => {
+      window.removeEventListener('schada_profile_updated', handleProfileUpdated);
+    };
   }, []);
 
   return (
@@ -135,4 +181,3 @@ export const LeaderboardTable: React.FC = () => {
     </div>
   );
 };
-

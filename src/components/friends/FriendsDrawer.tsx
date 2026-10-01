@@ -10,6 +10,7 @@ import {
 } from '@/services/firebase/friendService';
 import { X, UserPlus, Check, Swords, Trash2 } from 'lucide-react';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 
 interface FriendsDrawerProps {
   isOpen: boolean;
@@ -33,6 +34,8 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
 
   const refreshData = async () => {
     if (!user) return;
+    // Skip polling when the tab is hidden to eliminate background reads
+    if (typeof document !== 'undefined' && document.hidden) return;
     try {
       const fList = await getFriendsList(user.id);
       setFriends(fList);
@@ -48,7 +51,7 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
     refreshData();
 
     // Live presence polling & event synchronization
-    const interval = setInterval(refreshData, 3000);
+    const interval = setInterval(refreshData, MULTIPLAYER_SCALE_CONFIG.presence.friendsPollIntervalMs);
     const handleStatusOrStorage = () => refreshData();
 
     window.addEventListener('storage', handleStatusOrStorage);

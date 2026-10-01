@@ -52,7 +52,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Authoritative Symmetrical Elo Engine**: Immutable initial/final Elo ratings and deltas stored in match documents for symmetrical cross-client synchronization.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
 - **Zero-Friction Deployment Recovery**: Automatic chunk failure detection and session refresh post-deployment.
-- **Optimized Firestore CRUD Architecture**: Direct atomic updates without redundant reads or heavy locks and throttled presence updates.
+- **Optimized Firestore CRUD Architecture**: Composite index-aligned FIFO lobby/matchmaking queries, localStorage SWR leaderboard cache with immediate Elo-change invalidation, in-memory friends profile and username search caches, time-bounded cleanup queries, and self-healing ordered Elo reconciliation with automatic fallback.
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 - **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
 - **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.
@@ -184,35 +184,42 @@ The live application is hosted on **Firebase Hosting** and backed by **Cloud Fir
 
 ---
 
-### Routine Update Workflow
+### Deployment Workflow
 
-Whenever you introduce new features, engine tuning, or style updates:
+Always run the pre-deploy checks first, then deploy in the order below. Firestore must go first whenever rules or indexes change so new queries are backed by indexes before the hosting bundle lands.
 
 ```bash
-# 1. Verify engine and component tests
-npm test
+# 1. Verify all tests pass and the build is clean
+npm test && npm run build
 
-# 2. Build production assets into /dist
-npm run build
+# 2. Deploy Firestore rules and indexes first
+#    - firestore.rules takes effect immediately
+#    - New composite indexes begin building (takes 2–10 min depending on volume)
+npx firebase-tools deploy --only firestore
 
-# 3. Deploy frontend bundle to Firebase Hosting
+# 3. Deploy the frontend hosting bundle
 npx firebase-tools deploy --only hosting
 ```
 
-Your live site at `https://schada.org` updates immediately. Stale client browsers automatically refresh chunk assets thanks to the `deploymentRecoveryService`.
+Your live site at `https://schada.org` updates immediately after step 3. Stale client browsers automatically refresh chunk assets thanks to the `deploymentRecoveryService`.
+
+> **Note on index build time:** After step 2, new composite indexes show as **Building** in the [Firebase Console → Firestore → Indexes](https://console.firebase.google.com/project/schada-online/firestore/indexes). The app remains fully operational during this window — ordered queries fall back automatically until indexes are **Enabled**.
 
 ---
 
-### Deploying Firestore Rules & Indexes
+### Routine Hosting-Only Update
 
-When modifying `firestore.rules` or composite index configurations in `firestore.indexes.json`:
+When only source code changes (no `firestore.rules` or `firestore.indexes.json` modifications):
 
 ```bash
-# Deploy only Firestore rules and indexes
-npx firebase-tools deploy --only firestore
+npm test && npm run build && npx firebase-tools deploy --only hosting
 ```
 
-To deploy both frontend assets and Firestore configuration in a single command:
+---
+
+### Full Combined Deploy
+
+To deploy everything (Firestore rules, indexes, and hosting) in a single command:
 
 ```bash
 npm run build && npx firebase-tools deploy

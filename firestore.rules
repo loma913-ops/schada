@@ -23,7 +23,8 @@ service cloud.firestore {
 
       // User friends subcollection
       match /userFriends/{friendId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId);
+        allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.uid == friendId);
       }
     }
 

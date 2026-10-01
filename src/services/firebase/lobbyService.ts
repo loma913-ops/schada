@@ -3,6 +3,7 @@ import {
   query,
   where,
   limit,
+  orderBy,
   getDocs,
   onSnapshot,
   type QueryConstraint,
@@ -104,6 +105,7 @@ export async function getOpenRooms(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
       where('status', 'in', includeInProgress ? ['waiting', 'in_progress'] : ['waiting']),
+      orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
     const snap = await getDocs(q);
@@ -143,6 +145,7 @@ export async function getInProgressRooms(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
       where('status', '==', 'in_progress'),
+      orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
     const snap = await getDocs(q);
@@ -191,6 +194,7 @@ export function subscribeToOpenRooms(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
       where('status', 'in', statuses),
+      orderBy('createdAt', 'desc'),
       limit(maxRooms)
     );
     return onSnapshot(
@@ -239,6 +243,7 @@ export async function findOpenWaitingGame(
     if (typeof isRanked === 'boolean') {
       constraints.push(where('isRanked', '==', isRanked));
     }
+    constraints.push(orderBy('createdAt', 'asc'));
     constraints.push(limit(candidateLimit));
     const q = query(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
