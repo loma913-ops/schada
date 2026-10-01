@@ -162,7 +162,8 @@ export class SoundService {
   /** Synthesizes authentic wooden chess piece move tap with dual-component transient */
   private synthesizeMoveSound(ctx: AudioContext): void {
     try {
-      const now = ctx.currentTime;
+      const LOOKAHEAD = 0.015;
+      const now = ctx.currentTime + LOOKAHEAD;
       const { moveTransient, moveBody } = AUDIO_CONFIG.synthesis;
 
       // High-frequency transient impact
@@ -218,7 +219,8 @@ export class SoundService {
   /** Synthesizes authentic piece capture impact with two-stage strike sound */
   private synthesizeCaptureSound(ctx: AudioContext): void {
     try {
-      const now = ctx.currentTime;
+      const LOOKAHEAD = 0.015;
+      const now = ctx.currentTime + LOOKAHEAD;
       const { captureImpact1, captureImpact2 } = AUDIO_CONFIG.synthesis;
 
       // First impact: piece striking piece
@@ -335,11 +337,13 @@ export class SoundService {
   /** Directly outputs an AudioBuffer via Web Audio API */
   private playBufferDirect(ctx: AudioContext, buffer: AudioBuffer): void {
     try {
+      const LOOKAHEAD = 0.015;
+      const now = ctx.currentTime + LOOKAHEAD;
       const source = ctx.createBufferSource();
       source.buffer = buffer;
 
       source.connect(ctx.destination);
-      source.start();
+      source.start(now);
 
       source.onended = () => {
         try {
@@ -409,8 +413,6 @@ export class SoundService {
     if (ctx.state === 'running') {
       if (this.moveBuffer) {
         this.playBufferDirect(ctx, this.moveBuffer);
-      } else if (typeof Audio !== 'undefined') {
-        this.playFallbackAudio('move');
       } else {
         this.synthesizeMoveSound(ctx);
       }
@@ -438,8 +440,6 @@ export class SoundService {
     if (ctx.state === 'running') {
       if (this.captureBuffer) {
         this.playBufferDirect(ctx, this.captureBuffer);
-      } else if (typeof Audio !== 'undefined') {
-        this.playFallbackAudio('capture');
       } else {
         this.synthesizeCaptureSound(ctx);
       }
