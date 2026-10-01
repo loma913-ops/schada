@@ -481,7 +481,7 @@ export const GameRoomView: React.FC = () => {
         onMakeMove={async (move: Move) => {
           if (!userColor || game.status === 'waiting') return;
           try {
-            await makeGameMove(gameId!, move, userColor);
+            await makeGameMove(gameId!, move, userColor, game);
           } catch (err) {
             console.error('Failed to make move:', err);
           }

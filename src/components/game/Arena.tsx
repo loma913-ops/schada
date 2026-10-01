@@ -168,6 +168,17 @@ export const Arena: React.FC<ArenaProps> = ({
 
       lastAudibleMoveIndexRef.current = Math.max(lastAudibleMoveIndexRef.current, incomingLen - 1);
       prevMoveCountRef.current = incomingLen;
+
+      // If incoming synced state matches our local optimistic state move count and game over status,
+      // it is a server echo of our own move - skip redundant re-rendering
+      if (
+        incomingLen === currentLocalLen &&
+        syncedGameState.isGameOver === gameStateRef.current.isGameOver
+      ) {
+        return;
+      }
+
+      gameStateRef.current = syncedGameState;
       setGameState(syncedGameState);
     }
   }, [syncedGameState]);
@@ -331,6 +342,7 @@ export const Arena: React.FC<ArenaProps> = ({
       }
 
       const nextState = executeMove(currentState, move);
+      gameStateRef.current = nextState;
       const newMoveIndex = nextState.moveHistory.length - 1;
       lastAudibleMoveIndexRef.current = newMoveIndex;
       prevMoveCountRef.current = nextState.moveHistory.length;
@@ -349,6 +361,7 @@ export const Arena: React.FC<ArenaProps> = ({
     }
 
     const nextState = executeMove(currentState, move);
+    gameStateRef.current = nextState;
     const newMoveIndex = nextState.moveHistory.length - 1;
     lastAudibleMoveIndexRef.current = newMoveIndex;
     prevMoveCountRef.current = nextState.moveHistory.length;
@@ -442,7 +455,7 @@ export const Arena: React.FC<ArenaProps> = ({
   // - Random-access history scrubbing for UI renders: O(1) constant time array lookup.
   const cumulativeGameStates = useMemo(() => {
     return computeCumulativeGameStates(gameState.moveHistory, gameState);
-  }, [gameState]);
+  }, [gameState.moveHistory, gameState.isGameOver]);
 
   const isViewingHistory =
     gameState.moveHistory.length > 0 && viewMoveIndex < gameState.moveHistory.length - 1;

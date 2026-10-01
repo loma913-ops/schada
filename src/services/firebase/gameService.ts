@@ -345,23 +345,27 @@ export function subscribeToGame(
 export async function makeGameMove(
   gameId: string,
   move: Move,
-  playerColor: PieceColor
+  playerColor: PieceColor,
+  currentGame?: GameRoom
 ): Promise<void> {
   const now = Date.now();
 
   if (isFirebaseConfigured() && db) {
     const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) {
-      throw new Error('Game not found.');
+    let game = currentGame;
+    if (!game) {
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) {
+        throw new Error('Game not found.');
+      }
+      game = snap.data() as GameRoom;
     }
-    const game = snap.data() as GameRoom;
     const updatePayload = computeMoveTransition(game, move, playerColor, now);
     await updateDoc(docRef, sanitize(updatePayload));
     return;
   }
 
-  const game = localGameStore.get(gameId);
+  const game = currentGame || localGameStore.get(gameId);
   if (!game) {
     throw new Error('Game is not in progress.');
   }

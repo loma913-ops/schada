@@ -47,12 +47,12 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Comprehensive Match Stats & Post-Game Elo Summary**: Game-over modal with synchronized rating point deltas and match details.
 - **Competitive Integrity & Matchmaking Separation**: Strict rated and casual matchmaking separation for authenticated users and guests.
 - **Lichess-Inspired Minimalist UX**: Responsive arena with clocks, notation, controls, and dark/light mode.
-- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves with lightweight atomic Firestore updates and snapshot reconciliation.
-- **Cross-Platform Hybrid Audio Engine**: Web Audio API with realistic synthesized fallbacks and zero-latency desktop and mobile playback.
+- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves with direct atomic updates bypassing redundant document reads and deduplicated server-echo reconciliation.
+- **Cross-Platform Hybrid Audio Engine**: Web Audio API with immediate transient attack playback, realistic synthesized fallbacks, and zero-latency desktop and mobile sound.
 - **Authoritative Symmetrical Elo Engine**: Immutable initial/final Elo ratings and deltas stored in match documents for symmetrical cross-client synchronization.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
 - **Zero-Friction Deployment Recovery**: Automatic chunk failure detection and session refresh post-deployment.
-- **Optimized Firestore CRUD Architecture**: Direct atomic updates without heavy locks and throttled presence updates.
+- **Optimized Firestore CRUD Architecture**: Direct atomic updates without redundant reads or heavy locks and throttled presence updates.
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 - **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
 - **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.

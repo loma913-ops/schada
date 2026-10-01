@@ -56,7 +56,7 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
     if (listRef.current && currentMoveIndex !== undefined && currentMoveIndex >= 0) {
       const activeEl = listRef.current.querySelector<HTMLElement>('.move-cell.active');
       if (activeEl) {
-        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        activeEl.scrollIntoView({ block: 'nearest', behavior: 'auto' });
       }
     }
   }, [currentMoveIndex]);

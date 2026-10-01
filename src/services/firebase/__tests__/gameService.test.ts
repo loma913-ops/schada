@@ -143,6 +143,35 @@ describe('GameService Multiplayer Sync', () => {
     await expect(makeGameMove(gameId, p1Move, 'blue')).rejects.toThrow('It is not your turn.');
   });
 
+  it('optimizes move execution when currentGame is passed directly', async () => {
+    const creator = { id: 'p1', username: 'BluePlayer', elo: 1300 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      colorPref: 'blue',
+      isPrivate: true,
+      creator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: 'p2', username: 'GreenPlayer', elo: 1200 });
+
+    const currentRoom = localGameStore.get(gameId)!;
+    const p1Move = getLegalMovesForSquare(currentRoom.boardState.board, 'a1')[0] || {
+      from: 'a1',
+      to: 'a3',
+      piece: { id: 'blue_fo_a1', type: 'field_officer', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+      intermediateSquares: ['a2'],
+      notation: 'FO-a3',
+    };
+
+    // Make move providing currentGame directly
+    await makeGameMove(gameId, p1Move, 'blue', currentRoom);
+
+    const updatedGame = localGameStore.get(gameId);
+    expect(updatedGame?.boardState.moveHistory.length).toBe(1);
+    expect(updatedGame?.boardState.currentTurn).toBe('green');
+  });
+
   it('handles resignation cleanly', async () => {
     const creator = { id: 'p1', username: 'ResigningHost', elo: 1300 };
     const { gameId } = await createGame({
