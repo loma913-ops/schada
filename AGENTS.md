@@ -1,5 +1,7 @@
 All UI components must support dark and light mode. It is sufficient to verify this in the code as opposed to using the Browser tool.
 
+All UI components must be formatted well for desktop and mobile.
+
 Significant changes (e.g., new features, refactoring, performance updates, etc.) require `README.md` to be updated. If editing "## 2. Key Features" should have minimal information and only display the feature with a brief summary.
 
 Database CRUD operations must be optimized without compromising performance or gameplay; this is critical.

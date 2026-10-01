@@ -26,6 +26,7 @@ import { updateUserStats } from '@/services/firebase/authService';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { safeSetItem } from '@/services/storage/storageCleanup';
+import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 
 export const GameRoomView: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -144,15 +145,29 @@ export const GameRoomView: React.FC = () => {
       return;
     }
 
+    const isDonor = isPatronUser(user);
+
     // Auto join with either authenticated account or confirmed guest name
     const joinUser = user
-      ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed }
+      ? {
+        id: user.id,
+        username: user.username,
+        elo: user.eloRating,
+        gamesPlayed: user.gamesPlayed,
+        isPatron: isDonor,
+        hasDonated: isDonor,
+        patronTier: user.patronTier,
+        patronExpiresAt: user.patronExpiresAt,
+        patronSubscriptionStatus: user.patronSubscriptionStatus,
+      }
       : {
-          id: 'guest_' + (guestId || Math.random().toString(36).substring(2, 8)),
-          username: guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
-          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
-        };
+        id: 'guest_' + (guestId || Math.random().toString(36).substring(2, 8)),
+        username: guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
+        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: false,
+        hasDonated: false,
+      };
 
     joinGame(gameId, joinUser).then((res) => {
       if (res.success) {
@@ -162,7 +177,7 @@ export const GameRoomView: React.FC = () => {
         setHasJoined(true);
       }
     });
-  }, [gameId, game, user, hasJoined, guestName]);
+  }, [gameId, game, user, hasJoined, guestName, authLoading]);
 
   const handleConfirmGuestName = (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,6 +201,8 @@ export const GameRoomView: React.FC = () => {
       username: trimmed,
       elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
       gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+      isPatron: false,
+      hasDonated: false,
     }).then((res) => {
       if (res.success) {
         if (res.color) {
@@ -220,15 +237,15 @@ export const GameRoomView: React.FC = () => {
   const isBlue = user
     ? Boolean(game?.bluePlayer && game.bluePlayer.id === user.id)
     : Boolean(
-        (sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken) ||
-        (guestId && game?.bluePlayer && game.bluePlayer.id === guestId)
-      );
+      (sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken) ||
+      (guestId && game?.bluePlayer && game.bluePlayer.id === guestId)
+    );
   const isGreen = user
     ? Boolean(game?.greenPlayer && game.greenPlayer.id === user.id)
     : Boolean(
-        (sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken) ||
-        (guestId && game?.greenPlayer && game.greenPlayer.id === guestId)
-      );
+      (sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken) ||
+      (guestId && game?.greenPlayer && game.greenPlayer.id === guestId)
+    );
 
   // Maintain local session token synchronization if seated player token exists in room document
   useEffect(() => {
@@ -414,21 +431,33 @@ export const GameRoomView: React.FC = () => {
 
   const bluePlayer: ArenaPlayer = game.bluePlayer
     ? {
-        id: game.bluePlayer.id,
-        username: game.bluePlayer.username,
-        elo: eloResult?.initialBlueElo ?? (game.eloResult ? (game.bluePlayer.elo - game.eloResult.blueDelta) : game.bluePlayer.elo),
-        gamesPlayed: blueGames,
-      }
+      id: game.bluePlayer.id,
+      username: game.bluePlayer.username,
+      elo: eloResult?.initialBlueElo ?? (game.eloResult ? (game.bluePlayer.elo - game.eloResult.blueDelta) : game.bluePlayer.elo),
+      gamesPlayed: blueGames,
+      isPatron: isPatronUser(game.bluePlayer),
+      hasDonated: Boolean(game.bluePlayer.hasDonated || game.bluePlayer.isPatron),
+      patronTier: game.bluePlayer.patronTier,
+      patronExpiresAt: game.bluePlayer.patronExpiresAt,
+      patronSubscriptionStatus: game.bluePlayer.patronSubscriptionStatus,
+    }
     : { id: 'blue', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
 
   const greenPlayer: ArenaPlayer = game.greenPlayer
     ? {
-        id: game.greenPlayer.id,
-        username: game.greenPlayer.username,
-        elo: eloResult?.initialGreenElo ?? (game.eloResult ? (game.greenPlayer.elo - game.eloResult.greenDelta) : game.greenPlayer.elo),
-        gamesPlayed: greenGames,
-      }
+      id: game.greenPlayer.id,
+      username: game.greenPlayer.username,
+      elo: eloResult?.initialGreenElo ?? (game.eloResult ? (game.greenPlayer.elo - game.eloResult.greenDelta) : game.greenPlayer.elo),
+      gamesPlayed: greenGames,
+      isPatron: isPatronUser(game.greenPlayer),
+      hasDonated: Boolean(game.greenPlayer.hasDonated || game.greenPlayer.isPatron),
+      patronTier: game.greenPlayer.patronTier,
+      patronExpiresAt: game.greenPlayer.patronExpiresAt,
+      patronSubscriptionStatus: game.greenPlayer.patronSubscriptionStatus,
+    }
     : { id: 'green', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
+
+  const host = game.bluePlayer || game.greenPlayer;
 
   return (
     <div className="game-room-container">
@@ -528,6 +557,24 @@ export const GameRoomView: React.FC = () => {
             >
               Waiting for other player to join.
             </h2>
+
+            {host?.username && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+                Host:{' '}
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  {host.username}
+                  {isPatronUser(host) && <PatronBadge size={13} />}
+                </span>
+              </p>
+            )}
 
             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
               Share this invite link with another player, or play against the computer now.

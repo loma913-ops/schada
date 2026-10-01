@@ -15,6 +15,7 @@ import {
 import { db, isFirebaseConfigured } from './config';
 import { localBackend, type UserProfile, type LocalFriendRequest } from './localProvider';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
+import { isPatronUser } from '@/components/common/PatronBadge';
 
 export async function searchUserByExactUsername(
   username: string
@@ -65,9 +66,14 @@ export async function sendFriendRequest(
       throw new Error('Friend request already sent.');
     }
 
+    const isDonor = isPatronUser(currentUser);
     const docRef = await addDoc(collection(db, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), {
       fromUserId: currentUser.id,
       fromUsername: currentUser.username,
+      fromUserIsPatron: isDonor,
+      fromUserPatronTier: currentUser.patronTier ?? null,
+      fromUserPatronExpiresAt: currentUser.patronExpiresAt ?? null,
+      fromUserPatronSubscriptionStatus: currentUser.patronSubscriptionStatus ?? null,
       toUserId: targetUser.id,
       toUsername: targetUser.username,
       status: 'pending',
@@ -78,6 +84,10 @@ export async function sendFriendRequest(
       id: docRef.id,
       fromUserId: currentUser.id,
       fromUsername: currentUser.username,
+      fromUserIsPatron: isDonor,
+      fromUserPatronTier: currentUser.patronTier,
+      fromUserPatronExpiresAt: currentUser.patronExpiresAt,
+      fromUserPatronSubscriptionStatus: currentUser.patronSubscriptionStatus,
       toUserId: targetUser.id,
       toUsername: targetUser.username,
       status: 'pending',

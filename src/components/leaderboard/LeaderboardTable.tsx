@@ -5,6 +5,7 @@ import { db, isFirebaseConfigured } from '@/services/firebase/config';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Trophy, Medal } from 'lucide-react';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 
 const LEADERBOARD_CACHE_TTL_MS = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardCacheTtlMs;
 const LEADERBOARD_LIMIT = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit;
@@ -114,9 +115,12 @@ export const LeaderboardTable: React.FC = () => {
                   <div className="leaderboard-player-avatar player-avatar blue">
                     {p.username.charAt(0).toUpperCase()}
                   </div>
-                  <span className="leaderboard-player-name" title={p.username}>
-                    {p.username}
-                  </span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', minWidth: 0, overflow: 'hidden' }}>
+                    <span className="leaderboard-player-name" title={p.username}>
+                      {p.username}
+                    </span>
+                    {isPatronUser(p) && <PatronBadge size={13} style={{ flexShrink: 0 }} />}
+                  </div>
                 </div>
 
                 {/* Rating */}

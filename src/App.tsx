@@ -12,6 +12,8 @@ import { InstallModal } from './components/pwa/InstallModal';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
 import { LobbyTable } from './components/lobby/LobbyTable';
 import type { ArenaPlayer } from './components/game/Arena';
+import type { NavigationTab } from './components/layout/navigationTypes';
+import { isPatronUser } from './components/common/PatronBadge';
 
 // Lazy-loaded routes and modal components for minimal initial bundle size
 const GameRoomView = lazy(() => import('./components/game/GameRoomView').then((m) => ({ default: m.GameRoomView })));
@@ -21,6 +23,7 @@ const RulesGuide = lazy(() => import('./components/learn/RulesGuide').then((m) =
 const HistoryGuide = lazy(() => import('./components/history/HistoryGuide').then((m) => ({ default: m.HistoryGuide })));
 const TermsOfService = lazy(() => import('./components/legal/TermsOfService').then((m) => ({ default: m.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('./components/legal/PrivacyPolicy').then((m) => ({ default: m.PrivacyPolicy })));
+const DonatePage = lazy(() => import('./components/donate/DonatePage').then((m) => ({ default: m.DonatePage })));
 const PlayAgainstComputerModal = lazy(() => import('./components/lobby/PlayAgainstComputerModal').then((m) => ({ default: m.PlayAgainstComputerModal })));
 const CreateRoomModal = lazy(() => import('./components/lobby/CreateRoomModal').then((m) => ({ default: m.CreateRoomModal })));
 const AuthModal = lazy(() => import('./components/auth/AuthModal').then((m) => ({ default: m.AuthModal })));
@@ -70,8 +73,18 @@ const MainApp: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [currentTab, setCurrentTab] = useState<'play' | 'leaderboard' | 'learn' | 'history'>('play');
+  const [currentTab, setCurrentTab] = useState<NavigationTab>('play');
   const [activeMatch, setActiveMatch] = useState<ActiveMatch | null>(null);
+
+  // Synchronize currentTab with URL route changes
+  useEffect(() => {
+    if (location.pathname === '/donate') {
+      setCurrentTab('donate');
+      setActiveMatch(null);
+    } else if (location.pathname === '/') {
+      setCurrentTab((prev) => (prev === 'donate' ? 'play' : prev));
+    }
+  }, [location.pathname]);
 
   // Modals
   const [authOpen, setAuthOpen] = useState(false);
@@ -120,23 +133,37 @@ const MainApp: React.FC = () => {
 
   // Start a Quick Pair game (Player vs Player) - checks lobby for open game or creates new open room
   const handleStartQuickPair = async (minutes: number, increment: number, isRanked: boolean) => {
-    let guestId = localStorage.getItem('schada_guest_id');
+    const guestIdKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId;
+    let guestId = localStorage.getItem(guestIdKey);
     if (!guestId) {
       guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      safeSetItem('schada_guest_id', guestId);
+      safeSetItem(guestIdKey, guestId);
     }
 
     const defaultGuestName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
     const defaultGuestRating = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating;
+    const isDonor = isPatronUser(user);
 
     const currentUser = user
-      ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed ?? 0 }
+      ? {
+          id: user.id,
+          username: user.username,
+          elo: user.eloRating,
+          gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+          isPatron: isDonor,
+          hasDonated: isDonor,
+          patronTier: user.patronTier,
+          patronExpiresAt: user.patronExpiresAt,
+          patronSubscriptionStatus: user.patronSubscriptionStatus,
+        }
       : {
-        id: guestId,
-        username: localStorage.getItem('schada_guest_name') || defaultGuestName,
-        elo: defaultGuestRating,
-        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
-      };
+          id: guestId,
+          username: localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestName) || defaultGuestName,
+          elo: defaultGuestRating,
+          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+          isPatron: false,
+          hasDonated: false,
+        };
 
     try {
       // 1. Direct targeted index lookup for an open waiting room with this time control (O(1) read)
@@ -216,13 +243,26 @@ const MainApp: React.FC = () => {
       elo: tier.elo,
     };
 
+    const isDonor = isPatronUser(user);
+
     const currentUserPlayer: ArenaPlayer = user
-      ? { id: user.id, username: user.username, elo: user.eloRating }
+      ? {
+          id: user.id,
+          username: user.username,
+          elo: user.eloRating,
+          isPatron: isDonor,
+          hasDonated: isDonor,
+          patronTier: user.patronTier,
+          patronExpiresAt: user.patronExpiresAt,
+          patronSubscriptionStatus: user.patronSubscriptionStatus,
+        }
       : {
-        id: 'guest',
-        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
-        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-      };
+          id: 'guest',
+          username: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
+          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+          isPatron: false,
+          hasDonated: false,
+        };
 
     const bluePlayer = userColor === 'blue' ? currentUserPlayer : botOpponent;
     const greenPlayer = userColor === 'blue' ? botOpponent : currentUserPlayer;
@@ -245,18 +285,31 @@ const MainApp: React.FC = () => {
     if (!user) return;
     setFriendsOpen(false);
 
+    const isDonor = isPatronUser(user);
+    const friendIsDonor = isPatronUser(friend);
+
     setActiveMatch({
       bluePlayer: {
         id: user.id,
         username: user.username,
         elo: user.eloRating,
         gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: isDonor,
+        hasDonated: isDonor,
+        patronTier: user.patronTier,
+        patronExpiresAt: user.patronExpiresAt,
+        patronSubscriptionStatus: user.patronSubscriptionStatus,
       },
       greenPlayer: {
         id: friend.id,
         username: friend.username,
         elo: friend.eloRating,
         gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: friendIsDonor,
+        hasDonated: friendIsDonor,
+        patronTier: friend.patronTier,
+        patronExpiresAt: friend.patronExpiresAt,
+        patronSubscriptionStatus: friend.patronSubscriptionStatus,
       },
       timeControlMinutes: FORMAT_CONFIG.defaultFriendChallenge.minutes,
       incrementSeconds: FORMAT_CONFIG.defaultFriendChallenge.increment,
@@ -277,12 +330,19 @@ const MainApp: React.FC = () => {
       safeSetItem(guestIdKey, guestId);
     }
 
+    const isDonor = isPatronUser(user);
+
     const creator = user
       ? {
           id: user.id,
           username: user.username,
           elo: user.eloRating,
           gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+          isPatron: isDonor,
+          hasDonated: isDonor,
+          patronTier: user.patronTier,
+          patronExpiresAt: user.patronExpiresAt,
+          patronSubscriptionStatus: user.patronSubscriptionStatus,
         }
       : {
           id: guestId,
@@ -294,6 +354,8 @@ const MainApp: React.FC = () => {
           })(),
           elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
           gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+          isPatron: false,
+          hasDonated: false,
         };
 
     const result = await createGame({
@@ -346,6 +408,22 @@ const MainApp: React.FC = () => {
     }
   };
 
+  const handleSelectTab = (tab: NavigationTab) => {
+    setCurrentTab(tab);
+    if (tab === 'donate') {
+      if (location.pathname !== '/donate') {
+        navigate('/donate');
+      }
+    } else {
+      if (location.pathname !== '/') {
+        navigate('/');
+      }
+    }
+    if (tab !== 'play') {
+      setActiveMatch(null);
+    }
+  };
+
   const isMatchActive = Boolean(activeMatch) || location.pathname.startsWith('/game/');
 
   return (
@@ -355,15 +433,7 @@ const MainApp: React.FC = () => {
       {/* Top Navbar */}
       <Navbar
         currentTab={currentTab}
-        onSelectTab={(tab) => {
-          setCurrentTab(tab);
-          if (location.pathname !== '/') {
-            navigate('/');
-          }
-          if (tab !== 'play') {
-            setActiveMatch(null);
-          }
-        }}
+        onSelectTab={handleSelectTab}
         onOpenAuth={() => setAuthOpen(true)}
         onOpenProfile={() => setProfileOpen(true)}
         onOpenFriends={() => setFriendsOpen(true)}
@@ -383,6 +453,7 @@ const MainApp: React.FC = () => {
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/donate" element={<DonatePage />} />
           <Route
             path="*"
             element={
@@ -423,8 +494,10 @@ const MainApp: React.FC = () => {
                   <LeaderboardTable />
                 ) : currentTab === 'learn' ? (
                   <RulesGuide />
-                ) : (
+                ) : currentTab === 'history' ? (
                   <HistoryGuide />
+                ) : (
+                  <DonatePage />
                 )}
               </main>
             }
@@ -434,29 +507,14 @@ const MainApp: React.FC = () => {
 
       {/* Site Footer (Hidden during active matches) */}
       {!isMatchActive && (
-        <Footer
-          onSelectTab={(tab) => {
-            setCurrentTab(tab);
-            if (location.pathname !== '/') {
-              navigate('/');
-            }
-            if (tab !== 'play') {
-              setActiveMatch(null);
-            }
-          }}
-        />
+        <Footer onSelectTab={handleSelectTab} />
       )}
 
       {/* Mobile Bottom Navigation (Hidden during active matches) */}
       {!isMatchActive && (
         <BottomNav
           currentTab={currentTab}
-          onSelectTab={(tab) => {
-            setCurrentTab(tab);
-            if (location.pathname !== '/') {
-              navigate('/');
-            }
-          }}
+          onSelectTab={handleSelectTab}
           onOpenFriends={() => setFriendsOpen(true)}
           pendingRequestsCount={user ? localBackend.getPendingIncomingRequests(user.id).length : 0}
         />

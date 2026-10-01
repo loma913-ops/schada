@@ -16,6 +16,7 @@ export interface PresenceStorageKeys {
   readonly guestId: string;
   readonly guestName: string;
   readonly guestConfirmed: string;
+  readonly guestIsPatron: string;
   readonly playerTokenPrefix: string;
 }
 
@@ -189,6 +190,7 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     guestId,
     guestName,
     guestConfirmed,
+    guestIsPatron,
     playerTokenPrefix,
   } = presence.storageKeys;
   const storageKeyEntries = {
@@ -201,6 +203,7 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     guestId,
     guestName,
     guestConfirmed,
+    guestIsPatron,
     playerTokenPrefix,
   };
   for (const [keyName, val] of Object.entries(storageKeyEntries)) {
@@ -430,6 +433,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
       guestId: 'schada_guest_id',
       guestName: 'schada_guest_name',
       guestConfirmed: 'schada_guest_confirmed',
+      guestIsPatron: 'schada_guest_is_patron',
       playerTokenPrefix: 'schada_player_token_',
     }),
   }),

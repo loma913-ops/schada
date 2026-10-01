@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import type { Piece, PieceColor } from '@/core/schada/types';
 import { DigitalClock } from './DigitalClock';
 import { PieceIcon } from '../board/PieceIcon';
+import { PatronBadge } from '../common/PatronBadge';
 
 interface PlayerCardProps {
   username: string;
@@ -14,6 +15,7 @@ interface PlayerCardProps {
   isUser?: boolean;
   isThinking?: boolean;
   isUnlimited?: boolean;
+  isPatron?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = memo(function PlayerCard({
   isUser,
   isThinking,
   isUnlimited,
+  isPatron,
 }) {
   const pawns = capturedPieces.filter((p) => p.type === 'pawn');
   const fieldOfficers = capturedPieces.filter((p) => p.type === 'field_officer');
@@ -52,6 +55,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = memo(function PlayerCard({
         <div className="player-meta">
           <div className="player-name">
             <span>{username}</span>
+            {isPatron && <PatronBadge size={13} style={{ flexShrink: 0 }} />}
             {isUser && <span style={{ fontSize: '0.75rem', opacity: 0.7 }}> (You)</span>}
           </div>
           <div className="player-sub">

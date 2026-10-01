@@ -10,6 +10,13 @@ import { ACTIVE_SESSIONS_STORAGE_KEY } from './presenceService';
 import { LOCAL_CONFIG } from './localConfig';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { safeSetItem } from '../storage/storageCleanup';
+import {
+  type PatronTier,
+  type PatronSubscriptionStatus,
+  computePatronExpiration,
+  computeCancellationExpiration,
+  isPatronActive,
+} from '@/core/donate/patronService';
 
 export interface UserProfile {
   id: string;
@@ -23,6 +30,11 @@ export interface UserProfile {
   gamesLost: number;
   gamesDrawn: number;
   status: 'online' | 'in-game' | 'offline';
+  isPatron?: boolean;
+  hasDonated?: boolean;
+  patronTier?: PatronTier;
+  patronExpiresAt?: string | null;
+  patronSubscriptionStatus?: PatronSubscriptionStatus;
   lastSeen?: string;
   createdAt: string;
 }
@@ -31,6 +43,10 @@ export interface LocalFriendRequest {
   id: string;
   fromUserId: string;
   fromUsername: string;
+  fromUserIsPatron?: boolean;
+  fromUserPatronTier?: PatronTier;
+  fromUserPatronExpiresAt?: string | null;
+  fromUserPatronSubscriptionStatus?: PatronSubscriptionStatus;
   toUserId: string;
   toUsername: string;
   status: 'pending' | 'accepted' | 'declined';
@@ -415,6 +431,77 @@ class LocalBackend {
   }
 
   /**
+   * Updates the patron/donated status for a user.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(U) JSON serialization.
+   * - Auxiliary Space Complexity: O(U) string allocation.
+   *
+   * Growth Rate:
+   * - O(U) linear.
+   */
+  public markUserPatron(
+    userId: string,
+    tier: PatronTier = 'lifetime',
+    options?: {
+      subscriptionStatus?: PatronSubscriptionStatus;
+      customExpiresAt?: string | null;
+    }
+  ): UserProfile {
+    const users = this.getUsers();
+    const u = users[userId];
+    if (!u) {
+      throw new Error(`User not found: ${userId}`);
+    }
+    u.patronTier = tier;
+    u.patronSubscriptionStatus = tier === 'recurring' ? options?.subscriptionStatus || 'active' : undefined;
+    u.patronExpiresAt =
+      options?.customExpiresAt !== undefined
+        ? options.customExpiresAt
+        : computePatronExpiration(tier);
+    u.isPatron = isPatronActive(u);
+    u.hasDonated = true;
+    users[userId] = u;
+    this.saveUsers(users);
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: { userId, user: u } })
+        );
+      }
+    } catch {
+      // Ignore in non-browser environments
+    }
+    return u;
+  }
+
+  /**
+   * Cancels a recurring patron subscription and sets patronExpiresAt to 1 calendar month grace period.
+   */
+  public cancelUserRecurringPatron(userId: string): UserProfile {
+    const users = this.getUsers();
+    const u = users[userId];
+    if (!u) {
+      throw new Error(`User not found: ${userId}`);
+    }
+    u.patronSubscriptionStatus = 'cancelled';
+    u.patronExpiresAt = computeCancellationExpiration();
+    u.isPatron = isPatronActive(u);
+    users[userId] = u;
+    this.saveUsers(users);
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: { userId, user: u } })
+        );
+      }
+    } catch {
+      // Ignore in non-browser environments
+    }
+    return u;
+  }
+
+  /**
    * Retrieves a user profile by their unique ID from the local store.
    *
    * Algorithmic Complexity:
@@ -514,6 +601,10 @@ class LocalBackend {
       id: `freq_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       fromUserId: fromUser.id,
       fromUsername: fromUser.username,
+      fromUserIsPatron: isPatronActive(fromUser),
+      fromUserPatronTier: fromUser.patronTier,
+      fromUserPatronExpiresAt: fromUser.patronExpiresAt,
+      fromUserPatronSubscriptionStatus: fromUser.patronSubscriptionStatus,
       toUserId: target.id,
       toUsername: target.username,
       status: 'pending',

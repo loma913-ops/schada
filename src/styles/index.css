@@ -4,6 +4,7 @@
 @import './legal.css';
 @import './leaderboard.css';
 @import './orientation.css';
+@import './donate.css';
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -76,7 +77,8 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
-.install-btn {
+.install-btn,
+.mobile-donate-btn {
   display: none !important;
 }
 
@@ -94,13 +96,54 @@ body {
   .desktop-friends-btn {
     display: none !important;
   }
+  .action-btn.mobile-donate-btn,
+  .mobile-donate-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    height: 36px !important;
+    padding: 0 0.65rem !important;
+    box-sizing: border-box !important;
+    border-radius: var(--radius-sm);
+    background-color: var(--accent-gold-subtle) !important;
+    border: 1px solid var(--accent-gold) !important;
+    color: var(--accent-gold) !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .action-btn.mobile-donate-btn svg,
+  .mobile-donate-btn svg {
+    color: var(--accent-gold) !important;
+  }
+  .action-btn.mobile-donate-btn:hover,
+  .mobile-donate-btn:hover {
+    background-color: var(--accent-gold-muted) !important;
+    border-color: var(--accent-gold-hover) !important;
+    color: var(--accent-gold-hover) !important;
+  }
+  .action-btn.mobile-donate-btn.active,
+  .mobile-donate-btn.active {
+    background-color: var(--accent-gold) !important;
+    border-color: var(--accent-gold) !important;
+    color: var(--accent-gold-text) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+  .action-btn.mobile-donate-btn.active svg,
+  .mobile-donate-btn.active svg {
+    color: var(--accent-gold-text) !important;
+    stroke: var(--accent-gold-text) !important;
+    fill: var(--accent-gold-text) !important;
+  }
   .install-btn {
     display: inline-flex !important;
     align-items: center;
+    justify-content: center;
     gap: 0.35rem;
-    padding: 0.4rem 0.65rem !important;
+    height: 36px !important;
+    padding: 0 0.65rem !important;
+    box-sizing: border-box !important;
     border-radius: var(--radius-sm);
-    background-color: rgba(229, 183, 88, 0.08) !important;
+    background-color: var(--accent-gold-subtle) !important;
     border: 1px solid var(--accent-gold) !important;
     color: var(--accent-gold) !important;
     font-weight: 600;
@@ -108,7 +151,7 @@ body {
     transition: all 0.15s ease;
   }
   .install-btn:hover {
-    background-color: rgba(229, 183, 88, 0.18) !important;
+    background-color: var(--accent-gold-muted) !important;
     border-color: var(--accent-gold-hover) !important;
     color: var(--accent-gold-hover) !important;
   }
@@ -122,8 +165,13 @@ body {
   .install-btn-text {
     display: none;
   }
-  .install-btn {
-    padding: 0.4rem !important;
+  .install-btn,
+  .action-btn.mobile-donate-btn,
+  .mobile-donate-btn {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
   }
 }
 
@@ -150,28 +198,112 @@ body {
 
 .nav-tab {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-secondary);
-  padding: 0.5rem 0.9rem;
+  height: 36px;
+  padding: 0 0.85rem;
+  box-sizing: border-box;
   border-radius: var(--radius-sm);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
+  line-height: 1;
 }
 
 .nav-tab:hover, .nav-tab.active {
   color: var(--text-primary);
   background-color: var(--bg-tertiary);
+  border-color: transparent;
 }
 
 .nav-actions {
   display: flex;
   align-items: center;
   gap: 0.8rem;
+}
+
+.nav-actions .action-btn {
+  height: 36px;
+  padding: 0 0.85rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.nav-actions .theme-toggle-btn,
+.theme-toggle-btn {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0;
+}
+
+.theme-toggle-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  flex-shrink: 0;
+}
+
+@media (min-width: 769px) {
+  .desktop-friends-btn {
+    height: 36px;
+    padding: 0 0.85rem;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+}
+
+.nav-profile-btn {
+  height: 36px;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-color: var(--border-strong);
+}
+
+.nav-auth-loading {
+  height: 36px;
+  min-width: 85px;
+  padding: 0 0.9rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  cursor: default;
+}
+
+.nav-signin-btn {
+  height: 36px;
+  padding: 0 0.85rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 
 /* Main Arena Layout */
@@ -734,12 +866,12 @@ body {
   cursor: pointer;
   background-color: var(--bg-tertiary);
   color: var(--accent-gold);
-  border: 1px solid rgba(229, 183, 88, 0.4);
+  border: 1px solid var(--accent-gold-border);
   transition: all 0.15s ease;
 }
 
 .auth-tab-btn:hover {
-  background-color: var(--border-subtle);
+  background-color: var(--accent-gold-subtle);
   border-color: var(--accent-gold);
   color: var(--accent-gold-hover);
 }
@@ -751,29 +883,6 @@ body {
 }
 
 .auth-tab-btn.active:hover {
-  background-color: var(--accent-gold-hover);
-  border-color: var(--accent-gold-hover);
-}
-
-[data-theme='light'] .auth-tab-btn {
-  background-color: var(--bg-tertiary);
-  color: #925f0a;
-  border-color: rgba(146, 95, 10, 0.35);
-}
-
-[data-theme='light'] .auth-tab-btn:hover {
-  background-color: rgba(229, 183, 88, 0.15);
-  border-color: #925f0a;
-  color: #784804;
-}
-
-[data-theme='light'] .auth-tab-btn.active {
-  background-color: var(--accent-gold);
-  color: var(--accent-gold-text);
-  border-color: var(--accent-gold);
-}
-
-[data-theme='light'] .auth-tab-btn.active:hover {
   background-color: var(--accent-gold-hover);
   border-color: var(--accent-gold-hover);
 }
@@ -1255,9 +1364,9 @@ body {
 }
 
 .status-badge.join {
-  background-color: rgba(229, 183, 88, 0.15);
+  background-color: var(--accent-gold-subtle);
   color: var(--accent-gold);
-  border: 1px solid rgba(229, 183, 88, 0.3);
+  border: 1px solid var(--accent-gold-border);
 }
 
 .status-badge.live {
@@ -2002,7 +2111,9 @@ body {
     border-bottom-right-radius: 0 !important;
     border-top-left-radius: 20px !important;
     border-top-right-radius: 20px !important;
-    padding-bottom: calc(1.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 1.5rem 1.25rem calc(1.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    max-height: 90vh;
+    overflow-y: auto;
     animation: slideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }

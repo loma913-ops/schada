@@ -258,6 +258,20 @@ describe('MultiplayerScaleConfig validation', () => {
       /Invalid presence.storageKeys.playerTokenPrefix/
     );
 
+    const emptyGuestIsPatron = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        storageKeys: {
+          ...MULTIPLAYER_SCALE_CONFIG.presence.storageKeys,
+          guestIsPatron: '   ',
+        },
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyGuestIsPatron as MultiplayerScaleConfig)).toThrowError(
+      /Invalid presence.storageKeys.guestIsPatron/
+    );
+
     const missingStorageLimits = {
       ...MULTIPLAYER_SCALE_CONFIG,
       storageLimits: null as any,

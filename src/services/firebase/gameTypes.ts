@@ -43,18 +43,15 @@ export interface GameTimeoutResult {
   readonly timedOutColor?: PieceColor;
 }
 
+export type { ArenaPlayer };
+
 export interface CreateGameParams {
   timeControlMinutes: number;
   incrementSeconds?: number;
   isRanked?: boolean;
   colorPref?: PieceColor | 'random';
   isPrivate?: boolean;
-  creator: {
-    id: string;
-    username: string;
-    elo: number;
-    gamesPlayed?: number;
-  };
+  creator: ArenaPlayer;
 }
 
 export interface JoinGameResult {

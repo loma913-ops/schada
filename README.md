@@ -55,6 +55,8 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Optimized Firestore CRUD Architecture**: Direct atomic updates without heavy locks and throttled presence updates.
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 - **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
+- **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.
+- **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
 
 ---
 
@@ -124,7 +126,7 @@ cd schada
 # 2. Install dependencies
 npm install
 
-# 3. Run unit test suite (31 test suites, 262+ tests)
+# 3. Run unit test suite (41 test suites, 376+ tests)
 npm test
 
 # 4. Start local development server with HMR
@@ -146,17 +148,23 @@ npm run lint
 npm run build
 ```
 
-### Connecting to GCP / Firebase
+### Connecting to GCP / Firebase & Stripe
 
 Create a `.env` file from `.env.example`:
 
 ```bash
+# Firebase Web App Configuration
 VITE_FIREBASE_API_KEY=your_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your_project_id
 VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
+
+# Stripe Donation & Payment Configuration
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+VITE_STRIPE_PAYMENT_LINK=https://donate.stripe.com/test_...
+VITE_STRIPE_PAYMENT_LINK_LIFETIME=https://donate.stripe.com/test_...
 ```
 
 To connect to the local Firebase Emulator Suite:

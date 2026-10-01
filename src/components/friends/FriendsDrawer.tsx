@@ -9,6 +9,7 @@ import {
   getPendingIncomingRequests,
 } from '@/services/firebase/friendService';
 import { X, UserPlus, Check, Swords, Trash2 } from 'lucide-react';
+import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 
 interface FriendsDrawerProps {
   isOpen: boolean;
@@ -137,7 +138,7 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
                 bottom: '4px',
                 padding: '0 0.6rem',
                 backgroundColor: 'var(--accent-gold)',
-                color: '#1a1a1a',
+                color: 'var(--accent-gold-text)',
                 border: 'none',
               }}
               disabled={loading || !user}
@@ -227,7 +228,10 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
                         title={f.status}
                       />
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{f.username}</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>{f.username}</span>
+                          {isPatronUser(f) && <PatronBadge size={13} />}
+                        </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--accent-gold)', fontFamily: 'var(--font-mono)' }}>
                           {f.eloRating} Elo
                         </div>
@@ -279,7 +283,10 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.fromUsername}</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span>{r.fromUsername}</span>
+                        {isPatronUser(r) && <PatronBadge size={13} />}
+                      </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         Sent you a friend request
                       </div>

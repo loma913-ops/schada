@@ -171,9 +171,9 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
                         fontWeight: 700,
                         padding: '2px 8px',
                         borderRadius: '999px',
-                        background: 'rgba(229, 183, 88, 0.15)',
+                        background: 'var(--accent-gold-subtle)',
                         color: 'var(--accent-gold)',
-                        border: '1px solid rgba(229, 183, 88, 0.3)',
+                        border: '1px solid var(--accent-gold-border)',
                       }}
                     >
                       {selectedTier.elo} ELO

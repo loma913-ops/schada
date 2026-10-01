@@ -20,6 +20,7 @@ import {
   type GameRoom,
 } from '@/services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import {
   LOBBY_CONFIG,
   parseStoredLobbyFilters,
@@ -530,10 +531,14 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
                         <span className="player-indicator-dot" title={isWaiting ? 'Waiting for opponent' : 'Game in progress'} />
                         <span className="player-names-text" title={isWaiting ? `${hostName} vs ?` : `${hostName} vs ${oppName}`}>
                           <strong className="host-name">{hostName}</strong>
+                          {isPatronUser(host) && <PatronBadge size={11} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />}
                           <span className="vs-sep"> vs </span>
                           <span className={isWaiting ? 'waiting-placeholder' : 'opponent-name'}>
                             {oppName || '?'}
                           </span>
+                          {!isWaiting && isPatronUser(opponent) && (
+                            <PatronBadge size={11} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
+                          )}
                         </span>
                       </div>
 

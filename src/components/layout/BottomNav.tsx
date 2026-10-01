@@ -1,9 +1,10 @@
 import React from 'react';
 import { Crown, Trophy, BookOpen, Users, History } from 'lucide-react';
+import type { NavigationTab } from '@/components/layout/navigationTypes';
 
 interface BottomNavProps {
-  currentTab: 'play' | 'leaderboard' | 'learn' | 'history';
-  onSelectTab: (tab: 'play' | 'leaderboard' | 'learn' | 'history') => void;
+  currentTab: NavigationTab;
+  onSelectTab: (tab: NavigationTab) => void;
   onOpenFriends: () => void;
   pendingRequestsCount?: number;
 }

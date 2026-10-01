@@ -7,6 +7,7 @@ import { safeSetItem } from '@/services/storage/storageCleanup';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
 import { useNavigate } from 'react-router-dom';
+import { isPatronUser } from '@/components/common/PatronBadge';
 
 interface CreateRoomModalProps {
   isOpen: boolean;
@@ -45,18 +46,27 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
           ? storedGuestName
           : MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
 
+      const isDonor = isPatronUser(user);
+
       const creator = user
         ? {
             id: user.id,
             username: user.username,
             elo: user.eloRating,
             gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+            isPatron: isDonor,
+            hasDonated: isDonor,
+            patronTier: user.patronTier,
+            patronExpiresAt: user.patronExpiresAt,
+            patronSubscriptionStatus: user.patronSubscriptionStatus,
           }
         : {
             id: guestId,
             username: guestName,
             elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
             gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+            isPatron: false,
+            hasDonated: false,
           };
 
       const result = await createGame({

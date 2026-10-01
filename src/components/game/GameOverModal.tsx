@@ -11,10 +11,23 @@ import {
   validateGameOverModalConfig,
   type GameOverModalConfig,
 } from './gameOverConfig';
+import {
+  PatronBadge,
+  isPatronUser,
+  type PatronTier,
+  type PatronSubscriptionStatus,
+} from '@/components/common/PatronBadge';
 
 export interface GameOverPlayerInfo {
+  readonly id?: string;
+  readonly username?: string;
   readonly elo: number;
   readonly gamesPlayed?: number;
+  readonly isPatron?: boolean;
+  readonly hasDonated?: boolean;
+  readonly patronTier?: PatronTier;
+  readonly patronExpiresAt?: string | null;
+  readonly patronSubscriptionStatus?: PatronSubscriptionStatus;
 }
 
 export interface PlayerEloUpdate {
@@ -136,12 +149,15 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     return config.copy.defaultGameCompletedText;
   };
 
+  const winnerPlayer = result.winner === 'blue' ? bluePlayer : result.winner === 'green' ? greenPlayer : null;
+  const winnerDisplayName = winnerPlayer?.username || (result.winner ? result.winner.toUpperCase() : null);
+
   const modalTitle = isWinner
     ? config.copy.victoryTitle
     : isDraw
       ? config.copy.drawTitle
-      : result.winner
-        ? `${result.winner.toUpperCase()} Won`
+      : winnerDisplayName
+        ? `${winnerDisplayName} Won`
         : config.copy.defaultGameOverTitle;
 
   const gridColumns =
@@ -191,8 +207,22 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           )}
         </div>
 
-        <h2 id="game-over-title" style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>
-          {modalTitle}
+        <h2
+          id="game-over-title"
+          style={{
+            fontSize: '1.6rem',
+            fontWeight: 800,
+            marginBottom: '0.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.35rem',
+          }}
+        >
+          <span>{modalTitle}</span>
+          {!isWinner && !isDraw && isPatronUser(winnerPlayer) && (
+            <PatronBadge size={18} style={{ flexShrink: 0 }} />
+          )}
         </h2>
 
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '1.25rem' }}>
@@ -220,8 +250,13 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             }}
           >
             <span>Category</span>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span style={{ color: 'var(--piece-blue)' }}>Blue</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', maxWidth: '100%' }}>
+                <span style={{ color: 'var(--piece-blue)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {bluePlayer?.username || 'Blue'}
+                </span>
+                {isPatronUser(bluePlayer) && <PatronBadge size={12} style={{ flexShrink: 0 }} />}
+              </div>
               {isRanked && eloInfo && (
                 <span
                   style={{
@@ -249,8 +284,13 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                 </span>
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span style={{ color: 'var(--piece-green)' }}>Green</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', maxWidth: '100%' }}>
+                <span style={{ color: 'var(--piece-green)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {greenPlayer?.username || 'Green'}
+                </span>
+                {isPatronUser(greenPlayer) && <PatronBadge size={12} style={{ flexShrink: 0 }} />}
+              </div>
               {isRanked && eloInfo && (
                 <span
                   style={{

@@ -103,7 +103,7 @@
   color: var(--accent-gold);
   transform-origin: center center;
   animation: rotateDeviceLoop 3s ease-in-out infinite;
-  filter: drop-shadow(0 4px 10px rgba(229, 183, 88, 0.35));
+  filter: drop-shadow(0 4px 10px var(--accent-gold-border));
 }
 
 @keyframes rotateDeviceLoop {
@@ -124,8 +124,8 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0.75rem;
-  background-color: rgba(229, 183, 88, 0.12);
-  border: 1px solid rgba(229, 183, 88, 0.35);
+  background-color: var(--accent-gold-subtle);
+  border: 1px solid var(--accent-gold-border);
   border-radius: 9999px;
   color: var(--accent-gold);
   font-size: 0.725rem;

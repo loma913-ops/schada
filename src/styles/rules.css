@@ -24,8 +24,8 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: rgba(229, 183, 88, 0.12);
-  border: 1px solid rgba(229, 183, 88, 0.3);
+  background: var(--accent-gold-subtle);
+  border: 1px solid var(--accent-gold-border);
   margin-bottom: 0.75rem;
   color: var(--accent-gold);
 }
@@ -74,14 +74,14 @@
 }
 
 .rules-chip.highlight {
-  background: rgba(229, 183, 88, 0.12);
-  border-color: rgba(229, 183, 88, 0.4);
+  background: var(--accent-gold-subtle);
+  border-color: var(--accent-gold-border);
   color: var(--accent-gold);
 }
 
 [data-theme='light'] .rules-chip.highlight {
-  background: rgba(229, 183, 88, 0.2);
-  color: #925f0a;
+  background: var(--accent-gold-muted);
+  color: var(--accent-gold);
 }
 
 /* Tab Navigation */
@@ -183,8 +183,8 @@
 }
 
 .rules-callout.gold {
-  background: rgba(229, 183, 88, 0.1);
-  border: 1px solid rgba(229, 183, 88, 0.35);
+  background: var(--accent-gold-subtle);
+  border: 1px solid var(--accent-gold-border);
   color: var(--text-primary);
 }
 
@@ -192,10 +192,6 @@
   color: var(--accent-gold);
   flex-shrink: 0;
   margin-top: 0.15rem;
-}
-
-[data-theme='light'] .rules-callout.gold svg {
-  color: #b47a16;
 }
 
 .rules-callout.blue {
@@ -371,8 +367,8 @@
 
 .rules-picker-cell.active {
   background: var(--accent-gold) !important;
-  color: #1a1608 !important;
-  box-shadow: inset 0 0 0 2px #ffffff, 0 0 8px rgba(229, 183, 88, 0.7);
+  color: var(--accent-gold-text) !important;
+  box-shadow: inset 0 0 0 2px #ffffff, 0 0 8px var(--accent-gold-border-strong);
   font-weight: 800;
   z-index: 2;
 }
@@ -423,7 +419,7 @@
 
 .square-chip-btn.active {
   background: var(--accent-gold);
-  color: #1a1608;
+  color: var(--accent-gold-text);
   border-color: var(--accent-gold);
 }
 
@@ -531,13 +527,9 @@
 }
 
 .piece-score-badge.gold {
-  background: rgba(229, 183, 88, 0.15);
+  background: var(--accent-gold-muted);
   color: var(--accent-gold);
-  border: 1px solid rgba(229, 183, 88, 0.35);
-}
-
-[data-theme='light'] .piece-score-badge.gold {
-  color: #925f0a;
+  border: 1px solid var(--accent-gold-border);
 }
 
 .piece-score-badge.blue {
@@ -724,8 +716,8 @@
 }
 
 .zone-strip.goal {
-  background: linear-gradient(90deg, rgba(229, 183, 88, 0.15) 0%, rgba(229, 183, 88, 0.05) 100%);
-  border-color: rgba(229, 183, 88, 0.4);
+  background: linear-gradient(90deg, var(--accent-gold-subtle) 0%, transparent 100%);
+  border-color: var(--accent-gold-border);
 }
 
 .zone-strip.battlefield {
@@ -766,7 +758,7 @@
 
 .zone-strip.goal .zone-badge {
   color: var(--accent-gold);
-  border-color: rgba(229, 183, 88, 0.4);
+  border-color: var(--accent-gold-border);
 }
 
 .zone-desc {
@@ -908,10 +900,6 @@
   font-weight: 700;
   font-size: 0.85rem;
   color: var(--accent-gold);
-}
-
-[data-theme='light'] .rules-quote-author {
-  color: #925f0a;
 }
 
 /* Mini Board for Opening Moves */

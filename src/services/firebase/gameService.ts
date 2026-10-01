@@ -14,6 +14,9 @@ import { createInitialGameState } from '@/core/schada/engine';
 import { updateUserStats } from './authService';
 import type { UserProfile } from './localProvider';
 import { safeSetItem } from '../storage/storageCleanup';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
+import { isPatronUser } from '@/components/common/PatronBadge';
+import type { ArenaPlayer } from './gameTypes';
 
 // Re-exported modular domain services
 export * from './gameTypes';
@@ -93,8 +96,16 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
     id: params.creator.id,
     username: params.creator.username,
     elo: params.creator.elo,
-    gamesPlayed: typeof params.creator.gamesPlayed === 'number' ? params.creator.gamesPlayed : 0,
+    gamesPlayed:
+      typeof params.creator.gamesPlayed === 'number'
+        ? params.creator.gamesPlayed
+        : ELO_CONFIG.defaultAssumedGamesPlayed,
     sessionToken,
+    isPatron: isPatronUser(params.creator),
+    hasDonated: Boolean(params.creator.hasDonated || params.creator.isPatron),
+    patronTier: params.creator.patronTier,
+    patronExpiresAt: params.creator.patronExpiresAt,
+    patronSubscriptionStatus: params.creator.patronSubscriptionStatus,
   };
 
   const isGuest =
@@ -137,7 +148,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
 
 export async function joinGame(
   gameId: string,
-  user: { id: string; username: string; elo: number; gamesPlayed?: number }
+  user: ArenaPlayer
 ): Promise<JoinGameResult> {
   const existingToken = getLocalSessionToken(gameId);
 
@@ -182,8 +193,16 @@ export async function joinGame(
           id: user.id,
           username: user.username,
           elo: user.elo,
-          gamesPlayed: typeof user.gamesPlayed === 'number' ? user.gamesPlayed : 0,
+          gamesPlayed:
+            typeof user.gamesPlayed === 'number'
+              ? user.gamesPlayed
+              : ELO_CONFIG.defaultAssumedGamesPlayed,
           sessionToken: newToken,
+          isPatron: isPatronUser(user),
+          hasDonated: Boolean(user.hasDonated || user.isPatron),
+          patronTier: user.patronTier,
+          patronExpiresAt: user.patronExpiresAt,
+          patronSubscriptionStatus: user.patronSubscriptionStatus,
         };
 
         let assignedColor: PieceColor;
@@ -243,8 +262,16 @@ export async function joinGame(
       id: user.id,
       username: user.username,
       elo: user.elo,
-      gamesPlayed: typeof user.gamesPlayed === 'number' ? user.gamesPlayed : 0,
+      gamesPlayed:
+        typeof user.gamesPlayed === 'number'
+          ? user.gamesPlayed
+          : ELO_CONFIG.defaultAssumedGamesPlayed,
       sessionToken: newToken,
+      isPatron: isPatronUser(user),
+      hasDonated: Boolean(user.hasDonated || user.isPatron),
+      patronTier: user.patronTier,
+      patronExpiresAt: user.patronExpiresAt,
+      patronSubscriptionStatus: user.patronSubscriptionStatus,
     };
 
     let assignedColor: PieceColor;

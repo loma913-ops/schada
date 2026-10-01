@@ -1,16 +1,17 @@
 import React from 'react';
-import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, Smartphone, History } from 'lucide-react';
+import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, Smartphone, History, Heart } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { usePwa } from '@/context/PwaContext';
+import { SchadaStar } from '@/components/common/SchadaStar';
+import type { NavigationTab } from '@/components/layout/navigationTypes';
 
 interface NavbarProps {
-  currentTab: 'play' | 'leaderboard' | 'learn' | 'history';
-  onSelectTab: (tab: 'play' | 'leaderboard' | 'learn' | 'history') => void;
+  currentTab: NavigationTab;
+  onSelectTab: (tab: NavigationTab) => void;
   onOpenAuth: () => void;
   onOpenProfile: () => void;
   onOpenFriends: () => void;
-  friendsCount?: number;
   pendingRequestsCount?: number;
 }
 
@@ -30,9 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     <nav className="navbar">
       {/* Brand */}
       <div className="nav-brand" onClick={() => onSelectTab('play')}>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="24" height="24" aria-hidden="true">
-          <path fillRule="evenodd" d="M 50 18 L 62 42 L 85 45 L 68 62 L 72 85 L 50 74 L 28 85 L 32 62 L 15 45 L 38 42 Z M 58 50 A 8 8 0 0 1 50 58 A 8 8 0 0 1 42 50 A 8 8 0 0 1 50 42 A 8 8 0 0 1 58 50 Z" fill="var(--accent-gold)" stroke="var(--accent-gold-hover)" strokeWidth="2" />
-        </svg>
+        <SchadaStar size={24} />
         <span>Schada.org</span>
       </div>
 
@@ -66,10 +65,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           <History size={16} />
           <span>History</span>
         </button>
+        <button
+          className={`nav-tab nav-donate-tab ${currentTab === 'donate' ? 'active' : ''}`}
+          onClick={() => onSelectTab('donate')}
+          title="Support Schada • Donate"
+        >
+          <Heart size={16} />
+          <span>Donate</span>
+        </button>
       </div>
 
       {/* Right Cluster */}
       <div className="nav-actions">
+        {/* Mobile Donate Link */}
+        <button
+          className={`action-btn mobile-donate-btn ${currentTab === 'donate' ? 'active' : ''}`}
+          onClick={() => onSelectTab('donate')}
+          title="Support Schada • Donate"
+          aria-label="Support Schada • Donate"
+        >
+          <Heart size={16} />
+        </button>
+
         {/* PWA Install Trigger (hidden if already installed in standalone mode) */}
         {!isStandalone && (
           <button
@@ -86,7 +103,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Friends Drawer Button (Desktop only, mobile has it in BottomNav) */}
         <button
           className="action-btn desktop-friends-btn"
-          style={{ position: 'relative', padding: '0.45rem 0.75rem' }}
+          style={{ position: 'relative' }}
           onClick={onOpenFriends}
           title="Friends & Challenges"
         >
@@ -117,25 +134,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Theme Toggle */}
         <button
-          className="action-btn"
-          style={{ padding: '0.45rem' }}
+          className="action-btn theme-toggle-btn"
           onClick={toggleTheme}
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
         >
-          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
         {/* User Account / Profile */}
         {user ? (
           <button
             className="action-btn nav-profile-btn"
-            style={{
-              padding: '0.4rem 0.8rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              borderColor: 'var(--border-strong)',
-            }}
             onClick={onOpenProfile}
             title={`User Profile & Settings (Status: ${user.status})`}
           >
@@ -166,7 +175,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.8rem',
                 color: 'var(--accent-gold)',
-                background: 'rgba(229, 183, 88, 0.12)',
+                background: 'var(--accent-gold-subtle)',
                 padding: '1px 6px',
                 borderRadius: '4px',
               }}
@@ -177,16 +186,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         ) : isLoading ? (
           <div
             className="action-btn nav-auth-loading"
-            style={{
-              padding: '0.4rem 0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: '85px',
-              minHeight: '34px',
-              opacity: 0.7,
-              cursor: 'default',
-            }}
             aria-busy="true"
             aria-label="Loading authentication"
           >
@@ -204,10 +203,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         ) : (
           <button
-            className="action-btn active"
-            style={{
-              padding: '0.4rem 0.9rem',
-            }}
+            className="action-btn active nav-signin-btn"
             onClick={onOpenAuth}
           >
             <LogIn size={15} />

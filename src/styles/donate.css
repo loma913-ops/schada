@@ -1,0 +1,998 @@
+/* ==========================================================================
+   Schada Donate & Patron Page Styles (Lichess-Inspired)
+   Fully responsive with full Dark and Light Mode support
+   ========================================================================== */
+
+.donate-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Hero Motto Banner
+   -------------------------------------------------------------------------- */
+.donate-banner {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-surface) 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.donate-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-gold), var(--accent-green), var(--accent-blue));
+}
+
+.donate-banner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent-gold-subtle);
+  border: 1px solid var(--accent-gold-border);
+  color: var(--accent-gold);
+  font-size: 0.825rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  margin-bottom: 1rem;
+}
+
+.donate-banner h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.donate-banner p {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   Checkout Card
+   -------------------------------------------------------------------------- */
+.donate-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.donate-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Frequency Tabs (One-time, Monthly, Lifetime)
+   -------------------------------------------------------------------------- */
+.donate-frequency-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  background: var(--bg-primary);
+  padding: 0.35rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.donate-freq-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.75rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 0.15s ease-in-out;
+}
+
+.donate-freq-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.donate-freq-btn.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.donate-freq-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.donate-disabled-badge {
+  font-size: 0.7rem;
+  background: rgba(117, 114, 109, 0.2);
+  color: var(--text-muted);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Segmented Amount Button Group (Matching user screenshot)
+   -------------------------------------------------------------------------- */
+.donate-amounts-segmented {
+  display: flex;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='light'] .donate-amounts-segmented {
+  background: #e5e3df;
+  border-color: #d1cdc7;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.donate-amount-seg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.85rem 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+}
+
+[data-theme='light'] .donate-amount-seg-btn {
+  border-right-color: #d1cdc7;
+  color: #44403c;
+}
+
+.donate-amount-seg-btn:last-child {
+  border-right: none;
+}
+
+.donate-amount-seg-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+[data-theme='light'] .donate-amount-seg-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.6);
+  color: #1c1917;
+}
+
+.donate-amount-seg-btn.active {
+  background: var(--accent-green, #629924) !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Custom Amount Input (When "Other" is chosen)
+   -------------------------------------------------------------------------- */
+.donate-custom-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 1rem;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  transition: border-color 0.15s ease;
+}
+
+.donate-custom-input-wrap:focus-within {
+  border-color: var(--accent-green, #629924);
+  box-shadow: 0 0 0 2px rgba(98, 153, 36, 0.25);
+}
+
+.donate-custom-currency {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.donate-custom-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.donate-custom-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Lifetime Highlight Box
+   -------------------------------------------------------------------------- */
+.donate-lifetime-highlight {
+  background: linear-gradient(135deg, var(--accent-gold-subtle) 0%, rgba(98, 153, 36, 0.1) 100%);
+  border: 1px solid var(--accent-gold-border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.donate-lifetime-info h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--accent-gold);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.donate-lifetime-info p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.donate-lifetime-price {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* --------------------------------------------------------------------------
+   Transaction Fee Offset Checkbox
+   -------------------------------------------------------------------------- */
+.donate-offset-fee-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease;
+}
+
+.donate-offset-fee-box:hover {
+  border-color: var(--border-strong);
+}
+
+.donate-checkbox-input {
+  width: 18px;
+  height: 18px;
+  margin-top: 0.2rem;
+  accent-color: var(--accent-green, #629924);
+  cursor: pointer;
+}
+
+.donate-offset-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.donate-offset-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.donate-offset-subtitle {
+  font-size: 0.825rem;
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Summary & Breakdown
+   -------------------------------------------------------------------------- */
+.donate-summary {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.donate-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.925rem;
+  color: var(--text-secondary);
+}
+
+.donate-summary-row.total-row {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.donate-total-amount {
+  color: var(--accent-green, #629924);
+  font-weight: 800;
+}
+
+/* --------------------------------------------------------------------------
+   Submit Action / Informational Button
+   -------------------------------------------------------------------------- */
+.donate-submit-btn {
+  width: 100%;
+  background: var(--accent-green, #629924);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 1rem 1.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  box-shadow: 0 4px 12px rgba(98, 153, 36, 0.25);
+}
+
+.donate-submit-btn:hover:not(:disabled) {
+  background: var(--accent-green-hover, #75b32e);
+  transform: translateY(-1px);
+}
+
+.donate-submit-btn.coming-soon-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  box-shadow: none;
+  cursor: default;
+}
+
+[data-theme='light'] .donate-submit-btn.coming-soon-btn {
+  background: #e5e3df;
+  color: #57534e;
+  border-color: #d6d3ce;
+}
+
+.donate-submit-helper {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: -0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Patron Schada Star Spotlight Card
+   -------------------------------------------------------------------------- */
+.donate-star-spotlight {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.donate-star-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.donate-star-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.donate-star-preview-box {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.donate-star-demo-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.donate-avatar-mock {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.donate-username-demo {
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.patron-star-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-gold-subtle);
+  border: 1px solid var(--accent-gold-border);
+  color: var(--accent-gold);
+  padding: 1px 3px;
+  border-radius: 4px;
+  line-height: 1;
+  vertical-align: middle;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.patron-star-badge:hover {
+  transform: scale(1.1);
+  background: var(--accent-gold-muted);
+}
+
+.patron-star-badge path {
+  fill: var(--accent-gold);
+  stroke: var(--accent-gold-hover);
+}
+
+.donate-star-preview-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.donate-star-preview-status.active {
+  color: var(--accent-green);
+}
+
+.donate-star-preview-status.expired {
+  color: var(--accent-orange);
+}
+
+.donate-star-preview-status.preview,
+.donate-star-preview-status.idle {
+  color: var(--accent-gold);
+}
+
+.donate-guest-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.15rem;
+  border-radius: var(--radius-md);
+  background-color: var(--accent-gold-subtle);
+  border: 1px solid var(--accent-gold-border);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.donate-guest-notice-icon {
+  flex-shrink: 0;
+  color: var(--accent-gold);
+}
+
+
+/* --------------------------------------------------------------------------
+   FAQ Section
+   -------------------------------------------------------------------------- */
+.donate-faq-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.donate-faq-section h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.donate-faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.donate-faq-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.donate-faq-item:hover {
+  border-color: var(--border-strong);
+}
+
+.donate-faq-question {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 1.15rem 1.25rem;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.donate-faq-answer {
+  padding: 0 1.25rem 1.15rem;
+  font-size: 0.925rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Media Queries
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .donate-container {
+    padding: 1rem 0.75rem 2.5rem;
+    gap: 1.5rem;
+  }
+
+  .donate-banner {
+    padding: 1.5rem 1rem;
+  }
+
+  .donate-banner h1 {
+    font-size: 1.6rem;
+  }
+
+  .donate-card {
+    padding: 1.25rem;
+  }
+
+  .donate-frequency-group {
+    grid-template-columns: 1fr;
+  }
+
+  .donate-amounts-segmented {
+    flex-wrap: wrap;
+  }
+
+  .donate-amount-seg-btn {
+    flex: 1 1 30%;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0.75rem 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .donate-lifetime-highlight {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Desktop & Mobile Header Donate Action Elements
+   -------------------------------------------------------------------------- */
+.nav-donate-tab {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.4rem !important;
+  height: 36px !important;
+  padding: 0 0.85rem !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--accent-gold) !important;
+  background-color: var(--accent-gold-subtle) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--accent-gold) !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  transition: all 0.15s ease;
+}
+
+.nav-donate-tab svg {
+  color: var(--accent-gold) !important;
+}
+
+.nav-donate-tab:hover {
+  background-color: var(--accent-gold-muted) !important;
+  border-color: var(--accent-gold-hover) !important;
+  color: var(--accent-gold-hover) !important;
+}
+
+.nav-donate-tab.active {
+  background-color: var(--accent-gold) !important;
+  border-color: var(--accent-gold) !important;
+  color: var(--accent-gold-text) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.nav-donate-tab.active svg {
+  color: var(--accent-gold-text) !important;
+  stroke: var(--accent-gold-text) !important;
+  fill: var(--accent-gold-text) !important;
+}
+
+/* --------------------------------------------------------------------------
+   User Patron Status Indicator Banner
+   -------------------------------------------------------------------------- */
+.donate-user-status-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease-in-out;
+}
+
+.donate-user-status-card.active {
+  border-color: var(--accent-gold-border);
+  background: linear-gradient(135deg, var(--accent-gold-subtle) 0%, var(--bg-secondary) 100%);
+}
+
+.donate-user-status-card.expired {
+  border-color: rgba(234, 88, 12, 0.4);
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.08) 0%, var(--bg-secondary) 100%);
+}
+
+.donate-user-status-card.guest {
+  border-color: var(--accent-gold-border);
+  background: var(--accent-gold-subtle);
+}
+
+.donate-user-status-card.new-user {
+  border-color: var(--border-subtle);
+  background: var(--bg-secondary);
+}
+
+.donate-user-status-main {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.donate-user-status-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-gold-subtle);
+  color: var(--accent-gold);
+  flex-shrink: 0;
+}
+
+.donate-user-status-icon.expired {
+  background: rgba(234, 88, 12, 0.15);
+  color: var(--accent-orange);
+}
+
+.donate-user-status-icon.guest {
+  background: var(--accent-gold-subtle);
+  color: var(--accent-gold);
+}
+
+.donate-user-status-icon.new-user {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.donate-user-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.donate-user-status-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.donate-status-pill {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.donate-status-pill.active {
+  background: var(--accent-gold-muted);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold-border);
+}
+
+.donate-status-pill.expired {
+  background: rgba(234, 88, 12, 0.18);
+  color: var(--accent-orange);
+  border: 1px solid rgba(234, 88, 12, 0.4);
+}
+
+.donate-status-pill.guest {
+  background: rgba(117, 114, 109, 0.18);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.donate-status-pill.idle {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.donate-user-status-username {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.donate-user-status-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Frequency Duration Pill
+   -------------------------------------------------------------------------- */
+.donate-frequency-duration-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.95rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.donate-frequency-duration-pill svg {
+  color: var(--accent-gold);
+  flex-shrink: 0;
+}
+
+.donate-duration-text strong {
+  color: var(--text-primary);
+}
+
+/* --------------------------------------------------------------------------
+   Duration Pill in Summary
+   -------------------------------------------------------------------------- */
+.donate-duration-pill-tag {
+  background: var(--accent-gold-muted);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold-border);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+
+.donate-summary-detail-row {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Badge Duration Tiers Grid (Spotlight)
+   -------------------------------------------------------------------------- */
+.donate-duration-tiers-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 680px) {
+  .donate-duration-tiers-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.donate-duration-tier-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: all 0.15s ease-in-out;
+}
+
+.donate-duration-tier-card.selected {
+  border-color: var(--accent-gold);
+  background: var(--accent-gold-subtle);
+  box-shadow: 0 0 0 1px var(--accent-gold-border);
+}
+
+.donate-tier-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.donate-tier-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.donate-tier-badge.lifetime {
+  background: var(--accent-gold-muted);
+  color: var(--accent-gold);
+}
+
+.donate-tier-duration {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.donate-duration-tier-card p {
+  font-size: 0.825rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+@media (max-width: 520px) {
+  .donate-user-status-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Light Theme Overrides */
+[data-theme='light'] .donate-user-status-card {
+  background: #ffffff;
+  border-color: #d6d3ce;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] .donate-user-status-card.active {
+  background: linear-gradient(135deg, var(--accent-gold-subtle) 0%, #ffffff 100%);
+  border-color: var(--accent-gold-border-strong);
+}
+
+[data-theme='light'] .donate-user-status-card.expired {
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.1) 0%, #ffffff 100%);
+  border-color: rgba(234, 88, 12, 0.5);
+}
+
+[data-theme='light'] .donate-user-status-card.guest {
+  background: var(--accent-gold-subtle);
+  border-color: var(--accent-gold-border);
+}
+
+[data-theme='light'] .donate-user-status-icon.new-user {
+  background: #f4f2ef;
+  color: #57534e;
+}
+
+[data-theme='light'] .donate-frequency-duration-pill {
+  background: #f9f8f6;
+  border-color: #d6d3ce;
+  color: #57534e;
+}
+
+[data-theme='light'] .donate-duration-tier-card {
+  background: #ffffff;
+  border-color: #d6d3ce;
+}
+
+[data-theme='light'] .donate-duration-tier-card.selected {
+  background: var(--accent-gold-subtle);
+  border-color: var(--accent-gold);
+}
+
+[data-theme='light'] .donate-tier-badge {
+  background: #edebe8;
+  color: #57534e;
+}
+
+
