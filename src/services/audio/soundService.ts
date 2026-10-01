@@ -289,7 +289,10 @@ export class SoundService {
 
     if (typeof Audio === 'undefined') {
       if (this.ctx && this.ctx.state === 'running') {
-        if (type === 'move') {
+        const buffer = type === 'move' ? this.moveBuffer : this.captureBuffer;
+        if (buffer) {
+          this.playBufferDirect(this.ctx, buffer);
+        } else if (type === 'move') {
           this.synthesizeMoveSound(this.ctx);
         } else {
           this.synthesizeCaptureSound(this.ctx);
@@ -312,9 +315,12 @@ export class SoundService {
       if (playPromise) {
         playPromise.catch(() => {
           this.activeAudios.delete(audio);
-          // If HTML5 Audio is blocked by browser autoplay policy, synthesize sound if ctx is running
+          // If HTML5 Audio is blocked by browser autoplay policy, play decoded buffer if ready or synthesize sound
           if (this.ctx && this.ctx.state === 'running') {
-            if (type === 'move') {
+            const buffer = type === 'move' ? this.moveBuffer : this.captureBuffer;
+            if (buffer) {
+              this.playBufferDirect(this.ctx, buffer);
+            } else if (type === 'move') {
               this.synthesizeMoveSound(this.ctx);
             } else {
               this.synthesizeCaptureSound(this.ctx);
@@ -325,7 +331,10 @@ export class SoundService {
     } catch (e) {
       console.warn('[Sound] playFallbackAudio failed:', e);
       if (this.ctx && this.ctx.state === 'running') {
-        if (type === 'move') {
+        const buffer = type === 'move' ? this.moveBuffer : this.captureBuffer;
+        if (buffer) {
+          this.playBufferDirect(this.ctx, buffer);
+        } else if (type === 'move') {
           this.synthesizeMoveSound(this.ctx);
         } else {
           this.synthesizeCaptureSound(this.ctx);
@@ -417,9 +426,16 @@ export class SoundService {
         this.synthesizeMoveSound(ctx);
       }
     } else {
-      // AudioContext is suspended. Attempt resume and immediately play MP3 via HTML5 Audio
-      ctx.resume().catch(() => { });
-      this.playFallbackAudio('move');
+      // AudioContext is suspended. Resume and play the decoded MP3 buffer directly
+      ctx.resume().then(() => {
+        if (this.moveBuffer) {
+          this.playBufferDirect(ctx, this.moveBuffer);
+        } else {
+          this.synthesizeMoveSound(ctx);
+        }
+      }).catch(() => {
+        this.playFallbackAudio('move');
+      });
     }
   }
 
@@ -444,9 +460,16 @@ export class SoundService {
         this.synthesizeCaptureSound(ctx);
       }
     } else {
-      // AudioContext is suspended. Attempt resume and immediately play MP3 via HTML5 Audio
-      ctx.resume().catch(() => { });
-      this.playFallbackAudio('capture');
+      // AudioContext is suspended. Resume and play the decoded MP3 buffer directly
+      ctx.resume().then(() => {
+        if (this.captureBuffer) {
+          this.playBufferDirect(ctx, this.captureBuffer);
+        } else {
+          this.synthesizeCaptureSound(ctx);
+        }
+      }).catch(() => {
+        this.playFallbackAudio('capture');
+      });
     }
   }
 
