@@ -618,17 +618,17 @@ export const RulesGuide: React.FC = () => {
 
           {/* Preset Buttons */}
           <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+            <div className="rules-example-header">
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
                 Select an Example:
               </span>
               <button
                 type="button"
-                className="rules-tab-btn"
-                style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
+                className={`rules-browse-gold-btn ${showFullGridPicker ? 'active' : ''}`}
                 onClick={() => setShowFullGridPicker((prev) => !prev)}
+                title={showFullGridPicker ? 'Hide full 64-square grid' : 'Browse all 64 squares on the board'}
               >
-                <Grid size={13} /> {showFullGridPicker ? 'Hide 64-Square Grid' : 'Browse All 64 Squares'}
+                <Grid size={14} /> {showFullGridPicker ? 'Hide 64-Square Grid' : 'Browse All 64 Squares'}
               </button>
             </div>
 
