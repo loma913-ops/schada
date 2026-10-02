@@ -12,6 +12,7 @@ interface BoardSquareProps {
   legalMoveTarget: Move | undefined;
   onClick: (square: Square) => void;
   orientation?: 'blue' | 'green';
+  isUnderAttack?: boolean;
 }
 
 export const BoardSquare: React.FC<BoardSquareProps> = memo(({
@@ -22,6 +23,7 @@ export const BoardSquare: React.FC<BoardSquareProps> = memo(({
   legalMoveTarget,
   onClick,
   orientation = 'blue',
+  isUnderAttack = false,
 }) => {
   const [col, row] = squareToColRow(square);
   const isLight = (col + row) % 2 === 1;
@@ -58,9 +60,17 @@ export const BoardSquare: React.FC<BoardSquareProps> = memo(({
       {piece && (
         <div className="piece-container">
           <PieceIcon piece={piece} />
-          {isInvulnerableInGoal && (
+          {isInvulnerableInGoal ? (
             <div className="goal-invulnerable-badge" title="Safe in Goal Line (Immune to capture)" />
-          )}
+          ) : isUnderAttack ? (
+            <div
+              className="piece-under-attack-badge"
+              title="Under attack (vulnerable to capture)"
+              aria-label="Under attack"
+            >
+              !
+            </div>
+          ) : null}
         </div>
       )}
 

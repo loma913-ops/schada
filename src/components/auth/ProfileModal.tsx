@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { X, LogOut, Edit2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X, LogOut, Edit2, CheckCircle2, AlertTriangle, Sliders, AlertCircle } from 'lucide-react';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { SchadaStar } from '@/components/common/SchadaStar';
 import { getPatronStatusDescription } from '@/core/donate/patronService';
+import { useGamePreferences } from '@/context/GamePreferencesContext';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface ProfileModalProps {
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
   const { user, updateUsername, logout } = useAuth();
+  const { showThreatIndicators, setShowThreatIndicators } = useGamePreferences();
   const [newUsername, setNewUsername] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,6 +197,62 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>WIN %</div>
           </div>
+        </div>
+
+        {/* Game Controls / Board Preferences Section */}
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            marginBottom: '1rem',
+            backgroundColor: 'var(--bg-tertiary)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Sliders size={16} color="var(--accent-gold)" />
+              <span>Game Controls</span>
+            </div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Preferences</span>
+          </div>
+
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              cursor: 'pointer',
+              userSelect: 'none',
+              padding: '0.35rem 0',
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 600 }}>
+                <AlertCircle size={15} color="var(--accent-red)" />
+                <span>Show Pieces Under Attack</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Display red exclamation badges on threatened pieces vulnerable to capture
+              </div>
+            </div>
+
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Show Pieces Under Attack"
+              checked={showThreatIndicators}
+              onChange={(e) => setShowThreatIndicators(e.target.checked)}
+              style={{
+                width: '18px',
+                height: '18px',
+                accentColor: 'var(--accent-gold)',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            />
+          </label>
         </div>
 
         {/* Username Change Management Section */}

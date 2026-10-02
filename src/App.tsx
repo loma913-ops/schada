@@ -2,6 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { GamePreferencesProvider } from './context/GamePreferencesContext';
 import { PwaProvider } from './context/PwaContext';
 import { Navbar } from './components/layout/Navbar';
 import { BottomNav } from './components/layout/BottomNav';
@@ -568,13 +569,15 @@ const MainApp: React.FC = () => {
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <PwaProvider>
-          <BrowserRouter>
-            <MainApp />
-          </BrowserRouter>
-        </PwaProvider>
-      </AuthProvider>
+      <GamePreferencesProvider>
+        <AuthProvider>
+          <PwaProvider>
+            <BrowserRouter>
+              <MainApp />
+            </BrowserRouter>
+          </PwaProvider>
+        </AuthProvider>
+      </GamePreferencesProvider>
     </ThemeProvider>
   );
 }

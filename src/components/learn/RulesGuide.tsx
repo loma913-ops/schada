@@ -21,9 +21,10 @@ import {
   Navigation,
 } from 'lucide-react';
 import type { BoardState, Move, Square, Piece, PieceType, MoveVector } from '@/core/schada/types';
-import { createInitialGameState, executeMove, getLegalMovesForSquare } from '@/core/schada/engine';
+import { createInitialGameState, executeMove, getLegalMovesForSquare, getPiecesUnderAttack } from '@/core/schada/engine';
 import { SCHADA_VECTORS, squareToColRow, colRowToSquare } from '@/core/schada/vectors';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
+import { useGamePreferences } from '@/context/GamePreferencesContext';
 import { BoardSquare } from '../board/BoardSquare';
 import { VectorOverlay } from '../board/VectorOverlay';
 import { PieceIcon } from '../board/PieceIcon';
@@ -157,6 +158,8 @@ export const RulesGuide: React.FC = () => {
     'Click any Blue piece on Rank 1 or 2 to see its opening move options.'
   );
 
+  const { showThreatIndicators } = useGamePreferences();
+
   const legalMovesForSelectedSquare = useMemo(() => {
     return selectedBoardSquare ? getLegalMovesForSquare(sandboxGameState.board, selectedBoardSquare) : [];
   }, [sandboxGameState.board, selectedBoardSquare]);
@@ -168,6 +171,11 @@ export const RulesGuide: React.FC = () => {
     }
     return map;
   }, [legalMovesForSelectedSquare]);
+
+  const attackedSquares = useMemo(() => {
+    if (!showThreatIndicators) return new Set<Square>();
+    return getPiecesUnderAttack(sandboxGameState.board);
+  }, [sandboxGameState.board, showThreatIndicators]);
 
   const handleSquareClick = useCallback(
     (sq: Square) => {
@@ -861,6 +869,7 @@ export const RulesGuide: React.FC = () => {
                     legalMoveTarget={legalTarget}
                     onClick={handleSquareClick}
                     orientation="blue"
+                    isUnderAttack={attackedSquares.has(sq)}
                   />
                 );
               })}
