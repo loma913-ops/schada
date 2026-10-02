@@ -154,7 +154,7 @@ export const RulesGuide: React.FC = () => {
   const [selectedBoardSquare, setSelectedBoardSquare] = useState<Square | null>(null);
   const [lastSandboxMove, setLastSandboxMove] = useState<Move | null>(null);
   const [sandboxFeedback, setSandboxFeedback] = useState<string>(
-    'Click any Blue piece on Rank 1 or 2 to see its opening move options!'
+    'Click any Blue piece on Rank 1 or 2 to see its opening move options.'
   );
 
   const legalMovesForSelectedSquare = useMemo(() => {
@@ -179,9 +179,9 @@ export const RulesGuide: React.FC = () => {
         setSelectedBoardSquare(null);
 
         if (move.piece.type === 'field_officer') {
-          setSandboxFeedback(`⚡ Played ${move.from} → ${move.to}! Field Officer leaped over the friendly pawn.`);
+          setSandboxFeedback(`⚡ Played ${move.from} → ${move.to}. Field Officer leaped over the friendly pawn.`);
         } else {
-          setSandboxFeedback(`♟️ Played ${move.from} → ${move.to}! Pawn advanced.`);
+          setSandboxFeedback(`♟️ Played ${move.from} → ${move.to}. Pawn advanced.`);
         }
         return;
       }
@@ -195,7 +195,7 @@ export const RulesGuide: React.FC = () => {
           setSelectedBoardSquare(sq);
           const moves = getLegalMovesForSquare(sandboxGameState.board, sq);
           if (moves.length === 0) {
-            setSandboxFeedback(`Piece on ${sq} is an Officer: forward path is blocked by the pawn on rank 2!`);
+            setSandboxFeedback(`Piece on ${sq} is an Officer: forward path is blocked by the pawn on rank 2.`);
           } else {
             const formattedType = piece.type.replace('_', ' ');
             setSandboxFeedback(
@@ -215,7 +215,7 @@ export const RulesGuide: React.FC = () => {
     setSandboxGameState(createInitialGameState());
     setSelectedBoardSquare(null);
     setLastSandboxMove(null);
-    setSandboxFeedback(`Board reset to opening position. Exactly ${board.openingLegalMoveCount} legal moves available for Blue!`);
+    setSandboxFeedback(`Board reset to opening position. Exactly ${board.openingLegalMoveCount} legal moves available for Blue.`);
   }, [board.openingLegalMoveCount]);
 
   // Precomputed squares in row-major order: ranks 8 to 1, files a to h (O(1) space and time)
@@ -246,11 +246,11 @@ export const RulesGuide: React.FC = () => {
 
   let outcomeText = '';
   if (blueScore > greenScore) {
-    outcomeText = `🏆 Blue Wins (${blueScore} vs ${greenScore})!`;
+    outcomeText = `🏆 Blue Wins (${blueScore} vs ${greenScore}).`;
   } else if (greenScore > blueScore) {
-    outcomeText = `🏆 Green Wins (${greenScore} vs ${blueScore})!`;
+    outcomeText = `🏆 Green Wins (${greenScore} vs ${blueScore}).`;
   } else {
-    outcomeText = `⚖️ Tied (${blueScore} vs ${greenScore})! Decided by Tiebreakers.`;
+    outcomeText = `⚖️ Tied (${blueScore} vs ${greenScore}). Decided by Tiebreakers.`;
   }
 
   const blueGoalRank = board.blueGoalRankIndex + 1; // 8
@@ -302,12 +302,36 @@ export const RulesGuide: React.FC = () => {
             Schada is an elegant, non-random abstract strategy game. Here are the 4 fundamental rules you need to start playing immediately:
           </p>
 
+          {/* Pieces Overview: Row of Three */}
+          <div className="quick-start-pieces-row">
+            <div className="quick-start-piece-card">
+              <div className="quick-start-piece-icon">
+                <PieceIcon piece={sampleFieldOfficer} />
+              </div>
+              <span className="quick-start-piece-name">Field Officer</span>
+            </div>
+
+            <div className="quick-start-piece-card">
+              <div className="quick-start-piece-icon">
+                <PieceIcon piece={sampleOfficer} />
+              </div>
+              <span className="quick-start-piece-name">Officer</span>
+            </div>
+
+            <div className="quick-start-piece-card">
+              <div className="quick-start-piece-icon">
+                <PieceIcon piece={samplePawn} />
+              </div>
+              <span className="quick-start-piece-name">Pawn</span>
+            </div>
+          </div>
+
           <div className="quick-start-grid">
             <div className="quick-start-step">
               <div className="quick-step-num">1</div>
               <div className="quick-step-title">Squares Dictate Movement</div>
               <div className="quick-step-desc">
-                In Chess, pieces have moves. In Schada, <strong>the square you stand on dictates your move</strong>! Follow the lines engraved on your tile and count the dots. Each dot is 1 square of travel.
+                In Chess, pieces have moves. In Schada, <strong>the square you stand on dictates your move</strong>. Follow the lines on your tile and count the dots. Each dot is 1 square of travel.
               </div>
             </div>
 
@@ -315,7 +339,7 @@ export const RulesGuide: React.FC = () => {
               <div className="quick-step-num">2</div>
               <div className="quick-step-title">Full Distance Required</div>
               <div className="quick-step-desc">
-                You must travel the <strong>entire designated distance</strong> of the vector. If a line shows 2 or 3 dots, you cannot stop early on an intermediate square. Bent paths also turn corners in a single turn!
+                You must travel the <strong>entire designated distance</strong> of the vector. If a line shows 2 or 3 dots, you cannot stop early on an intermediate square. Bent paths also turn corners in a single turn.
               </div>
             </div>
 
@@ -333,7 +357,7 @@ export const RulesGuide: React.FC = () => {
               <div className="quick-step-desc">
                 Advance your High Pieces into the enemy back rank (Goal Line). Field Officers are worth{' '}
                 <strong>{scoring.fieldOfficerGoalPoints} points</strong>; Officers are worth{' '}
-                <strong>{scoring.officerGoalPoints} point</strong>. High pieces in the goal are <strong>immune to capture</strong>!
+                <strong>{scoring.officerGoalPoints} point</strong>. High pieces in the goal are <strong>immune to capture</strong>.
               </div>
             </div>
           </div>
@@ -347,7 +371,7 @@ export const RulesGuide: React.FC = () => {
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <li><strong>Do use Pawns as shields:</strong> Pawns have {scoring.pawnGoalPoints} goal points, making them ideal blockers and screeners for your {army.fieldOfficersCount} Field Officers.</li>
                 <li><strong>Do open with Field Officers:</strong> They can jump straight over your rank-2 pawns to rank 3 on turn 1.</li>
-                <li><strong>Do protect high pieces in the field:</strong> If they get captured, your potential goal score decreases!</li>
+                <li><strong>Do protect high pieces in the field:</strong> If they get captured, your potential goal score decreases.</li>
               </ul>
             </div>
 
@@ -357,14 +381,219 @@ export const RulesGuide: React.FC = () => {
               </div>
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <li><strong>Don't return to the Base Line:</strong> Once a high piece leaves rank 1, it is strictly forbidden from returning.</li>
-                <li><strong>Don't rush to end the game if trailing:</strong> The game ends the second your remaining high pieces reach the goal-only finish if you have more points!</li>
-                <li><strong>Don't expect Field Officers to jump enemies:</strong> Only friendly pieces can be leaped over!</li>
+                <li><strong>Don't rush to end the game if trailing:</strong> The game ends the second your remaining high pieces reach the goal-only finish if you have more points.</li>
+                <li><strong>Don't expect Field Officers to jump enemies:</strong> Only friendly pieces can be leaped over.</li>
               </ul>
             </div>
           </div>
         </section>
 
-        {/* Section 2: How Squares Move */}
+        {/* Section 2: The Three Pieces & Their Powers */}
+        <section className="rules-card">
+          <div className="rules-card-header">
+            <h2 className="rules-card-title">
+              <Shield size={22} color="var(--accent-blue)" />
+              The Three Pieces & Their Powers
+            </h2>
+            <span className="rules-card-badge">Armies & Roles</span>
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+            Each player commands an army of {army.totalPiecesPerPlayer} pieces:{' '}
+            {army.fieldOfficersCount} Field Officers, {army.officersCount} Officers, and {army.pawnsCount} Pawns.
+            Together, Field Officers and Officers are called <strong>High Pieces</strong>.
+          </p>
+
+          <div className="pieces-grid">
+            {/* Field Officer */}
+            <div className="piece-showcase-card">
+              <div className="piece-showcase-top">
+                <div className="piece-icon-box">
+                  <PieceIcon piece={sampleFieldOfficer} />
+                </div>
+                <div>
+                  <div className="piece-name">
+                    Field Officer ({army.fieldOfficersCount})
+                  </div>
+                  <div className="piece-dutch-name">Hoofd-Officier (Dutch)</div>
+                </div>
+              </div>
+              <div className="piece-score-badge gold">
+                <Award size={14} /> Worth {scoring.fieldOfficerGoalPoints} Points in Goal
+              </div>
+              <div className="piece-ability-desc">
+                <strong>Superpower: Friendly Leap.</strong> The only piece on the board capable of leaping over intermediate <em>friendly</em> pieces along its path. Cannot jump enemy pieces.
+              </div>
+            </div>
+
+            {/* Officer */}
+            <div className="piece-showcase-card">
+              <div className="piece-showcase-top">
+                <div className="piece-icon-box">
+                  <PieceIcon piece={sampleOfficer} />
+                </div>
+                <div>
+                  <div className="piece-name">
+                    Officer ({army.officersCount})
+                  </div>
+                  <div className="piece-dutch-name">Officier (Dutch)</div>
+                </div>
+              </div>
+              <div className="piece-score-badge blue">
+                <Award size={14} /> Worth {scoring.officerGoalPoints} Point in Goal
+              </div>
+              <div className="piece-ability-desc">
+                <strong>High Piece.</strong> Must march toward the goal line to score points. Cannot leap over any piece-any intermediate piece completely blocks its movement.
+              </div>
+            </div>
+
+            {/* Pawn */}
+            <div className="piece-showcase-card">
+              <div className="piece-showcase-top">
+                <div className="piece-icon-box">
+                  <PieceIcon piece={samplePawn} />
+                </div>
+                <div>
+                  <div className="piece-name">
+                    Pawn ({army.pawnsCount})
+                  </div>
+                  <div className="piece-dutch-name">Pion (Dutch)</div>
+                </div>
+              </div>
+              <div className="piece-score-badge muted">
+                {scoring.pawnGoalPoints} Goal Points
+              </div>
+              <div className="piece-ability-desc">
+                <strong>Blocker & Defender.</strong> Scores 0 points in the goal, but has <em>total freedom</em>: pawns can enter and leave base and goal lines at will, capturing and blocking enemy high pieces.
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Leap Simulator */}
+          <div className="leap-simulator-box">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <Sparkles size={18} color="var(--accent-gold)" />
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                Interactive Demo: Can My Piece Make the Leap?
+              </h3>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+              Square <code>a1</code> instructs a piece to move 2 squares forward to <code>a3</code> (passing through <code>a2</code>).
+              Test how different piece types react when <code>a2</code> is occupied:
+            </p>
+
+            <div className="leap-demo-controls">
+              <div className="leap-control-group">
+                <span className="leap-control-label">
+                  Moving Piece:
+                </span>
+                <div className="leap-btn-group">
+                  <button
+                    type="button"
+                    className={`leap-btn ${selectedPieceType === 'field_officer' ? 'active' : ''}`}
+                    onClick={() => setSelectedPieceType('field_officer')}
+                  >
+                    Field Officer
+                  </button>
+                  <button
+                    type="button"
+                    className={`leap-btn ${selectedPieceType === 'officer' ? 'active' : ''}`}
+                    onClick={() => setSelectedPieceType('officer')}
+                  >
+                    Officer
+                  </button>
+                  <button
+                    type="button"
+                    className={`leap-btn ${selectedPieceType === 'pawn' ? 'active' : ''}`}
+                    onClick={() => setSelectedPieceType('pawn')}
+                  >
+                    Pawn
+                  </button>
+                </div>
+              </div>
+
+              <div className="leap-control-group">
+                <span className="leap-control-label">
+                  Blocking Piece:
+                </span>
+                <div className="leap-btn-group">
+                  <button
+                    type="button"
+                    className={`leap-btn ${obstacleType === 'friendly' ? 'active' : ''}`}
+                    onClick={() => setObstacleType('friendly')}
+                  >
+                    Friendly Piece
+                  </button>
+                  <button
+                    type="button"
+                    className={`leap-btn ${obstacleType === 'enemy' ? 'active' : ''}`}
+                    onClick={() => setObstacleType('enemy')}
+                  >
+                    Enemy Piece
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3-Square Visual Strip */}
+            <div className="leap-visual-strip">
+              <div className="leap-square-cell dark">
+                <div style={{ width: '38px', height: '38px' }}>
+                  <PieceIcon piece={currentMovingPiece} />
+                </div>
+                <span className="leap-square-coord">a1 (Start)</span>
+              </div>
+
+              <div style={{ fontSize: '1.25rem', color: 'var(--text-muted)' }}>➔</div>
+
+              <div className="leap-square-cell light">
+                <div style={{ width: '38px', height: '38px' }}>
+                  <PieceIcon piece={intermediateObstaclePiece} />
+                </div>
+                <span className="leap-square-coord">a2 (Path)</span>
+              </div>
+
+              <div style={{ fontSize: '1.25rem', color: 'var(--text-muted)' }}>➔</div>
+
+              <div className={`leap-square-cell dark ${isLeapMoveAllowed ? 'target-allowed' : 'target-blocked'}`}>
+                <div
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: isLeapMoveAllowed ? 'var(--accent-green)' : 'var(--accent-red)',
+                    opacity: 0.8,
+                  }}
+                />
+                <span className="leap-square-coord">a3 (Dest)</span>
+              </div>
+            </div>
+
+            <div className={`leap-outcome-banner ${isLeapMoveAllowed ? 'success' : 'blocked'}`}>
+              {isLeapMoveAllowed ? (
+                <>
+                  <CheckCircle2 size={20} />
+                  <span>
+                    <strong>Move Allowed.</strong> The Field Officer leaps over the friendly piece on <code>a2</code> and safely lands on <code>a3</code>.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <XCircle size={20} />
+                  <span>
+                    <strong>Move Blocked.</strong>{' '}
+                    {selectedPieceType !== 'field_officer'
+                      ? `${selectedPieceType === 'officer' ? 'Officers' : 'Pawns'} cannot leap over any pieces. Intermediate square a2 must be completely empty.`
+                      : 'Field Officers can only leap over FRIENDLY pieces, never enemy pieces.'}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Section 3: How Squares Move */}
         <section className="rules-card">
           <div className="rules-card-header">
             <h2 className="rules-card-title">
@@ -564,7 +793,7 @@ export const RulesGuide: React.FC = () => {
                           ) : (
                             <span>
                               Travels through {pathSteps.join(' → ')} to land on <strong>{destSquare}</strong>.
-                              {isBent && ' (Mid-move turn required!)'}
+                              {isBent && ' (Mid-move turn required.)'}
                             </span>
                           )}
                         </div>
@@ -579,215 +808,10 @@ export const RulesGuide: React.FC = () => {
                 <div>
                   <strong>Rule: Mandatory Full Distance</strong>
                   <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
-                    You must travel the <em>full distance</em> indicated by the dots. A piece on <code>f2</code> moving towards <code>h1</code> cannot stop early on <code>g2</code> or <code>h2</code>!
+                    You must travel the <em>full distance</em> indicated by the dots. A piece on <code>f2</code> moving towards <code>h1</code> cannot stop early on <code>g2</code> or <code>h2</code>.
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 3: The Three Pieces & Their Powers */}
-        <section className="rules-card">
-          <div className="rules-card-header">
-            <h2 className="rules-card-title">
-              <Shield size={22} color="var(--accent-blue)" />
-              The Three Pieces & Their Powers
-            </h2>
-            <span className="rules-card-badge">Armies & Roles</span>
-          </div>
-
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
-            Each player commands an army of {army.totalPiecesPerPlayer} pieces:{' '}
-            {army.fieldOfficersCount} Field Officers, {army.officersCount} Officers, and {army.pawnsCount} Pawns.
-            Together, Field Officers and Officers are called <strong>High Pieces</strong>.
-          </p>
-
-          <div className="pieces-grid">
-            {/* Field Officer */}
-            <div className="piece-showcase-card">
-              <div className="piece-showcase-top">
-                <div className="piece-icon-box">
-                  <PieceIcon piece={sampleFieldOfficer} />
-                </div>
-                <div>
-                  <div className="piece-name">
-                    Field Officer ({army.fieldOfficersCount})
-                  </div>
-                  <div className="piece-dutch-name">Hoofd-Officier (Dutch)</div>
-                </div>
-              </div>
-              <div className="piece-score-badge gold">
-                <Award size={14} /> Worth {scoring.fieldOfficerGoalPoints} Points in Goal
-              </div>
-              <div className="piece-ability-desc">
-                <strong>Superpower: Friendly Leap.</strong> The only piece on the board capable of leaping over intermediate <em>friendly</em> pieces along its path. Cannot jump enemy pieces.
-              </div>
-            </div>
-
-            {/* Officer */}
-            <div className="piece-showcase-card">
-              <div className="piece-showcase-top">
-                <div className="piece-icon-box">
-                  <PieceIcon piece={sampleOfficer} />
-                </div>
-                <div>
-                  <div className="piece-name">
-                    Officer ({army.officersCount})
-                  </div>
-                  <div className="piece-dutch-name">Officier (Dutch)</div>
-                </div>
-              </div>
-              <div className="piece-score-badge blue">
-                <Award size={14} /> Worth {scoring.officerGoalPoints} Point in Goal
-              </div>
-              <div className="piece-ability-desc">
-                <strong>High Piece.</strong> Must march toward the goal line to score points. Cannot leap over any piece-any intermediate piece completely blocks its movement.
-              </div>
-            </div>
-
-            {/* Pawn */}
-            <div className="piece-showcase-card">
-              <div className="piece-showcase-top">
-                <div className="piece-icon-box">
-                  <PieceIcon piece={samplePawn} />
-                </div>
-                <div>
-                  <div className="piece-name">
-                    Pawn ({army.pawnsCount})
-                  </div>
-                  <div className="piece-dutch-name">Pion (Dutch)</div>
-                </div>
-              </div>
-              <div className="piece-score-badge muted">
-                {scoring.pawnGoalPoints} Goal Points
-              </div>
-              <div className="piece-ability-desc">
-                <strong>Blocker & Defender.</strong> Scores 0 points in the goal, but has <em>total freedom</em>: pawns can enter and leave base and goal lines at will, capturing and blocking enemy high pieces.
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Leap Simulator */}
-          <div className="leap-simulator-box">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <Sparkles size={18} color="var(--accent-gold)" />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                Interactive Demo: Can My Piece Make the Leap?
-              </h3>
-            </div>
-
-            <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              Square <code>a1</code> instructs a piece to move 2 squares forward to <code>a3</code> (passing through <code>a2</code>).
-              Test how different piece types react when <code>a2</code> is occupied:
-            </p>
-
-            <div className="leap-demo-controls">
-              <div className="leap-control-group">
-                <span className="leap-control-label">
-                  Moving Piece:
-                </span>
-                <div className="leap-btn-group">
-                  <button
-                    type="button"
-                    className={`leap-btn ${selectedPieceType === 'field_officer' ? 'active' : ''}`}
-                    onClick={() => setSelectedPieceType('field_officer')}
-                  >
-                    Field Officer
-                  </button>
-                  <button
-                    type="button"
-                    className={`leap-btn ${selectedPieceType === 'officer' ? 'active' : ''}`}
-                    onClick={() => setSelectedPieceType('officer')}
-                  >
-                    Officer
-                  </button>
-                  <button
-                    type="button"
-                    className={`leap-btn ${selectedPieceType === 'pawn' ? 'active' : ''}`}
-                    onClick={() => setSelectedPieceType('pawn')}
-                  >
-                    Pawn
-                  </button>
-                </div>
-              </div>
-
-              <div className="leap-control-group">
-                <span className="leap-control-label">
-                  Blocking Piece:
-                </span>
-                <div className="leap-btn-group">
-                  <button
-                    type="button"
-                    className={`leap-btn ${obstacleType === 'friendly' ? 'active' : ''}`}
-                    onClick={() => setObstacleType('friendly')}
-                  >
-                    Friendly Piece
-                  </button>
-                  <button
-                    type="button"
-                    className={`leap-btn ${obstacleType === 'enemy' ? 'active' : ''}`}
-                    onClick={() => setObstacleType('enemy')}
-                  >
-                    Enemy Piece
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 3-Square Visual Strip */}
-            <div className="leap-visual-strip">
-              <div className="leap-square-cell dark">
-                <div style={{ width: '38px', height: '38px' }}>
-                  <PieceIcon piece={currentMovingPiece} />
-                </div>
-                <span className="leap-square-coord">a1 (Start)</span>
-              </div>
-
-              <div style={{ fontSize: '1.25rem', color: 'var(--text-muted)' }}>➔</div>
-
-              <div className="leap-square-cell light">
-                <div style={{ width: '38px', height: '38px' }}>
-                  <PieceIcon piece={intermediateObstaclePiece} />
-                </div>
-                <span className="leap-square-coord">a2 (Path)</span>
-              </div>
-
-              <div style={{ fontSize: '1.25rem', color: 'var(--text-muted)' }}>➔</div>
-
-              <div className={`leap-square-cell dark ${isLeapMoveAllowed ? 'target-allowed' : 'target-blocked'}`}>
-                <div
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '50%',
-                    background: isLeapMoveAllowed ? 'var(--accent-green)' : 'var(--accent-red)',
-                    opacity: 0.8,
-                  }}
-                />
-                <span className="leap-square-coord">a3 (Dest)</span>
-              </div>
-            </div>
-
-            <div className={`leap-outcome-banner ${isLeapMoveAllowed ? 'success' : 'blocked'}`}>
-              {isLeapMoveAllowed ? (
-                <>
-                  <CheckCircle2 size={20} />
-                  <span>
-                    <strong>Move Allowed!</strong> The Field Officer leaps over the friendly piece on <code>a2</code> and safely lands on <code>a3</code>.
-                  </span>
-                </>
-              ) : (
-                <>
-                  <XCircle size={20} />
-                  <span>
-                    <strong>Move Blocked!</strong>{' '}
-                    {selectedPieceType !== 'field_officer'
-                      ? `${selectedPieceType === 'officer' ? 'Officers' : 'Pawns'} cannot leap over any pieces. Intermediate square a2 must be completely empty.`
-                      : 'Field Officers can only leap over FRIENDLY pieces, never enemy pieces!'}
-                  </span>
-                </>
-              )}
             </div>
           </div>
         </section>
@@ -865,7 +889,7 @@ export const RulesGuide: React.FC = () => {
             <div>
               <strong>Capturing is by Replacement (Chess style)</strong>
               <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
-                When a piece lands on a square occupied by an enemy piece, the enemy is captured and removed. Any piece can capture any enemy piece (Pawns can capture High Pieces!). Capturing is <strong>not compulsory</strong>.
+                When a piece lands on a square occupied by an enemy piece, the enemy is captured and removed. Any piece can capture any enemy piece (Pawns can capture High Pieces.). Capturing is <strong>not compulsory</strong>.
               </div>
             </div>
           </div>
@@ -897,13 +921,13 @@ export const RulesGuide: React.FC = () => {
                   <span className="zone-badge">Target Zone</span>
                 </div>
                 <div className="zone-desc">
-                  Your primary destination! Each Field Officer in the goal line scores{' '}
+                  Your primary destination. Each Field Officer in the goal line scores{' '}
                   <strong>{scoring.fieldOfficerGoalPoints} points</strong>, and each Officer scores{' '}
                   <strong>{scoring.officerGoalPoints} point</strong>.
                   <ul style={{ marginTop: '0.4rem', paddingLeft: '1.2rem', lineHeight: 1.5 }}>
                     <li><strong>One-Way Entry:</strong> Once a high piece enters the goal line, it <strong>can never leave</strong> it.</li>
                     <li><strong>Shuffling:</strong> It may shuffle horizontally along the goal line to make room or block.</li>
-                    <li><strong>Golden Shield Invulnerability:</strong> High pieces in their goal line <strong>CANNOT BE CAPTURED</strong> by enemy pieces! (However, they can still capture enemies).</li>
+                    <li><strong>Golden Shield Invulnerability:</strong> High pieces in their goal line <strong>CANNOT BE CAPTURED</strong> by enemy pieces. (However, they can still capture enemies).</li>
                   </ul>
                 </div>
               </div>
@@ -961,7 +985,7 @@ export const RulesGuide: React.FC = () => {
             <div>
               <strong>Special Exemption: Pawns Have Total Freedom</strong>
               <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
-                Pawns are <strong>exempt</strong> from both Base Line and Goal Line restrictions. They can enter and leave both rows freely, using their versatility to support advances, block enemy high pieces, or deliver tactical surprises!
+                Pawns are <strong>exempt</strong> from both Base Line and Goal Line restrictions. They can enter and leave both rows freely, using their versatility to support advances, block enemy high pieces, or deliver tactical surprises.
               </div>
             </div>
           </div>
@@ -978,7 +1002,7 @@ export const RulesGuide: React.FC = () => {
           </div>
 
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
-            Schada does not end in checkmate. Instead, the game ends immediately the instant all remaining high pieces of a player reach the goal line, or if pieces are blocked!
+            Schada does not end in checkmate. Instead, the game ends immediately the instant all remaining high pieces of a player reach the goal line, or if pieces are blocked.
           </p>
 
           <div style={{ background: 'var(--bg-tertiary)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.5rem' }}>
@@ -1153,7 +1177,7 @@ export const RulesGuide: React.FC = () => {
             <div>
               <strong>Golden Tactical Tip</strong>
               <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
-                Do not end the game by rushing your last high piece into the goal line if your opponent has more points in their goal than you! Maneuver, capture their incoming officers, and protect your high-value Field Officers first.
+                Do not end the game by rushing your last high piece into the goal line if your opponent has more points in their goal than you. Maneuver, capture their incoming officers, and protect your high-value Field Officers first.
               </div>
             </div>
           </div>
