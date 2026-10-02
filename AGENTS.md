@@ -16,6 +16,6 @@ Configuration over hardcoding:
   - Business logic, algorithms, and thresholds (rates, multipliers, retry limits, cache TTLs, scoring weights).. 
 - Do not hard-code fallback values for these settings; throw a meaningful error if the config is missing or invalid.
 - Scope Exemptions:
-  - Visual design tokens (colors, fonts, radii, transitions, shadows) belong directly in CSS as the single source of truth; do not duplicate them in JSON configs.
+  - Visual design tokens (colors, fonts, radii, transitions, shadows) belong directly in CSS as the single source of truth.
   - Semantic HTML structure and standard protocol constants do not belong in config files.
 - These configuration and documentation rules strictly supersede any minimalism or YAGNI guidelines (e.g., Ponytail).

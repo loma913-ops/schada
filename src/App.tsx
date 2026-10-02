@@ -8,6 +8,7 @@ import { Navbar } from './components/layout/Navbar';
 import { BottomNav } from './components/layout/BottomNav';
 import { Footer } from './components/layout/Footer';
 import { OfflineBanner } from './components/layout/OfflineBanner';
+import { UpdateNotificationBanner } from './components/layout/UpdateNotificationBanner';
 import { OrientationLockOverlay } from './components/layout/OrientationLockOverlay';
 import { InstallModal } from './components/pwa/InstallModal';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
@@ -147,24 +148,24 @@ const MainApp: React.FC = () => {
 
     const currentUser = user
       ? {
-          id: user.id,
-          username: user.username,
-          elo: user.eloRating,
-          gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
-          isPatron: isDonor,
-          hasDonated: isDonor,
-          patronTier: user.patronTier,
-          patronExpiresAt: user.patronExpiresAt,
-          patronSubscriptionStatus: user.patronSubscriptionStatus,
-        }
+        id: user.id,
+        username: user.username,
+        elo: user.eloRating,
+        gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: isDonor,
+        hasDonated: isDonor,
+        patronTier: user.patronTier,
+        patronExpiresAt: user.patronExpiresAt,
+        patronSubscriptionStatus: user.patronSubscriptionStatus,
+      }
       : {
-          id: guestId,
-          username: localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestName) || defaultGuestName,
-          elo: defaultGuestRating,
-          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
-          isPatron: false,
-          hasDonated: false,
-        };
+        id: guestId,
+        username: localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestName) || defaultGuestName,
+        elo: defaultGuestRating,
+        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: false,
+        hasDonated: false,
+      };
 
     try {
       // 1. Direct targeted index lookup for an open waiting room with this time control (O(1) read)
@@ -240,7 +241,7 @@ const MainApp: React.FC = () => {
     const tier = getBotTier(difficultyLevel);
     const botOpponent: ArenaPlayer = {
       id: `bot_level_${difficultyLevel}`,
-      username: `SchadaBot (${tier.name} - Lvl ${difficultyLevel})`,
+      username: `SchadaBot - Lvl ${difficultyLevel}`,
       elo: tier.elo,
     };
 
@@ -248,22 +249,22 @@ const MainApp: React.FC = () => {
 
     const currentUserPlayer: ArenaPlayer = user
       ? {
-          id: user.id,
-          username: user.username,
-          elo: user.eloRating,
-          isPatron: isDonor,
-          hasDonated: isDonor,
-          patronTier: user.patronTier,
-          patronExpiresAt: user.patronExpiresAt,
-          patronSubscriptionStatus: user.patronSubscriptionStatus,
-        }
+        id: user.id,
+        username: user.username,
+        elo: user.eloRating,
+        isPatron: isDonor,
+        hasDonated: isDonor,
+        patronTier: user.patronTier,
+        patronExpiresAt: user.patronExpiresAt,
+        patronSubscriptionStatus: user.patronSubscriptionStatus,
+      }
       : {
-          id: 'guest',
-          username: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
-          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-          isPatron: false,
-          hasDonated: false,
-        };
+        id: 'guest',
+        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
+        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+        isPatron: false,
+        hasDonated: false,
+      };
 
     const bluePlayer = userColor === 'blue' ? currentUserPlayer : botOpponent;
     const greenPlayer = userColor === 'blue' ? botOpponent : currentUserPlayer;
@@ -335,29 +336,29 @@ const MainApp: React.FC = () => {
 
     const creator = user
       ? {
-          id: user.id,
-          username: user.username,
-          elo: user.eloRating,
-          gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
-          isPatron: isDonor,
-          hasDonated: isDonor,
-          patronTier: user.patronTier,
-          patronExpiresAt: user.patronExpiresAt,
-          patronSubscriptionStatus: user.patronSubscriptionStatus,
-        }
+        id: user.id,
+        username: user.username,
+        elo: user.eloRating,
+        gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: isDonor,
+        hasDonated: isDonor,
+        patronTier: user.patronTier,
+        patronExpiresAt: user.patronExpiresAt,
+        patronSubscriptionStatus: user.patronSubscriptionStatus,
+      }
       : {
-          id: guestId,
-          username: (() => {
-            const stored = localStorage.getItem(guestNameKey);
-            return stored && stored.trim().length > 0
-              ? stored
-              : MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
-          })(),
-          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
-          isPatron: false,
-          hasDonated: false,
-        };
+        id: guestId,
+        username: (() => {
+          const stored = localStorage.getItem(guestNameKey);
+          return stored && stored.trim().length > 0
+            ? stored
+            : MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
+        })(),
+        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: false,
+        hasDonated: false,
+      };
 
     const result = await createGame({
       timeControlMinutes: minutes,
@@ -429,6 +430,7 @@ const MainApp: React.FC = () => {
 
   return (
     <div className={`app-container ${isMatchActive ? 'in-match' : ''}`}>
+      <UpdateNotificationBanner isMatchActive={isMatchActive} />
       <OfflineBanner />
 
       {/* Top Navbar */}

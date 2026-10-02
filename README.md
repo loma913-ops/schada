@@ -51,7 +51,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Cross-Platform Hybrid Audio Engine**: Web Audio API with immediate transient attack playback, realistic synthesized fallbacks, and zero-latency desktop and mobile sound.
 - **Authoritative Symmetrical Elo Engine**: Immutable initial/final Elo ratings and deltas stored in match documents for symmetrical cross-client synchronization.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
-- **Zero-Friction Deployment Recovery**: Automatic chunk failure detection and session refresh post-deployment.
+- **Zero-Cache Deployment & Session Recovery**: Immediate cache bypass, background service worker updates, and seamless auto-recovery without hard reload.
 - **Optimized Firestore CRUD Architecture**: Composite index-aligned FIFO lobby/matchmaking queries, localStorage SWR leaderboard cache with immediate Elo-change invalidation, in-memory friends profile and username search caches, time-bounded cleanup queries, and self-healing ordered Elo reconciliation with automatic fallback.
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 - **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
@@ -203,7 +203,12 @@ npx firebase-tools deploy --only firestore
 npx firebase-tools deploy --only hosting
 ```
 
-Your live site at `https://schada.org` updates immediately after step 3. Stale client browsers automatically refresh chunk assets thanks to the `deploymentRecoveryService`.
+Your live site at `https://schada.org` updates immediately after step 3. Clients never need to empty cache or perform a hard reload to see changes:
+
+- **Zero-Cache Entry Points**: `index.html`, `sw.js`, `manifest.webmanifest`, and `version.json` are served with `Cache-Control: no-cache, no-store, must-revalidate` (across both Firebase Hosting and Nginx / Cloud Run), while hashed assets in `/assets/` are cached immutably for 1 year.
+- **Service Worker Auto-Claim & Lifecycle**: Background update checks trigger on app mount, visibility change, window focus, network reconnection, and periodic intervals. When a new service worker installs, it immediately activates (`skipWaiting`) and claims clients (`clientsClaim`).
+- **Safe Dynamic Reloading**: Active browser sessions receive the `controllerchange` event. If the player is in an active match, reload is cleanly deferred until the game concludes or manually confirmed via the update banner; idle and lobby tabs reload automatically.
+- **Resilient Version Polling**: Remote `/version.json` manifest checks provide a lightweight fallback across all browsers and private browsing modes.
 
 > **Note on index build time:** After step 2, new composite indexes show as **Building** in the [Firebase Console → Firestore → Indexes](https://console.firebase.google.com/project/schada-online/firestore/indexes). The app remains fully operational during this window — ordered queries fall back automatically until indexes are **Enabled**.
 

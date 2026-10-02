@@ -1,14 +1,58 @@
+import fs from 'fs';
 import path from 'path';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// Dynamically read version from package.json without hard-coded fallbacks
+const packageJsonPath = path.resolve(import.meta.dirname, './package.json');
+if (!fs.existsSync(packageJsonPath)) {
+  throw new Error(`vite.config.ts: package.json not found at ${packageJsonPath}`);
+}
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+if (!packageJson || typeof packageJson.version !== 'string' || packageJson.version.trim().length === 0) {
+  throw new Error('vite.config.ts: package.json is missing a valid "version" property.');
+}
+
+const appVersion: string = packageJson.version;
+const buildTimestamp: number = Date.now();
+
+/**
+ * Custom Vite plugin that generates dist/version.json with the exact build timestamp.
+ * Allows client sessions to query and detect new deployments with 0-byte caching.
+ */
+function versionManifestPlugin(): Plugin {
+  return {
+    name: 'version-manifest-plugin',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify(
+          {
+            version: appVersion,
+            buildTime: buildTimestamp,
+          },
+          null,
+          2
+        ),
+      });
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_BUILD_TIME__: JSON.stringify(buildTimestamp),
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     react(),
+    versionManifestPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: null,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'sounds/*.mp3'],
       manifest: {
         name: 'Schada • Strategy Board Game',
@@ -44,6 +88,7 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3,json}'],
+        globIgnores: ['**/version.json'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -103,5 +148,3 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
   },
 });
-
-

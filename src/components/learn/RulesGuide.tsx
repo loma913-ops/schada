@@ -8,7 +8,6 @@ import {
   Crown,
   Trophy,
   Award,
-  Users,
   CheckCircle2,
   AlertCircle,
   Info,
@@ -276,22 +275,6 @@ export const RulesGuide: React.FC = () => {
           Invented by <strong>{gameMetadata.inventor}</strong> ({gameMetadata.cityOfOrigin},{' '}
           {gameMetadata.yearInvented})<br /><em>"{gameMetadata.tagline}"</em>
         </p>
-
-        {/* Quick Stat Chips */}
-        <div className="rules-stat-chips">
-          <span className="rules-chip">
-            <Users size={14} color="var(--accent-blue)" /> 2 Players (Blue vs Green)
-          </span>
-          <span className="rules-chip">
-            <Shield size={14} color="var(--accent-green)" /> {army.totalPiecesPerPlayer} Pieces per Army
-          </span>
-          <span className="rules-chip highlight">
-            <Sparkles size={14} color="var(--accent-gold)" /> The Squares Dictate Movement
-          </span>
-          <span className="rules-chip">
-            <Award size={14} color="var(--accent-gold)" /> Goal: {scoring.fieldOfficerGoalPoints} pts (FO) / {scoring.officerGoalPoints} pt (O)
-          </span>
-        </div>
       </div>
 
       {/* Complete Full Guide Content (Unified, Sequential) */}
