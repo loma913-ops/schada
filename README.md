@@ -31,7 +31,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
   - **Pawn (8 per side)**: Support blocker. Can capture and move according to square vectors, but cannot score goal points.
 - **Base Line & Goal Line Restrictions**:
   - High pieces can shuffle along their base line, but once they leave it, they **cannot return**.
-  - Once high pieces reach their goal line (Rank 8 for Blue, Rank 1 for Green), they **cannot leave**, and are **immune to enemy capture**.
+  - Once high pieces reach their goal line (Rank 8 for Blue, Rank 1 for Green), they **cannot leave**, and are **immune to enemy capture** (marked with a gold shield badge).
 - **Victory & Scoring**:
   - The game concludes when all surviving high pieces of a player reach their goal line, upon opponent piece elimination or immobilization (no legal moves), 3-fold repetition, 6-ply mutual high-piece base/goal shuffling, or when high pieces outside the goal are blocked by enemy pieces.
   - Scoring is determined by goal line points ($\text{Field Officer} = 2, \text{Officer} = 1$).
@@ -56,6 +56,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 - **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
 - **Threat Detection Indicators**: Real-time visual attack badges on vulnerable pieces with toggleable player preferences.
+- **Goal Invulnerability Shield Badges**: Golden shield badges displayed on goal-line high pieces denoting capture immunity.
 - **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.
 - **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
 
