@@ -21,6 +21,8 @@ import {
 } from '@/services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
+import { isGuestUser } from '@/services/firebase/gameTypes';
+import { useAuth } from '@/context/AuthContext';
 import {
   LOBBY_CONFIG,
   parseStoredLobbyFilters,
@@ -33,6 +35,8 @@ export type { LobbyFilterState };
 
 interface LobbyTableProps {
   onOpenCreateRoomModal?: () => void;
+  initialWaitingRooms?: GameRoom[];
+  initialInProgressRooms?: GameRoom[];
 }
 
 /**
@@ -46,9 +50,15 @@ interface LobbyTableProps {
  * - Auxiliary Space Complexity: O(K) for active and filtered room arrays.
  * - Growth Rate: Sub-linear ceiling O(K log K), scaling stably with thousands of active players.
  */
-export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal }) => {
-  const [waitingRooms, setWaitingRooms] = useState<GameRoom[]>([]);
-  const [inProgressRooms, setInProgressRooms] = useState<GameRoom[]>([]);
+export const LobbyTable: React.FC<LobbyTableProps> = ({
+  onOpenCreateRoomModal,
+  initialWaitingRooms = [],
+  initialInProgressRooms = [],
+}) => {
+  const { user } = useAuth();
+  const isGuest = isGuestUser(user);
+  const [waitingRooms, setWaitingRooms] = useState<GameRoom[]>(initialWaitingRooms);
+  const [inProgressRooms, setInProgressRooms] = useState<GameRoom[]>(initialInProgressRooms);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<LobbyFilterState>(() => {
     if (typeof localStorage === 'undefined') {
@@ -502,6 +512,7 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
               <div className="lobby-table-list">
                 {filteredRooms.map((room) => {
                   const isWaiting = room.status === 'waiting';
+                  const isRankedGuestDisabled = isWaiting && isGuest && room.isRanked;
                   const host = room.bluePlayer || room.greenPlayer;
                   const opponent = room.bluePlayer && room.greenPlayer ? (room.bluePlayer === host ? room.greenPlayer : room.bluePlayer) : null;
 
@@ -516,12 +527,18 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({ onOpenCreateRoomModal })
                   return (
                     <div
                       key={room.id}
-                      className={`lobby-game-row ${isWaiting ? 'row-waiting' : 'row-live'}`}
-                      onClick={() => navigate(`/game/${room.id}`)}
-                      role="button"
-                      tabIndex={0}
+                      className={`lobby-game-row ${isWaiting ? 'row-waiting' : 'row-live'}${isRankedGuestDisabled ? ' row-disabled' : ''}`}
+                      onClick={isRankedGuestDisabled ? undefined : () => navigate(`/game/${room.id}`)}
+                      role={isRankedGuestDisabled ? 'row' : 'button'}
+                      aria-disabled={isRankedGuestDisabled ? 'true' : undefined}
+                      tabIndex={isRankedGuestDisabled ? -1 : 0}
+                      title={
+                        isRankedGuestDisabled
+                          ? MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedTooltipText
+                          : undefined
+                      }
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
+                        if (!isRankedGuestDisabled && (e.key === 'Enter' || e.key === ' ')) {
                           navigate(`/game/${room.id}`);
                         }
                       }}

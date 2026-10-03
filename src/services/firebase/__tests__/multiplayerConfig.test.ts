@@ -345,5 +345,60 @@ describe('MultiplayerScaleConfig validation', () => {
     expect(() => validateMultiplayerScaleConfig(emptyLegacySessions as MultiplayerScaleConfig)).toThrowError(
       /Invalid storageLimits.legacyActiveSessions/
     );
+
+    const emptyGuestRankedErrorMessage = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        guestRankedErrorMessage: '   ',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyGuestRankedErrorMessage as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.guestRankedErrorMessage/
+    );
+
+    const emptyGuestRankedNoticeTitle = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        guestRankedNoticeTitle: '',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyGuestRankedNoticeTitle as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.guestRankedNoticeTitle/
+    );
+
+    const emptyGuestRankedNoticeMessage = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        guestRankedNoticeMessage: '   ',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyGuestRankedNoticeMessage as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.guestRankedNoticeMessage/
+    );
+
+    const emptyGuestRankedBadgeText = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        guestRankedBadgeText: '',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyGuestRankedBadgeText as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.guestRankedBadgeText/
+    );
+
+    const emptyGuestRankedTooltipText = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        guestRankedTooltipText: '   ',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyGuestRankedTooltipText as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.guestRankedTooltipText/
+    );
   });
 });

@@ -694,6 +694,82 @@ describe('GameService Multiplayer Sync', () => {
     expect(rankedFound).not.toBeNull();
     expect(rankedFound?.id).toBe(rankedGameId);
     expect(rankedFound?.isRanked).toBe(true);
+
+    // Guest seeker looking for games without specifying isRanked must NEVER get ranked game
+    const guestFoundDefault = await findOpenWaitingGame(10, 0, 'guest_seeker');
+    expect(guestFoundDefault).not.toBeNull();
+    expect(guestFoundDefault?.id).toBe(casualGameId);
+    expect(guestFoundDefault?.isRanked).toBe(false);
+
+    // Guest seeker requesting a ranked game must return null
+    const guestFoundRanked = await findOpenWaitingGame(10, 0, 'guest_seeker', 10, true);
+    expect(guestFoundRanked).toBeNull();
+  });
+
+  it('strictly forbids guests from joining a ranked game as a player via joinGame', async () => {
+    const rankedHost = { id: 'usr_ranked_host', username: 'RankedHost', elo: 1350 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      isRanked: true,
+      colorPref: 'blue',
+      creator: rankedHost,
+    });
+
+    // Clear host token from localStorage so joiner behaves as separate client
+    localStorage.removeItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.playerTokenPrefix + gameId);
+
+    // 1. Guest with guest_ prefix attempts to join
+    const guestJoiner = { id: 'guest_attacker', username: 'GuestChallenger', elo: 1200 };
+    const guestJoinRes = await joinGame(gameId, guestJoiner);
+    expect(guestJoinRes.success).toBe(false);
+    expect(guestJoinRes.role).toBe('spectator');
+    expect(guestJoinRes.error).toContain('Guests cannot play in ranked games');
+
+    // Verify room is still waiting and has no opponent
+    const gameSnapshot = localGameStore.get(gameId);
+    expect(gameSnapshot?.status).toBe('waiting');
+    expect(gameSnapshot?.greenPlayer).toBeNull();
+
+    // 2. Anonymous guest with 'guest' ID attempts to join
+    const anonJoiner = { id: 'guest', username: 'GuestAnon', elo: 1200 };
+    const anonJoinRes = await joinGame(gameId, anonJoiner);
+    expect(anonJoinRes.success).toBe(false);
+    expect(anonJoinRes.role).toBe('spectator');
+    expect(anonJoinRes.error).toContain('Guests cannot play in ranked games');
+
+    // 3. Registered user joins successfully
+    const regJoiner = { id: 'usr_legit_challenger', username: 'LegitChallenger', elo: 1320 };
+    const regJoinRes = await joinGame(gameId, regJoiner);
+    expect(regJoinRes.success).toBe(true);
+    expect(regJoinRes.role).toBe('player');
+    expect(regJoinRes.color).toBe('green');
+
+    const updatedGame = localGameStore.get(gameId);
+    expect(updatedGame?.status).toBe('in_progress');
+    expect(updatedGame?.greenPlayer?.id).toBe('usr_legit_challenger');
+  });
+
+  it('returns null in computeRankedGameEloResult if either player is a guest', async () => {
+    const host = { id: 'usr_valid_player', username: 'ValidPlayer', elo: 1400 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 5,
+      isRanked: true,
+      colorPref: 'blue',
+      creator: host,
+    });
+
+    const game = localGameStore.get(gameId)!;
+    // Artificially inject guest as opponent to test defensive Elo barrier
+    game.greenPlayer = {
+      id: 'guest_infiltrator',
+      username: 'GuestInfiltrator',
+      elo: 1200,
+      gamesPlayed: 0,
+      sessionToken: 'token_guest',
+    };
+
+    const eloResult = computeRankedGameEloResult(game, 'blue');
+    expect(eloResult).toBeNull();
   });
 
   it('correctly completes game and computes ranked Elo when resigning', async () => {
