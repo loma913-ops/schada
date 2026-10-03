@@ -29,6 +29,7 @@ export * from './gameCleanupService';
 
 import {
   ABANDONED_GAME_EXPIRY_MS,
+  isGuestUser,
   type GamePlayer,
   type GameRoom,
   type CreateGameParams,
@@ -108,10 +109,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
     patronSubscriptionStatus: params.creator.patronSubscriptionStatus,
   };
 
-  const isGuest =
-    !params.creator?.id ||
-    params.creator.id.startsWith('guest_') ||
-    params.creator.id === 'guest';
+  const isGuest = isGuestUser(params.creator);
   const isRanked = isGuest ? false : Boolean(params.isRanked);
 
   const initialBoard = createInitialGameState();
@@ -161,6 +159,15 @@ export async function joinGame(
         return { success: false, role: 'spectator', error: 'Game not found.' };
       }
       const game = snap.data() as GameRoom;
+
+      // Guests are strictly forbidden from playing in ranked games
+      if (game.isRanked && isGuestUser(user)) {
+        return {
+          success: false,
+          role: 'spectator',
+          error: MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedErrorMessage,
+        };
+      }
 
       // Check if existing token matches already assigned player
       if (existingToken) {
@@ -232,6 +239,15 @@ export async function joinGame(
   const game = localGameStore.get(gameId);
   if (!game) {
     return { success: false, role: 'spectator', error: 'Game not found.' };
+  }
+
+  // Guests are strictly forbidden from playing in ranked games
+  if (game.isRanked && isGuestUser(user)) {
+    return {
+      success: false,
+      role: 'spectator',
+      error: MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedErrorMessage,
+    };
   }
 
   if (existingToken) {

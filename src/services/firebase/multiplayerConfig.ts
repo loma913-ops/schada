@@ -64,6 +64,11 @@ export interface MatchmakingConfig {
   readonly leaderboardCacheTtlMs: number;
   readonly clockSyncJitterThresholdMs: number;
   readonly reconcileEloBatchLimit: number;
+  readonly guestRankedErrorMessage: string;
+  readonly guestRankedNoticeTitle: string;
+  readonly guestRankedNoticeMessage: string;
+  readonly guestRankedBadgeText: string;
+  readonly guestRankedTooltipText: string;
 }
 
 export interface MultiplayerCollectionsConfig {
@@ -402,6 +407,51 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
+  if (
+    typeof matchmaking.guestRankedErrorMessage !== 'string' ||
+    matchmaking.guestRankedErrorMessage.trim().length === 0
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.guestRankedErrorMessage: expected non-empty string, received "${matchmaking.guestRankedErrorMessage}".`
+    );
+  }
+
+  if (
+    typeof matchmaking.guestRankedNoticeTitle !== 'string' ||
+    matchmaking.guestRankedNoticeTitle.trim().length === 0
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.guestRankedNoticeTitle: expected non-empty string, received "${matchmaking.guestRankedNoticeTitle}".`
+    );
+  }
+
+  if (
+    typeof matchmaking.guestRankedNoticeMessage !== 'string' ||
+    matchmaking.guestRankedNoticeMessage.trim().length === 0
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.guestRankedNoticeMessage: expected non-empty string, received "${matchmaking.guestRankedNoticeMessage}".`
+    );
+  }
+
+  if (
+    typeof matchmaking.guestRankedBadgeText !== 'string' ||
+    matchmaking.guestRankedBadgeText.trim().length === 0
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.guestRankedBadgeText: expected non-empty string, received "${matchmaking.guestRankedBadgeText}".`
+    );
+  }
+
+  if (
+    typeof matchmaking.guestRankedTooltipText !== 'string' ||
+    matchmaking.guestRankedTooltipText.trim().length === 0
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.guestRankedTooltipText: expected non-empty string, received "${matchmaking.guestRankedTooltipText}".`
+    );
+  }
+
   const { collections } = config;
   if (!collections || typeof collections !== 'object') {
     throw new MultiplayerConfigError('Collections configuration section is missing or invalid.');
@@ -513,6 +563,11 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     leaderboardCacheTtlMs: 5 * 60 * 1000,
     clockSyncJitterThresholdMs: 1500,
     reconcileEloBatchLimit: 5,
+    guestRankedErrorMessage: 'Guests cannot play in ranked games. Please sign in to play ranked matches.',
+    guestRankedNoticeTitle: 'Account Required',
+    guestRankedNoticeMessage: 'Guests cannot play in ranked games. Please sign in or create an account to challenge the host, or watch as a spectator.',
+    guestRankedBadgeText: '(Account required)',
+    guestRankedTooltipText: 'Ranked match: account required to play',
   }),
   collections: Object.freeze({
     users: 'users',

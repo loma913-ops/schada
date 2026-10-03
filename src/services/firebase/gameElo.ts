@@ -15,7 +15,7 @@ import { calculateEloUpdate } from '@/core/elo/eloService';
 import { updateUserStats } from './authService';
 import type { UserProfile } from './localProvider';
 import type { PieceColor } from '@/core/schada/types';
-import type { GameRoom, GameEloResult } from './gameTypes';
+import { type GameRoom, type GameEloResult, isGuestUser } from './gameTypes';
 import { localGameStore } from './localGameStore';
 
 /**
@@ -33,6 +33,9 @@ export function computeRankedGameEloResult(
   outcome: 'blue' | 'green' | 'draw'
 ): GameEloResult | null {
   if (!game.isRanked || !game.bluePlayer || !game.greenPlayer) {
+    return null;
+  }
+  if (isGuestUser(game.bluePlayer) || isGuestUser(game.greenPlayer)) {
     return null;
   }
   const blueGames = typeof game.bluePlayer.gamesPlayed === 'number'

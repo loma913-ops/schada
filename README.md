@@ -45,7 +45,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Historical End-Condition Engine**: Bilateral goal reached, piece elimination, 3-fold repetition, mutual shuffle, and enemy blockades.
 - **Move History Navigator & Replay Controls**: Stepping controls and keyboard shortcuts to review board positions.
 - **Comprehensive Match Stats & Post-Game Elo Summary**: Game-over modal with synchronized rating point deltas and match details.
-- **Competitive Integrity & Matchmaking Separation**: Strict rated and casual matchmaking separation for authenticated users and guests.
+- **Competitive Integrity & Guest Ranked Restriction**: Guests are strictly prohibited from participating in ranked matches; rated play requires an authenticated account.
 - **Lichess-Inspired Minimalist UX**: Responsive arena with clocks, notation, controls, and dark/light mode.
 - **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves with direct atomic updates bypassing redundant document reads and deduplicated server-echo reconciliation.
 - **Cross-Platform Hybrid Audio Engine**: Web Audio API with immediate transient attack playback, realistic synthesized fallbacks, and zero-latency desktop and mobile sound.

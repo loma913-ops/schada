@@ -53,10 +53,10 @@ service cloud.firestore {
       );
     }
 
-    // Active & archived games
+    // Active & archived games (ranked games strictly require authentication)
     match /games/{gameId} {
       allow read: if true;
-      allow create: if true;
+      allow create: if !request.resource.data.isRanked || isAuthenticated();
       allow update: if true;
       allow delete: if resource.data.status == 'abandoned';
     }
