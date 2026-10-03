@@ -59,6 +59,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Goal Invulnerability Shield Badges**: Golden shield badges displayed on goal-line high pieces denoting capture immunity.
 - **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.
 - **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
+- **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.
 
 ---
 
@@ -128,7 +129,7 @@ cd schada
 # 2. Install dependencies
 npm install
 
-# 3. Run unit test suite (41 test suites, 376+ tests)
+# 3. Run unit test suite (47 test suites, 420+ tests)
 npm test
 
 # 4. Start local development server with HMR
@@ -162,12 +163,15 @@ VITE_FIREBASE_PROJECT_ID=your_project_id
 VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
 
 # Stripe Donation & Payment Configuration
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 VITE_STRIPE_PAYMENT_LINK=https://donate.stripe.com/test_...
 VITE_STRIPE_PAYMENT_LINK_LIFETIME=https://donate.stripe.com/test_...
 ```
+
+`VITE_FIREBASE_MEASUREMENT_ID` is required when Firebase is configured and analytics is enabled; startup throws a descriptive error if it is missing or malformed. Analytics behavior (enable flag, event names, privacy signals) is configured in `src/services/firebase/analyticsConfig.ts`.
 
 To connect to the local Firebase Emulator Suite:
 ```bash

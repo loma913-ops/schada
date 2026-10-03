@@ -27,7 +27,7 @@ export const PrivacyPolicy: React.FC = () => {
             How Schada.org collects, uses, and safeguards your personal information with full transparency.
           </p>
           <div className="legal-meta">
-            <span>Last Updated: September 2026</span>
+            <span>Last Updated: October 2026</span>
             <span className="legal-meta-dot">•</span>
             <span>GDPR & Privacy Compliant</span>
           </div>
@@ -39,11 +39,11 @@ export const PrivacyPolicy: React.FC = () => {
           <ul className="legal-summary-list">
             <li>
               <ShieldCheck size={16} className="summary-icon" />
-              <span><strong>100% Ad-Free & Tracker-Free:</strong> We never sell, rent, or monetize your personal data to advertisers or third parties.</span>
+              <span><strong>100% Ad-Free:</strong> We never sell, rent, or monetize your personal data to advertisers or third parties.</span>
             </li>
             <li>
               <EyeOff size={16} className="summary-icon" />
-              <span><strong>No Third-Party Analytics Tracking:</strong> We do not use third-party invasive trackers or marketing pixels.</span>
+              <span><strong>Privacy-First Telemetry:</strong> No advertising trackers or marketing pixels. Firebase Google Analytics is used only for aggregate usage and stability metrics, with Google Signals and ad personalization disabled.</span>
             </li>
             <li>
               <Database size={16} className="summary-icon" />
@@ -156,6 +156,12 @@ export const PrivacyPolicy: React.FC = () => {
                     <td>Stored in browser localStorage / session</td>
                   </tr>
                   <tr>
+                    <td><strong>Usage Telemetry (Firebase Google Analytics)</strong></td>
+                    <td>Aggregate page views, stability, and performance monitoring</td>
+                    <td>Legitimate Interest (Art. 6.1.f)</td>
+                    <td>Per Google Analytics data retention settings</td>
+                  </tr>
+                  <tr>
                     <td><strong>Support & Contact Messages</strong></td>
                     <td>Resolving player issues, bug reports, and fair play appeals</td>
                     <td>Legitimate Interest (Art. 6.1.f)</td>
@@ -169,12 +175,13 @@ export const PrivacyPolicy: React.FC = () => {
           <section className="legal-section">
             <h2>3. Cookies and Local Storage</h2>
             <p>
-              Schada.org utilizes strictly necessary local storage items and session cookies to ensure core platform functionality:
+              Schada.org utilizes local storage items and cookies for core platform functionality and aggregate usage telemetry:
             </p>
             <ul>
               <li><strong>Authentication & Guest Session:</strong> Keeps you logged in or maintains your guest player identifier between page navigations.</li>
               <li><strong>Theme & Display Settings:</strong> Remembers your preference for Dark Mode or Light Mode.</li>
               <li><strong>Game Preferences:</strong> Saves board sound effects toggles, board orientation, and favorite time controls.</li>
+              <li><strong>Platform Telemetry:</strong> Firebase Google Analytics sets first-party cookies (e.g. <code>_ga</code>) with a pseudonymous identifier to produce aggregate usage and performance metrics. Google Signals and ad personalization are disabled.</li>
             </ul>
             <p>
               We do <strong>not</strong> use third-party advertising cookies, marketing trackers, or cross-site profiling technologies.
@@ -189,7 +196,7 @@ export const PrivacyPolicy: React.FC = () => {
             </p>
             <p>
               We rely on trusted cloud infrastructure providers (such as Firebase / Google Cloud Platform) operating in secure, high-compliance data centers
-              to host our database, realtime game synchronization, and static assets. These providers act strictly as data processors under binding data
+              to host our database, realtime game synchronization, application telemetry, and static assets. These providers act strictly as data processors under binding data
               protection terms. We never sell or license personal data to third parties.
             </p>
           </section>

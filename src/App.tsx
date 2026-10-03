@@ -38,6 +38,7 @@ import { calculateEloUpdate } from './core/elo/eloService';
 import { ELO_CONFIG } from './core/elo/eloConfig';
 import { FORMAT_CONFIG } from './core/schada/formatConfig';
 import { localBackend, type UserProfile } from './services/firebase/localProvider';
+import { logPageView } from './services/firebase/analyticsService';
 
 import { updateUserStats } from './services/firebase/authService';
 import {
@@ -86,6 +87,11 @@ const MainApp: React.FC = () => {
     } else if (location.pathname === '/') {
       setCurrentTab((prev) => (prev === 'donate' ? 'play' : prev));
     }
+  }, [location.pathname]);
+
+  // Dispatch SPA page view telemetry on route changes (fail-soft, non-blocking)
+  useEffect(() => {
+    void logPageView(location.pathname);
   }, [location.pathname]);
 
   // Modals
