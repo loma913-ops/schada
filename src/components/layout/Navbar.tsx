@@ -25,7 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { user, isLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { isStandalone, setInstallModalOpen } = usePwa();
+  const { isStandalone, isMobile, setInstallModalOpen, config: pwaConfig } = usePwa();
 
   return (
     <nav className="navbar">
@@ -87,16 +87,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Heart size={16} />
         </button>
 
-        {/* PWA Install Trigger (hidden if already installed in standalone mode) */}
-        {!isStandalone && (
+        {/* PWA Install Trigger (only visible on mobile devices, hidden on desktop browser and if already installed) */}
+        {!isStandalone && isMobile && (
           <button
+            type="button"
             className="action-btn install-btn"
             onClick={() => setInstallModalOpen(true)}
-            title="Install Schada App"
-            aria-label="Install Schada App"
+            title={pwaConfig.copy.installAppTitle}
+            aria-label={pwaConfig.copy.installAppAriaLabel}
           >
             <Smartphone size={16} />
-            <span className="install-btn-text">Install App</span>
+            <span className="install-btn-text">{pwaConfig.copy.installAppButtonText}</span>
           </button>
         )}
 

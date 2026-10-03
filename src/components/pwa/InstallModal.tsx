@@ -3,7 +3,14 @@ import { X, Download, Share2, PlusSquare, Smartphone, CheckCircle2, Zap, Info } 
 import { usePwa } from '@/context/PwaContext';
 
 export const InstallModal: React.FC = () => {
-  const { installModalOpen, setInstallModalOpen, isIOS, isStandalone, promptInstall } = usePwa();
+  const {
+    installModalOpen,
+    setInstallModalOpen,
+    isIOS,
+    isStandalone,
+    promptInstall,
+    config: pwaConfig,
+  } = usePwa();
   const [installedSuccessfully, setInstalledSuccessfully] = useState(false);
   const [showManualHelp, setShowManualHelp] = useState(false);
 
@@ -11,7 +18,7 @@ export const InstallModal: React.FC = () => {
 
   const handleClose = () => {
     try {
-      localStorage.setItem('schada_pwa_dismissed', 'true');
+      localStorage.setItem(pwaConfig.storageKey, pwaConfig.dismissedValue);
     } catch {
       // Ignore if localStorage unavailable
     }
@@ -24,14 +31,14 @@ export const InstallModal: React.FC = () => {
     if (installed) {
       setInstalledSuccessfully(true);
       try {
-        localStorage.setItem('schada_pwa_dismissed', 'true');
+        localStorage.setItem(pwaConfig.storageKey, pwaConfig.dismissedValue);
       } catch {
         // Ignore
       }
       setTimeout(() => {
         setInstallModalOpen(false);
         setInstalledSuccessfully(false);
-      }, 1600);
+      }, pwaConfig.delays.installedSuccessDismissDelayMs);
     } else {
       setShowManualHelp(true);
     }

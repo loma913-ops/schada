@@ -10,14 +10,16 @@
   border-radius: var(--radius-md);
   border: 8px solid var(--board-border);
   background: var(--board-border);
+  box-sizing: content-box;
+  align-self: center;
 }
 
 .schada-board-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
-  width: min(85vw, 600px);
-  height: min(85vw, 600px);
+  width: var(--board-size, min(85vw, 600px));
+  height: var(--board-size, min(85vw, 600px));
   position: relative;
   touch-action: manipulation;
 }
@@ -29,9 +31,9 @@
   }
 
   .schada-board-grid {
-    /* Fits mobile screens vertically and horizontally without scrolling */
-    width: min(calc(100vw - 24px), min(calc(100dvh - 210px), 520px));
-    height: min(calc(100vw - 24px), min(calc(100dvh - 210px), 520px));
+    /* Fits mobile screens vertically and horizontally without scrolling or overlapping actions */
+    width: min(calc(100vw - 24px), min(calc(100dvh - 330px), 520px)) !important;
+    height: min(calc(100vw - 24px), min(calc(100dvh - 330px), 520px)) !important;
     max-width: 100%;
   }
 
