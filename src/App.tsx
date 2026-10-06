@@ -428,9 +428,7 @@ const MainApp: React.FC = () => {
         navigate('/');
       }
     }
-    if (tab !== 'play') {
-      setActiveMatch(null);
-    }
+    setActiveMatch(null);
   };
 
   const isMatchActive = Boolean(activeMatch) || location.pathname.startsWith('/game/');
