@@ -1364,6 +1364,14 @@ body {
     padding: 0.6rem 0.65rem;
   }
 
+  .lobby-section-header {
+    padding: 0.4rem 0.65rem;
+  }
+
+  .lobby-section-empty-note {
+    padding: 0.65rem 0.65rem;
+  }
+
   .lobby-game-row {
     padding: 0.6rem 0.65rem;
   }
@@ -1486,6 +1494,92 @@ body {
 .lobby-table-list::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 3px;
+}
+
+/* Partitioned Lobby Sections */
+.lobby-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.lobby-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 1rem;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border-subtle);
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.lobby-table-list > .lobby-section:first-child > .lobby-section-header {
+  border-top: none;
+}
+
+.lobby-section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.lobby-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.lobby-section-my-games .lobby-section-title {
+  color: var(--accent-gold);
+}
+
+[data-theme='light'] .lobby-section-my-games .lobby-section-title {
+  color: #8c6d10;
+  font-weight: 800;
+}
+
+.lobby-section-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.05rem 0.45rem;
+  border-radius: 10px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  min-width: 18px;
+  text-align: center;
+}
+
+.lobby-section-badge.my-games-badge {
+  background-color: var(--accent-gold-subtle);
+  color: var(--accent-gold);
+  border-color: var(--accent-gold-border);
+}
+
+[data-theme='light'] .lobby-section-badge.my-games-badge {
+  background-color: rgba(204, 160, 29, 0.15);
+  color: #8c6d10;
+  border-color: var(--accent-gold-border);
+}
+
+.lobby-section-empty-note {
+  padding: 0.85rem 1rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-style: italic;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lobby-section-items {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Game Row */

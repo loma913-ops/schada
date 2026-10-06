@@ -6,7 +6,9 @@ import {
   parseStoredLobbyFilters,
   determineTimeCategory,
   formatTimeControlDisplay,
+  isUserGameRoom,
 } from '../lobbyConfig';
+import type { GameRoom } from '@/services/firebase/gameTypes';
 
 describe('LobbyConfig validation and helpers', () => {
   it('canonical LOBBY_CONFIG passes validation', () => {
@@ -71,6 +73,64 @@ describe('LobbyConfig validation and helpers', () => {
     };
     expect(() => validateLobbyConfig(invalidTimeControls)).toThrowError(
       /Invalid timeControls section/
+    );
+  });
+
+  it('throws if sectionTitles or empty messages are missing or empty', () => {
+    const invalidTitles = { ...LOBBY_CONFIG, sectionTitles: null as any };
+    expect(() => validateLobbyConfig(invalidTitles)).toThrowError(
+      /Invalid sectionTitles configuration/
+    );
+
+    const emptyMyGames = {
+      ...LOBBY_CONFIG,
+      sectionTitles: { myGames: '  ', availableGames: 'Available Games' },
+    };
+    expect(() => validateLobbyConfig(emptyMyGames)).toThrowError(
+      /Invalid sectionTitles configuration/
+    );
+
+    const emptyMsg = { ...LOBBY_CONFIG, emptyAvailableGamesMessage: ' ' };
+    expect(() => validateLobbyConfig(emptyMsg)).toThrowError(
+      /Invalid emptyAvailableGamesMessage/
+    );
+
+    const emptyFilteredMsg = { ...LOBBY_CONFIG, emptyAvailableFilteredMessage: '' };
+    expect(() => validateLobbyConfig(emptyFilteredMsg)).toThrowError(
+      /Invalid emptyAvailableFilteredMessage/
+    );
+
+    const emptyLobbyTitle = { ...LOBBY_CONFIG, emptyLobbyTitle: '   ' };
+    expect(() => validateLobbyConfig(emptyLobbyTitle)).toThrowError(
+      /Invalid emptyLobbyTitle/
+    );
+
+    const emptyFilterTitle = { ...LOBBY_CONFIG, emptyFilterTitle: '' };
+    expect(() => validateLobbyConfig(emptyFilterTitle)).toThrowError(
+      /Invalid emptyFilterTitle/
+    );
+
+    const emptyLobbyDesc = { ...LOBBY_CONFIG, emptyLobbyDescription: '' };
+    expect(() => validateLobbyConfig(emptyLobbyDesc)).toThrowError(
+      /Invalid emptyLobbyDescription/
+    );
+
+    const emptyFilterDesc = { ...LOBBY_CONFIG, emptyFilterDescription: '  ' };
+    expect(() => validateLobbyConfig(emptyFilterDesc)).toThrowError(
+      /Invalid emptyFilterDescription/
+    );
+
+    const invalidModeLabels = { ...LOBBY_CONFIG, modeLabels: null as any };
+    expect(() => validateLobbyConfig(invalidModeLabels)).toThrowError(
+      /Invalid modeLabels configuration/
+    );
+
+    const emptyCasualLabel = {
+      ...LOBBY_CONFIG,
+      modeLabels: { casual: '', ranked: 'Rated' },
+    };
+    expect(() => validateLobbyConfig(emptyCasualLabel)).toThrowError(
+      /Invalid modeLabels configuration/
     );
   });
 
@@ -164,6 +224,57 @@ describe('LobbyConfig validation and helpers', () => {
       expect(() => formatTimeControlDisplay(5, -1)).toThrowError(TypeError);
       expect(() => formatTimeControlDisplay(5, NaN)).toThrowError(TypeError);
       expect(() => formatTimeControlDisplay(5, 'invalid' as any)).toThrowError(TypeError);
+    });
+  });
+
+  describe('isUserGameRoom', () => {
+    const baseRoom: GameRoom = {
+      id: 'room_123',
+      isPrivate: false,
+      status: 'waiting',
+      createdAt: 1000,
+      timeControlMinutes: 5,
+      incrementSeconds: 0,
+      isRanked: false,
+      creatorColorPref: 'random',
+      bluePlayer: { id: 'user_blue', username: 'BluePlayer', elo: 1200, sessionToken: 'tok_blue' },
+      greenPlayer: { id: 'user_green', username: 'GreenPlayer', elo: 1250, sessionToken: 'tok_green' },
+      boardState: {} as any,
+      currentTurn: 'blue',
+      blueTimeMs: 300000,
+      greenTimeMs: 300000,
+      lastTurnStartTimeMs: null,
+    };
+
+    it('returns false when room is null or undefined', () => {
+      expect(isUserGameRoom(null as any, 'user_blue')).toBe(false);
+      expect(isUserGameRoom(undefined as any, 'user_blue')).toBe(false);
+    });
+
+    it('identifies room ownership by authenticated userId', () => {
+      expect(isUserGameRoom(baseRoom, 'user_blue')).toBe(true);
+      expect(isUserGameRoom(baseRoom, 'user_green')).toBe(true);
+      expect(isUserGameRoom(baseRoom, 'other_user')).toBe(false);
+    });
+
+    it('identifies room ownership by guestId', () => {
+      const guestRoom: GameRoom = {
+        ...baseRoom,
+        bluePlayer: { id: 'guest_abc', username: 'Guest 1', elo: 1200, sessionToken: 'tok_guest' },
+        greenPlayer: null,
+      };
+      expect(isUserGameRoom(guestRoom, undefined, 'guest_abc')).toBe(true);
+      expect(isUserGameRoom(guestRoom, undefined, 'guest_xyz')).toBe(false);
+    });
+
+    it('identifies room ownership by sessionToken', () => {
+      expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_blue')).toBe(true);
+      expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_green')).toBe(true);
+      expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_random')).toBe(false);
+    });
+
+    it('returns false when no matching credentials are provided', () => {
+      expect(isUserGameRoom(baseRoom, null, null, null)).toBe(false);
     });
   });
 });

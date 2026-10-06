@@ -18,6 +18,7 @@ import {
   subscribeToOpenRooms,
   getInProgressRooms,
   sortLobbyRooms,
+  getLocalSessionToken,
   type GameRoom,
 } from '@/services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
@@ -29,6 +30,7 @@ import {
   parseStoredLobbyFilters,
   determineTimeCategory,
   formatTimeControlDisplay,
+  isUserGameRoom,
   type LobbyFilterState,
   type TimeControlCategory,
 } from './lobbyConfig';
@@ -48,8 +50,9 @@ interface LobbyTableProps {
  * - Waiting Room Subscription: O(1) listener invocation on open challenge changes.
  * - Live Rooms Polling: O(1) scheduled rate (liveRoomsPollIntervalMs), avoiding move-by-move stream traffic.
  * - Merging & Partition Sorting: O(K log K) where K <= maxOpenRoomsLobbyLimit (K <= 50).
+ * - Room Partitioning (My Games vs Available Games): O(K) linear pass resolving ownership.
  * - Filter Evaluation: O(K) linear pass preserving relative order.
- * - Auxiliary Space Complexity: O(K) for active and filtered room arrays.
+ * - Auxiliary Space Complexity: O(K) for partitioned and filtered room arrays.
  * - Growth Rate: Sub-linear ceiling O(K log K), scaling stably with thousands of active players.
  */
 export const LobbyTable: React.FC<LobbyTableProps> = ({
@@ -155,10 +158,27 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
     );
   }, [filters]);
 
-  // Filtered rooms: rooms is already stably ordered by sortLobbyRooms (waiting rooms first, newest first).
-  // Array.prototype.filter preserves relative order with optimal O(N) linear time.
-  const filteredRooms = useMemo(() => {
-    return rooms.filter((room) => {
+  // Partition rooms: My Games (immune to filters, pinned at top) and Other Rooms
+  const { myGames, otherRooms } = useMemo(() => {
+    const guestIdKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId;
+    const currentGuestId =
+      typeof localStorage !== 'undefined' ? localStorage.getItem(guestIdKey) : null;
+    const my: GameRoom[] = [];
+    const other: GameRoom[] = [];
+    for (const room of rooms) {
+      const localToken = getLocalSessionToken(room.id);
+      if (isUserGameRoom(room, user?.id, currentGuestId, localToken)) {
+        my.push(room);
+      } else {
+        other.push(room);
+      }
+    }
+    return { myGames: my, otherRooms: other };
+  }, [rooms, user?.id]);
+
+  // Filtered available games: applies active filters to other rooms in linear time O(N)
+  const filteredAvailableGames = useMemo(() => {
+    return otherRooms.filter((room) => {
       // 1. Status filter (Open vs In-Progress)
       if (room.status === 'waiting' && !filters.statuses.open) return false;
       if (room.status === 'in_progress' && !filters.statuses.inProgress) return false;
@@ -179,7 +199,9 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
 
       return true;
     });
-  }, [rooms, filters]);
+  }, [otherRooms, filters]);
+
+  const isLobbyEmpty = myGames.length === 0 && filteredAvailableGames.length === 0;
 
   const renderSpeedIcon = (category: TimeControlCategory) => {
     switch (category) {
@@ -194,6 +216,94 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
       case 'correspondence':
         return <Mail size={14} className="lobby-speed-icon correspondence" />;
     }
+  };
+
+  const renderGameRow = (room: GameRoom) => {
+    const isWaiting = room.status === 'waiting';
+    const isRankedGuestDisabled = isWaiting && isGuest && room.isRanked;
+    const host = room.bluePlayer || room.greenPlayer;
+    const opponent =
+      room.bluePlayer && room.greenPlayer
+        ? room.bluePlayer === host
+          ? room.greenPlayer
+          : room.bluePlayer
+        : null;
+
+    const defaultHostName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
+    const defaultOpponentName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
+    const hostName = host?.username?.trim() || defaultHostName;
+    const oppName = opponent?.username?.trim() || (isWaiting ? null : defaultOpponentName);
+
+    const category = determineTimeCategory(room.timeControlMinutes, room.incrementSeconds || 0);
+    const timeFormatted = formatTimeControlDisplay(
+      room.timeControlMinutes,
+      room.incrementSeconds || 0
+    );
+
+    return (
+      <div
+        key={room.id}
+        className={`lobby-game-row ${isWaiting ? 'row-waiting' : 'row-live'}${
+          isRankedGuestDisabled ? ' row-disabled' : ''
+        }`}
+        onClick={isRankedGuestDisabled ? undefined : () => navigate(`/game/${room.id}`)}
+        role={isRankedGuestDisabled ? 'row' : 'button'}
+        aria-disabled={isRankedGuestDisabled ? 'true' : undefined}
+        tabIndex={isRankedGuestDisabled ? -1 : 0}
+        title={
+          isRankedGuestDisabled
+            ? MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedTooltipText
+            : undefined
+        }
+        onKeyDown={(e) => {
+          if (!isRankedGuestDisabled && (e.key === 'Enter' || e.key === ' ')) {
+            navigate(`/game/${room.id}`);
+          }
+        }}
+      >
+        {/* Players Column */}
+        <div className="lobby-col col-activity row-player-cell">
+          <span
+            className="player-indicator-dot"
+            title={isWaiting ? 'Waiting for opponent' : 'Game in progress'}
+          />
+          <span
+            className="player-names-text"
+            title={isWaiting ? `${hostName} vs ?` : `${hostName} vs ${oppName}`}
+          >
+            <strong className="host-name">{hostName}</strong>
+            {isPatronUser(host) && (
+              <PatronBadge size={11} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
+            )}
+            <span className="vs-sep"> vs </span>
+            <span className={isWaiting ? 'waiting-placeholder' : 'opponent-name'}>
+              {oppName || '?'}
+            </span>
+            {!isWaiting && isPatronUser(opponent) && (
+              <PatronBadge size={11} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
+            )}
+          </span>
+        </div>
+
+        {/* Time Column */}
+        <div className="lobby-col col-time row-time-cell">
+          <span className="time-badge">{timeFormatted}</span>
+        </div>
+
+        {/* Mode Column */}
+        <div className="lobby-col col-mode row-mode-cell">
+          <div className="mode-with-icon">
+            {renderSpeedIcon(category)}
+            <span className="mode-label">
+              {room.isRanked ? LOBBY_CONFIG.modeLabels.ranked : LOBBY_CONFIG.modeLabels.casual}
+            </span>
+          </div>
+        </div>
+
+        {/* Spacer to align with header gear icon */}
+        <div className="lobby-col col-gear" aria-hidden="true" />
+      </div>
+    );
   };
 
   return (
@@ -489,20 +599,21 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
             </div>
           </div>
         ) : (
-          /* ================= LOBBY GAMES TABLE ================= */
           <div className="lobby-table-wrapper">
-            {filteredRooms.length === 0 ? (
+            {isLobbyEmpty ? (
               <div className="lobby-empty-state">
                 <div className="empty-icon-wrap">
                   <Users size={28} />
                 </div>
                 <div className="empty-title">
-                  {rooms.length === 0 ? 'No active games in lobby' : 'No games match your filters'}
+                  {rooms.length === 0
+                    ? LOBBY_CONFIG.emptyLobbyTitle
+                    : LOBBY_CONFIG.emptyFilterTitle}
                 </div>
                 <p className="empty-description">
                   {rooms.length === 0
-                    ? 'Create an open room to challenge players or invite friends.'
-                    : 'Try relaxing your filter settings to see more games.'}
+                    ? LOBBY_CONFIG.emptyLobbyDescription
+                    : LOBBY_CONFIG.emptyFilterDescription}
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                   {rooms.length > 0 && isCustomFilterActive && (
@@ -533,73 +644,49 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
               </div>
             ) : (
               <div className="lobby-table-list">
-                {filteredRooms.map((room) => {
-                  const isWaiting = room.status === 'waiting';
-                  const isRankedGuestDisabled = isWaiting && isGuest && room.isRanked;
-                  const host = room.bluePlayer || room.greenPlayer;
-                  const opponent = room.bluePlayer && room.greenPlayer ? (room.bluePlayer === host ? room.greenPlayer : room.bluePlayer) : null;
-
-                  const defaultHostName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
-                  const defaultOpponentName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
-                  const hostName = host?.username?.trim() || defaultHostName;
-                  const oppName = opponent?.username?.trim() || (isWaiting ? null : defaultOpponentName);
-
-                  const category = determineTimeCategory(room.timeControlMinutes, room.incrementSeconds || 0);
-                  const timeFormatted = formatTimeControlDisplay(room.timeControlMinutes, room.incrementSeconds || 0);
-
-                  return (
-                    <div
-                      key={room.id}
-                      className={`lobby-game-row ${isWaiting ? 'row-waiting' : 'row-live'}${isRankedGuestDisabled ? ' row-disabled' : ''}`}
-                      onClick={isRankedGuestDisabled ? undefined : () => navigate(`/game/${room.id}`)}
-                      role={isRankedGuestDisabled ? 'row' : 'button'}
-                      aria-disabled={isRankedGuestDisabled ? 'true' : undefined}
-                      tabIndex={isRankedGuestDisabled ? -1 : 0}
-                      title={
-                        isRankedGuestDisabled
-                          ? MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedTooltipText
-                          : undefined
-                      }
-                      onKeyDown={(e) => {
-                        if (!isRankedGuestDisabled && (e.key === 'Enter' || e.key === ' ')) {
-                          navigate(`/game/${room.id}`);
-                        }
-                      }}
-                    >
-                      {/* Players Column */}
-                      <div className="lobby-col col-activity row-player-cell">
-                        <span className="player-indicator-dot" title={isWaiting ? 'Waiting for opponent' : 'Game in progress'} />
-                        <span className="player-names-text" title={isWaiting ? `${hostName} vs ?` : `${hostName} vs ${oppName}`}>
-                          <strong className="host-name">{hostName}</strong>
-                          {isPatronUser(host) && <PatronBadge size={11} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />}
-                          <span className="vs-sep"> vs </span>
-                          <span className={isWaiting ? 'waiting-placeholder' : 'opponent-name'}>
-                            {oppName || '?'}
-                          </span>
-                          {!isWaiting && isPatronUser(opponent) && (
-                            <PatronBadge size={11} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
-                          )}
+                {/* 1. My Games section (pinned at top when active/waiting games exist) */}
+                {myGames.length > 0 && (
+                  <div className="lobby-section lobby-section-my-games">
+                    <div className="lobby-section-header">
+                      <div className="lobby-section-title-wrap">
+                        <span className="lobby-section-title">
+                          {LOBBY_CONFIG.sectionTitles.myGames}
                         </span>
                       </div>
-
-                      {/* Time Column */}
-                      <div className="lobby-col col-time row-time-cell">
-                        <span className="time-badge">{timeFormatted}</span>
-                      </div>
-
-                      {/* Mode Column */}
-                      <div className="lobby-col col-mode row-mode-cell">
-                        <div className="mode-with-icon">
-                          {renderSpeedIcon(category)}
-                          <span className="mode-label">{room.isRanked ? 'Rated' : 'Casual'}</span>
-                        </div>
-                      </div>
-
-                      {/* Spacer to align with header gear icon */}
-                      <div className="lobby-col col-gear" aria-hidden="true" />
+                      <span className="lobby-section-badge my-games-badge">
+                        {myGames.length}
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="lobby-section-items">
+                      {myGames.map(renderGameRow)}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Available Games section (always shown for clear section identity) */}
+                <div className="lobby-section lobby-section-available">
+                  <div className="lobby-section-header">
+                    <div className="lobby-section-title-wrap">
+                      <span className="lobby-section-title">
+                        {LOBBY_CONFIG.sectionTitles.availableGames}
+                      </span>
+                    </div>
+                    <span className="lobby-section-badge available-games-badge">
+                      {filteredAvailableGames.length}
+                    </span>
+                  </div>
+                  {filteredAvailableGames.length === 0 ? (
+                    <div className="lobby-section-empty-note">
+                      {otherRooms.length === 0
+                        ? LOBBY_CONFIG.emptyAvailableGamesMessage
+                        : LOBBY_CONFIG.emptyAvailableFilteredMessage}
+                    </div>
+                  ) : (
+                    <div className="lobby-section-items">
+                      {filteredAvailableGames.map(renderGameRow)}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

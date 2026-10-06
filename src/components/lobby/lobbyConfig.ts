@@ -6,6 +6,8 @@
  * Validates configuration to eliminate hard-coded fallback values.
  */
 
+import type { GameRoom } from '@/services/firebase/gameTypes';
+
 export class LobbyConfigError extends Error {
   constructor(message: string) {
     super(`LobbyConfigError: ${message}`);
@@ -51,6 +53,20 @@ export interface LobbyConfig {
   readonly estimatedMovesPerGame: number;
   readonly secondsPerMinute: number;
   readonly defaultFilters: LobbyFilterState;
+  readonly sectionTitles: {
+    readonly myGames: string;
+    readonly availableGames: string;
+  };
+  readonly emptyAvailableGamesMessage: string;
+  readonly emptyAvailableFilteredMessage: string;
+  readonly emptyLobbyTitle: string;
+  readonly emptyFilterTitle: string;
+  readonly emptyLobbyDescription: string;
+  readonly emptyFilterDescription: string;
+  readonly modeLabels: {
+    readonly casual: string;
+    readonly ranked: string;
+  };
 }
 
 /**
@@ -148,6 +164,68 @@ export function validateLobbyConfig(config: LobbyConfig): void {
   if (!statuses || typeof statuses.open !== 'boolean' || typeof statuses.inProgress !== 'boolean') {
     throw new LobbyConfigError('Invalid statuses section in defaultFilters.');
   }
+
+  if (
+    !config.sectionTitles ||
+    typeof config.sectionTitles.myGames !== 'string' ||
+    config.sectionTitles.myGames.trim().length === 0 ||
+    typeof config.sectionTitles.availableGames !== 'string' ||
+    config.sectionTitles.availableGames.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid sectionTitles configuration in LobbyConfig.');
+  }
+
+  if (
+    typeof config.emptyAvailableGamesMessage !== 'string' ||
+    config.emptyAvailableGamesMessage.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid emptyAvailableGamesMessage in LobbyConfig.');
+  }
+
+  if (
+    typeof config.emptyAvailableFilteredMessage !== 'string' ||
+    config.emptyAvailableFilteredMessage.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid emptyAvailableFilteredMessage in LobbyConfig.');
+  }
+
+  if (
+    typeof config.emptyLobbyTitle !== 'string' ||
+    config.emptyLobbyTitle.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid emptyLobbyTitle in LobbyConfig.');
+  }
+
+  if (
+    typeof config.emptyFilterTitle !== 'string' ||
+    config.emptyFilterTitle.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid emptyFilterTitle in LobbyConfig.');
+  }
+
+  if (
+    typeof config.emptyLobbyDescription !== 'string' ||
+    config.emptyLobbyDescription.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid emptyLobbyDescription in LobbyConfig.');
+  }
+
+  if (
+    typeof config.emptyFilterDescription !== 'string' ||
+    config.emptyFilterDescription.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid emptyFilterDescription in LobbyConfig.');
+  }
+
+  if (
+    !config.modeLabels ||
+    typeof config.modeLabels.casual !== 'string' ||
+    config.modeLabels.casual.trim().length === 0 ||
+    typeof config.modeLabels.ranked !== 'string' ||
+    config.modeLabels.ranked.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid modeLabels configuration in LobbyConfig.');
+  }
 }
 
 export const LOBBY_CONFIG: LobbyConfig = Object.freeze({
@@ -178,6 +256,20 @@ export const LOBBY_CONFIG: LobbyConfig = Object.freeze({
       open: true,
       inProgress: true,
     }),
+  }),
+  sectionTitles: Object.freeze({
+    myGames: 'My Games',
+    availableGames: 'Available Games',
+  }),
+  emptyAvailableGamesMessage: 'No other games available in lobby',
+  emptyAvailableFilteredMessage: 'No other games match your filters',
+  emptyLobbyTitle: 'No active games in lobby',
+  emptyFilterTitle: 'No games match your filters',
+  emptyLobbyDescription: 'Create an open room to challenge players or invite friends.',
+  emptyFilterDescription: 'Try relaxing your filter settings to see more games.',
+  modeLabels: Object.freeze({
+    casual: 'Casual',
+    ranked: 'Rated',
   }),
 });
 
@@ -309,5 +401,52 @@ export function formatTimeControlDisplay(
   if (minutes === 0.5) return `½+${increment}`;
   if (minutes === 1.5) return `1.5+${increment}`;
   return `${minutes}+${increment}`;
+}
+
+/**
+ * Determines whether a game room belongs to the active player.
+ * Checks for authenticated user id, local guest id, and session token ownership.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant scalar string comparisons.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ * - Growth Rate: O(1) constant time, invariant to lobby size or match counts.
+ *
+ * @param room The game room object.
+ * @param userId Signed-in user ID (if authenticated).
+ * @param guestId Current guest player ID (if active in browser session).
+ * @param sessionToken Active local session token for the game room (if available).
+ * @returns true if the game belongs to the current user.
+ */
+export function isUserGameRoom(
+  room: GameRoom,
+  userId?: string | null,
+  guestId?: string | null,
+  sessionToken?: string | null
+): boolean {
+  if (!room) return false;
+
+  if (userId) {
+    if (room.bluePlayer?.id === userId || room.greenPlayer?.id === userId) {
+      return true;
+    }
+  }
+
+  if (guestId) {
+    if (room.bluePlayer?.id === guestId || room.greenPlayer?.id === guestId) {
+      return true;
+    }
+  }
+
+  if (sessionToken) {
+    if (
+      (room.bluePlayer?.sessionToken && room.bluePlayer.sessionToken === sessionToken) ||
+      (room.greenPlayer?.sessionToken && room.greenPlayer.sessionToken === sessionToken)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 

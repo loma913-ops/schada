@@ -62,6 +62,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Real-Time Abandonment & Disconnect Protection**: 60-second abandonment countdown for disconnected players on turn in real-time matches with automatic victory resolution and clock-timeout precedence.
 - **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
 - **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.
+- **Partitioned Lobby Sections**: Dedicated "My Games" section pinned at the top for player's active and waiting games, alongside filtered "Available Games".
 
 ---
 
