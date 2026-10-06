@@ -40,6 +40,11 @@ export interface FormatConfig {
     readonly minutes: number;
     readonly increment: number;
   };
+  readonly realTimeMinutesSequence: readonly number[];
+  readonly realTimeIncrementSequence: readonly number[];
+  readonly correspondenceDaysSequence: readonly number[];
+  readonly defaultCorrespondenceDays: number;
+  readonly minutesPerDay: number;
 }
 
 /**
@@ -47,8 +52,8 @@ export interface FormatConfig {
  * Throws FormatConfigError if configuration is missing, null, or contains invalid parameters.
  *
  * Algorithmic Complexity:
- * - Time Complexity: O(P + M + I) where P = number of presets, M = modal minutes, I = modal increments.
- *   Since all arrays are statically bounded (P=11, M=5, I=5), time complexity is strictly O(1) constant time.
+ * - Time Complexity: O(P + M + I + R + C) where P = presets, M = modal minutes, I = modal increments,
+ *   R = real-time sequence steps, C = correspondence sequence steps. Strictly bounded O(1) constant time.
  * - Auxiliary Space Complexity: O(1) constant auxiliary space with zero dynamic allocations during validation.
  *
  * Growth Rate:
@@ -134,7 +139,74 @@ export function validateFormatConfig(config: FormatConfig): void {
   ) {
     throw new FormatConfigError('Invalid defaultFriendChallenge.increment: expected non-negative number.');
   }
+
+  // Correspondence & Slider validations
+  if (!Array.isArray(config.realTimeMinutesSequence) || config.realTimeMinutesSequence.length === 0) {
+    throw new FormatConfigError('Invalid realTimeMinutesSequence: expected non-empty array of numbers.');
+  }
+  for (const m of config.realTimeMinutesSequence) {
+    if (typeof m !== 'number' || isNaN(m) || m <= 0) {
+      throw new FormatConfigError(`Invalid realTimeMinutesSequence entry "${m}": expected positive number.`);
+    }
+  }
+
+  if (!Array.isArray(config.realTimeIncrementSequence) || config.realTimeIncrementSequence.length === 0) {
+    throw new FormatConfigError('Invalid realTimeIncrementSequence: expected non-empty array of numbers.');
+  }
+  for (const inc of config.realTimeIncrementSequence) {
+    if (typeof inc !== 'number' || isNaN(inc) || inc < 0) {
+      throw new FormatConfigError(`Invalid realTimeIncrementSequence entry "${inc}": expected non-negative number.`);
+    }
+  }
+
+  if (!Array.isArray(config.correspondenceDaysSequence) || config.correspondenceDaysSequence.length === 0) {
+    throw new FormatConfigError('Invalid correspondenceDaysSequence: expected non-empty array of numbers.');
+  }
+  for (const d of config.correspondenceDaysSequence) {
+    if (typeof d !== 'number' || isNaN(d) || d <= 0) {
+      throw new FormatConfigError(`Invalid correspondenceDaysSequence entry "${d}": expected positive number.`);
+    }
+  }
+
+  if (
+    typeof config.defaultCorrespondenceDays !== 'number' ||
+    isNaN(config.defaultCorrespondenceDays) ||
+    !config.correspondenceDaysSequence.includes(config.defaultCorrespondenceDays)
+  ) {
+    throw new FormatConfigError('Invalid defaultCorrespondenceDays: expected entry from correspondenceDaysSequence.');
+  }
+
+  if (!config.realTimeMinutesSequence.includes(config.defaultMatchMinutes)) {
+    throw new FormatConfigError(
+      `Invalid defaultMatchMinutes: "${config.defaultMatchMinutes}" not found in realTimeMinutesSequence.`
+    );
+  }
+
+  if (!config.realTimeIncrementSequence.includes(config.defaultIncrementSeconds)) {
+    throw new FormatConfigError(
+      `Invalid defaultIncrementSeconds: "${config.defaultIncrementSeconds}" not found in realTimeIncrementSequence.`
+    );
+  }
+
+  if (typeof config.minutesPerDay !== 'number' || config.minutesPerDay !== 1440) {
+    throw new FormatConfigError('Invalid minutesPerDay: expected 1440.');
+  }
 }
+
+const REAL_TIME_MINUTES: readonly number[] = Object.freeze([
+  0.5,
+  1,
+  1.5,
+  ...Array.from({ length: 179 }, (_, i) => i + 2),
+]);
+
+const REAL_TIME_INCREMENTS: readonly number[] = Object.freeze(
+  Array.from({ length: 181 }, (_, i) => i)
+);
+
+const CORRESPONDENCE_DAYS: readonly number[] = Object.freeze(
+  Array.from({ length: 14 }, (_, i) => i + 1)
+);
 
 export const FORMAT_CONFIG: FormatConfig = Object.freeze({
   presets: Object.freeze([
@@ -158,6 +230,11 @@ export const FORMAT_CONFIG: FormatConfig = Object.freeze({
     minutes: 5,
     increment: 0,
   }),
+  realTimeMinutesSequence: REAL_TIME_MINUTES,
+  realTimeIncrementSequence: REAL_TIME_INCREMENTS,
+  correspondenceDaysSequence: CORRESPONDENCE_DAYS,
+  defaultCorrespondenceDays: 2,
+  minutesPerDay: 1440,
 });
 
 // Validate canonical format configuration at module load time

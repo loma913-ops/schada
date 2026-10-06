@@ -13,12 +13,20 @@ export class LobbyConfigError extends Error {
   }
 }
 
+export type TimeControlCategory =
+  | 'bullet'
+  | 'blitz'
+  | 'rapid'
+  | 'classical'
+  | 'correspondence';
+
 export interface LobbyFilterState {
   readonly timeControls: {
     readonly bullet: boolean;
     readonly blitz: boolean;
     readonly rapid: boolean;
     readonly classical: boolean;
+    readonly correspondence: boolean;
   };
   readonly increment: {
     readonly yes: boolean;
@@ -39,6 +47,7 @@ export interface LobbyConfig {
   readonly bulletCutoffMinutes: number;
   readonly blitzCutoffMinutes: number;
   readonly rapidCutoffMinutes: number;
+  readonly correspondenceCutoffMinutes: number;
   readonly estimatedMovesPerGame: number;
   readonly secondsPerMinute: number;
   readonly defaultFilters: LobbyFilterState;
@@ -90,6 +99,15 @@ export function validateLobbyConfig(config: LobbyConfig): void {
     );
   }
 
+  if (
+    typeof config.correspondenceCutoffMinutes !== 'number' ||
+    config.correspondenceCutoffMinutes <= config.rapidCutoffMinutes
+  ) {
+    throw new LobbyConfigError(
+      `Invalid correspondenceCutoffMinutes: expected number strictly greater than rapidCutoffMinutes (${config.rapidCutoffMinutes}), received ${config.correspondenceCutoffMinutes}.`
+    );
+  }
+
   if (typeof config.estimatedMovesPerGame !== 'number' || config.estimatedMovesPerGame <= 0) {
     throw new LobbyConfigError(
       `Invalid estimatedMovesPerGame: expected positive number, received ${config.estimatedMovesPerGame}.`
@@ -113,7 +131,8 @@ export function validateLobbyConfig(config: LobbyConfig): void {
     typeof timeControls.bullet !== 'boolean' ||
     typeof timeControls.blitz !== 'boolean' ||
     typeof timeControls.rapid !== 'boolean' ||
-    typeof timeControls.classical !== 'boolean'
+    typeof timeControls.classical !== 'boolean' ||
+    typeof timeControls.correspondence !== 'boolean'
   ) {
     throw new LobbyConfigError('Invalid timeControls section in defaultFilters.');
   }
@@ -136,6 +155,7 @@ export const LOBBY_CONFIG: LobbyConfig = Object.freeze({
   bulletCutoffMinutes: 3,
   blitzCutoffMinutes: 8,
   rapidCutoffMinutes: 25,
+  correspondenceCutoffMinutes: 1440,
   estimatedMovesPerGame: 40,
   secondsPerMinute: 60,
   defaultFilters: Object.freeze({
@@ -144,6 +164,7 @@ export const LOBBY_CONFIG: LobbyConfig = Object.freeze({
       blitz: true,
       rapid: true,
       classical: true,
+      correspondence: true,
     }),
     increment: Object.freeze({
       yes: true,
@@ -202,6 +223,7 @@ export function parseStoredLobbyFilters(
         blitz: typeof tc.blitz === 'boolean' ? tc.blitz : defaults.timeControls.blitz,
         rapid: typeof tc.rapid === 'boolean' ? tc.rapid : defaults.timeControls.rapid,
         classical: typeof tc.classical === 'boolean' ? tc.classical : defaults.timeControls.classical,
+        correspondence: typeof tc.correspondence === 'boolean' ? tc.correspondence : defaults.timeControls.correspondence,
       },
       increment: {
         yes: typeof inc.yes === 'boolean' ? inc.yes : defaults.increment.yes,
@@ -222,7 +244,7 @@ export function parseStoredLobbyFilters(
 }
 
 /**
- * Categorizes a time control into bullet, blitz, rapid, or classical.
+ * Categorizes a time control into bullet, blitz, rapid, classical, or correspondence.
  * Uses the standard estimated game duration formula:
  * Estimated = minutes + (increment * estimatedMovesPerGame) / secondsPerMinute.
  *
@@ -237,7 +259,7 @@ export function determineTimeCategory(
   minutes: number,
   increment: number,
   config: LobbyConfig = LOBBY_CONFIG
-): 'bullet' | 'blitz' | 'rapid' | 'classical' {
+): TimeControlCategory {
   if (typeof minutes !== 'number' || minutes < 0 || isNaN(minutes)) {
     throw new TypeError(`Invalid minutes: expected non-negative number, received ${minutes}.`);
   }
@@ -245,13 +267,15 @@ export function determineTimeCategory(
     throw new TypeError(`Invalid increment: expected non-negative number, received ${increment}.`);
   }
 
+  if (minutes >= config.correspondenceCutoffMinutes) return 'correspondence';
   if (minutes === 0) return 'classical';
 
   const estimated = minutes + (increment * config.estimatedMovesPerGame) / config.secondsPerMinute;
   if (estimated < config.bulletCutoffMinutes) return 'bullet';
   if (estimated < config.blitzCutoffMinutes) return 'blitz';
   if (estimated < config.rapidCutoffMinutes) return 'rapid';
-  return 'classical';
+  if (estimated < config.correspondenceCutoffMinutes) return 'classical';
+  return 'correspondence';
 }
 
 /**
@@ -264,7 +288,11 @@ export function determineTimeCategory(
  * Growth Rate:
  * - O(1) constant, zero non-trivial allocation overhead.
  */
-export function formatTimeControlDisplay(minutes: number, increment: number): string {
+export function formatTimeControlDisplay(
+  minutes: number,
+  increment: number,
+  config: LobbyConfig = LOBBY_CONFIG
+): string {
   if (typeof minutes !== 'number' || isNaN(minutes) || minutes < 0) {
     throw new TypeError(`Invalid minutes: expected non-negative number, received ${minutes}.`);
   }
@@ -273,6 +301,11 @@ export function formatTimeControlDisplay(minutes: number, increment: number): st
   }
 
   if (minutes === 0) return '∞';
+  const cutoff = config.correspondenceCutoffMinutes;
+  if (minutes >= cutoff && minutes % cutoff === 0) {
+    const days = minutes / cutoff;
+    return increment > 0 ? `${days}d+${increment}` : `${days}d`;
+  }
   if (minutes === 0.5) return `½+${increment}`;
   if (minutes === 1.5) return `1.5+${increment}`;
   return `${minutes}+${increment}`;

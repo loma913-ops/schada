@@ -99,6 +99,7 @@ const MainApp: React.FC = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [customGameOpen, setCustomGameOpen] = useState(false);
+  const [customGameInitialTab, setCustomGameInitialTab] = useState<'realtime' | 'correspondence'>('realtime');
   const [computerModalOpen, setComputerModalOpen] = useState(false);
   const [computerModalSettings, setComputerModalSettings] = useState<{
     timeControlMinutes?: number;
@@ -489,7 +490,10 @@ const MainApp: React.FC = () => {
                         <QuickPairingGrid
                           onSelectTimeControl={handleStartQuickPair}
                           onStartPassAndPlay={handleStartPassAndPlay}
-                          onOpenCustomModal={() => setCustomGameOpen(true)}
+                          onOpenCustomModal={(tab) => {
+                            setCustomGameInitialTab(tab || 'realtime');
+                            setCustomGameOpen(true);
+                          }}
                           onOpenComputerModal={() => setComputerModalOpen(true)}
                           onOpenCreateRoomModal={() => setCreateRoomOpen(true)}
                         />
@@ -551,6 +555,7 @@ const MainApp: React.FC = () => {
             isOpen={customGameOpen}
             onClose={() => setCustomGameOpen(false)}
             onCreateGame={handleCreateCustom}
+            initialTab={customGameInitialTab}
           />
         )}
         {computerModalOpen && (

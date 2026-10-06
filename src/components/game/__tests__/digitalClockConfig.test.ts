@@ -63,10 +63,12 @@ describe('CANONICAL_DIGITAL_CLOCK_CONFIG validation and configuration', () => {
         msPerSecond: 0,
         secondsPerMinute: 60,
         msPerTenth: 100,
+        minutesPerHour: 60,
+        hoursPerDay: 24,
       },
     };
     expect(() => validateDigitalClockConfig(invalidConfig)).toThrowError(
-      'DigitalClockConfigError: Invalid timeUnits: expected positive numbers for msPerSecond, secondsPerMinute, and msPerTenth.'
+      'DigitalClockConfigError: Invalid timeUnits: expected positive numbers for msPerSecond, secondsPerMinute, msPerTenth, minutesPerHour, and hoursPerDay.'
     );
   });
 

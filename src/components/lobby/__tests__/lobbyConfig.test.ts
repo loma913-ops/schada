@@ -66,7 +66,7 @@ describe('LobbyConfig validation and helpers', () => {
       ...LOBBY_CONFIG,
       defaultFilters: {
         ...LOBBY_CONFIG.defaultFilters,
-        timeControls: { bullet: true, blitz: true, rapid: true, classical: 'not-a-bool' as any },
+        timeControls: { ...LOBBY_CONFIG.defaultFilters.timeControls, classical: 'not-a-bool' as any },
       },
     };
     expect(() => validateLobbyConfig(invalidTimeControls)).toThrowError(
@@ -84,7 +84,7 @@ describe('LobbyConfig validation and helpers', () => {
 
     it('correctly parses valid stored json preferences', () => {
       const customPreferences = {
-        timeControls: { bullet: false, blitz: true, rapid: false, classical: true },
+        timeControls: { bullet: false, blitz: true, rapid: false, classical: true, correspondence: false },
         increment: { yes: false, no: true },
         modes: { casual: true, ranked: false },
         statuses: { open: true, inProgress: false },
@@ -125,6 +125,10 @@ describe('LobbyConfig validation and helpers', () => {
       expect(determineTimeCategory(30, 0)).toBe('classical');
       // 0 minutes = unlimited -> classical
       expect(determineTimeCategory(0, 0)).toBe('classical');
+      // 1440 minutes = 1 day -> correspondence
+      expect(determineTimeCategory(1440, 0)).toBe('correspondence');
+      // 4320 minutes = 3 days -> correspondence
+      expect(determineTimeCategory(4320, 0)).toBe('correspondence');
     });
 
     it('throws on negative or invalid minutes input', () => {
@@ -146,6 +150,9 @@ describe('LobbyConfig validation and helpers', () => {
       expect(formatTimeControlDisplay(1.5, 2)).toBe('1.5+2');
       expect(formatTimeControlDisplay(3, 2)).toBe('3+2');
       expect(formatTimeControlDisplay(10, 0)).toBe('10+0');
+      expect(formatTimeControlDisplay(1440, 0)).toBe('1d');
+      expect(formatTimeControlDisplay(2880, 0)).toBe('2d');
+      expect(formatTimeControlDisplay(20160, 0)).toBe('14d');
     });
 
     it('throws on negative or invalid minutes input', () => {

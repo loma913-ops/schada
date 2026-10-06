@@ -45,4 +45,46 @@ describe('formatConfig', () => {
     };
     expect(() => validateFormatConfig(invalidFriend)).toThrow('Invalid defaultFriendChallenge.minutes');
   });
+
+  it('validates correspondence and real-time sequences', () => {
+    expect(FORMAT_CONFIG.realTimeMinutesSequence[0]).toBe(0.5);
+    expect(FORMAT_CONFIG.realTimeMinutesSequence[1]).toBe(1);
+    expect(FORMAT_CONFIG.realTimeMinutesSequence[2]).toBe(1.5);
+    expect(FORMAT_CONFIG.realTimeMinutesSequence[3]).toBe(2);
+    expect(FORMAT_CONFIG.realTimeMinutesSequence[FORMAT_CONFIG.realTimeMinutesSequence.length - 1]).toBe(180);
+
+    expect(FORMAT_CONFIG.realTimeIncrementSequence[0]).toBe(0);
+    expect(FORMAT_CONFIG.realTimeIncrementSequence[FORMAT_CONFIG.realTimeIncrementSequence.length - 1]).toBe(180);
+
+    expect(FORMAT_CONFIG.correspondenceDaysSequence[0]).toBe(1);
+    expect(FORMAT_CONFIG.correspondenceDaysSequence[FORMAT_CONFIG.correspondenceDaysSequence.length - 1]).toBe(14);
+    expect(FORMAT_CONFIG.defaultCorrespondenceDays).toBe(2);
+    expect(FORMAT_CONFIG.minutesPerDay).toBe(1440);
+  });
+
+  it('throws on invalid correspondenceDaysSequence or defaultCorrespondenceDays', () => {
+    const invalidDays = {
+      ...FORMAT_CONFIG,
+      correspondenceDaysSequence: [0, 1, 2],
+    };
+    expect(() => validateFormatConfig(invalidDays)).toThrow('Invalid correspondenceDaysSequence');
+
+    const invalidDefault = {
+      ...FORMAT_CONFIG,
+      defaultCorrespondenceDays: 99,
+    };
+    expect(() => validateFormatConfig(invalidDefault)).toThrow('Invalid defaultCorrespondenceDays');
+
+    const invalidMatchMinutes = {
+      ...FORMAT_CONFIG,
+      defaultMatchMinutes: 999,
+    };
+    expect(() => validateFormatConfig(invalidMatchMinutes)).toThrow('Invalid defaultMatchMinutes');
+
+    const invalidIncrementSeconds = {
+      ...FORMAT_CONFIG,
+      defaultIncrementSeconds: 999,
+    };
+    expect(() => validateFormatConfig(invalidIncrementSeconds)).toThrow('Invalid defaultIncrementSeconds');
+  });
 });

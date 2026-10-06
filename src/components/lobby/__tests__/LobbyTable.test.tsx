@@ -149,4 +149,39 @@ describe('LobbyTable Component - Guest Ranked Restriction', () => {
     expect(html).not.toContain('aria-disabled="true"');
     expect(html).toContain('tabindex="0"');
   });
+
+  it('renders correspondence game rooms with proper time badge', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'usr_member', username: 'MemberPlayer', elo: 1300 },
+      isLoading: false,
+    });
+
+    const mockCorrespondenceRoom: GameRoom = {
+      id: 'game_corr_wait',
+      isRanked: true,
+      isPrivate: false,
+      status: 'waiting',
+      timeControlMinutes: 2880, // 2 days
+      incrementSeconds: 0,
+      creatorColorPref: 'random',
+      currentTurn: 'blue',
+      createdAt: Date.now(),
+      blueTimeMs: 2880 * 60 * 1000,
+      greenTimeMs: 2880 * 60 * 1000,
+      lastTurnStartTimeMs: null,
+      bluePlayer: { id: 'usr_host', username: 'CorrHost', elo: 1500, sessionToken: 'mock_token' },
+      greenPlayer: null,
+      boardState: {} as any,
+    };
+
+    const html = renderToStaticMarkup(
+      <LobbyTable
+        initialWaitingRooms={[mockCorrespondenceRoom]}
+        initialInProgressRooms={[]}
+      />
+    );
+
+    expect(html).toContain('2d');
+    expect(html).toContain('lobby-speed-icon correspondence');
+  });
 });

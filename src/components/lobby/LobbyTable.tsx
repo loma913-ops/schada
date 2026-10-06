@@ -12,6 +12,7 @@ import {
   Plus,
   Users,
   ArrowLeft,
+  Mail,
 } from 'lucide-react';
 import {
   subscribeToOpenRooms,
@@ -29,6 +30,7 @@ import {
   determineTimeCategory,
   formatTimeControlDisplay,
   type LobbyFilterState,
+  type TimeControlCategory,
 } from './lobbyConfig';
 
 export type { LobbyFilterState };
@@ -179,7 +181,7 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
     });
   }, [rooms, filters]);
 
-  const renderSpeedIcon = (category: 'bullet' | 'blitz' | 'rapid' | 'classical') => {
+  const renderSpeedIcon = (category: TimeControlCategory) => {
     switch (category) {
       case 'bullet':
         return <Rocket size={14} className="lobby-speed-icon bullet" />;
@@ -189,6 +191,8 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
         return <Rabbit size={14} className="lobby-speed-icon rapid" />;
       case 'classical':
         return <Turtle size={14} className="lobby-speed-icon classical" />;
+      case 'correspondence':
+        return <Mail size={14} className="lobby-speed-icon correspondence" />;
     }
   };
 
@@ -327,6 +331,25 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
                   </span>
                   <span className="filter-label-text">
                     <strong>Classical</strong> - Classical games: 25 minutes and more
+                  </span>
+                </label>
+
+                <label className="filter-checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={filters.timeControls.correspondence}
+                    onChange={(e) =>
+                      handleUpdateFilters((prev) => ({
+                        ...prev,
+                        timeControls: { ...prev.timeControls, correspondence: e.target.checked },
+                      }))
+                    }
+                  />
+                  <span className="custom-checkbox">
+                    {filters.timeControls.correspondence && <Check size={12} />}
+                  </span>
+                  <span className="filter-label-text">
+                    <strong>Correspondence</strong> - Turn-based games: 1 day and more
                   </span>
                 </label>
               </div>

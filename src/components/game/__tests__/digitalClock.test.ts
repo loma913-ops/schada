@@ -95,6 +95,30 @@ describe('DigitalClock Component', () => {
       expect(html).toContain('00:09.5');
     });
 
+    it('formats correspondence time with days and hours when >= 24 hours', () => {
+      // 2 days + 14 hours = 2 * 86,400,000 + 14 * 3,600,000 = 223,200,000 ms
+      const html = renderToStaticMarkup(
+        React.createElement(DigitalClock, {
+          remainingMs: 223200000,
+          isActive: false,
+          isUnlimited: false,
+        })
+      );
+      expect(html).toContain('2d 14h');
+    });
+
+    it('formats correspondence time with hours and minutes when under 24 hours but >= 1 hour', () => {
+      // 14 hours + 25 minutes = 14 * 3,600,000 + 25 * 60,000 = 51,900,000 ms
+      const html = renderToStaticMarkup(
+        React.createElement(DigitalClock, {
+          remainingMs: 51900000,
+          isActive: false,
+          isUnlimited: false,
+        })
+      );
+      expect(html).toContain('14h 25m');
+    });
+
     it('throws DigitalClockConfigError if an invalid custom config is provided', () => {
       expect(() => {
         renderToStaticMarkup(

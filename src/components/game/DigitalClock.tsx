@@ -46,6 +46,37 @@ export const DigitalClock: React.FC<DigitalClockProps> = memo(function DigitalCl
     );
   }
 
+  const msPerMinute = config.timeUnits.msPerSecond * config.timeUnits.secondsPerMinute;
+  const msPerHour = msPerMinute * config.timeUnits.minutesPerHour;
+  const msPerDay = msPerHour * config.timeUnits.hoursPerDay;
+
+  // Correspondence adaptive format: >= 24h shows "Xd Yh", >= 1h shows "Xh Ym"
+  if (remainingMs >= msPerDay) {
+    const days = Math.floor(remainingMs / msPerDay);
+    const hours = Math.floor((remainingMs % msPerDay) / msPerHour);
+    return (
+      <div
+        className={`digital-clock ${isActive ? 'active' : ''}`}
+        aria-label={config.ariaLabels.remainingTime}
+      >
+        {days}d {hours}h
+      </div>
+    );
+  }
+
+  if (remainingMs >= msPerHour) {
+    const hours = Math.floor(remainingMs / msPerHour);
+    const minutes = Math.floor((remainingMs % msPerHour) / msPerMinute);
+    return (
+      <div
+        className={`digital-clock ${isActive ? 'active' : ''}`}
+        aria-label={config.ariaLabels.remainingTime}
+      >
+        {hours}h {minutes}m
+      </div>
+    );
+  }
+
   const totalSeconds = Math.max(0, Math.floor(remainingMs / config.timeUnits.msPerSecond));
   const minutes = Math.floor(totalSeconds / config.timeUnits.secondsPerMinute);
   const seconds = totalSeconds % config.timeUnits.secondsPerMinute;
