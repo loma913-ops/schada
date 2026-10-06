@@ -17,7 +17,7 @@ import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 import { isPatronUser, type PatronTier, type PatronSubscriptionStatus } from '@/components/common/PatronBadge';
-import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
+import { LOBBY_CONFIG, formatTimeControlDisplay } from '@/components/lobby/lobbyConfig';
 
 /** Pure helper - defined at module scope so it is never re-created on render. */
 function getMaterialValue(pieces: Piece[]): number {
@@ -525,6 +525,16 @@ export const Arena: React.FC<ArenaProps> = ({
     typeof timeControlMinutes === 'number' &&
     timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
 
+  const formattedTimeControl = useMemo(
+    () =>
+      formatTimeControlDisplay(
+        Math.max(0, timeControlMinutes),
+        Math.max(0, incrementSeconds),
+        LOBBY_CONFIG
+      ),
+    [timeControlMinutes, incrementSeconds]
+  );
+
   const topCaptured = displayedGameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue'];
   const bottomCaptured = displayedGameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue'];
 
@@ -666,7 +676,7 @@ export const Arena: React.FC<ArenaProps> = ({
         {/* Match Header */}
         <div className="arena-match-header">
           <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            {timeControlMinutes > 0 ? `${timeControlMinutes}+${incrementSeconds}` : 'Unlimited'} •{' '}
+            {formattedTimeControl} •{' '}
             <span style={{ color: isRanked ? 'var(--accent-gold)' : 'var(--text-secondary)' }}>
               {isSpectator ? 'Spectating' : isComputer ? `${getBotTier(botLevel).name} (Lvl ${botLevel})` : isRanked ? 'Ranked' : 'Casual'}
             </span>
@@ -719,7 +729,7 @@ export const Arena: React.FC<ArenaProps> = ({
             {/* Match Header in Mobile Sheet */}
             <div className="arena-match-header mobile">
               <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {timeControlMinutes > 0 ? `${timeControlMinutes}+${incrementSeconds}` : 'Unlimited'} •{' '}
+                {formattedTimeControl} •{' '}
                 <span style={{ color: isRanked ? 'var(--accent-gold)' : 'var(--text-secondary)' }}>
                   {isSpectator ? 'Spectating' : isComputer ? `${getBotTier(botLevel).name} (Lvl ${botLevel})` : isRanked ? 'Ranked' : 'Casual'}
                 </span>
