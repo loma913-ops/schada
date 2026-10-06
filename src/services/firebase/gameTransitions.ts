@@ -3,6 +3,8 @@ import { executeMove, resignGame, timeoutGame } from '@/core/schada/engine';
 import type { GameRoom } from './gameTypes';
 import { calculateMoveClocks } from './gameClock';
 import { computeRankedGameEloResult } from './gameElo';
+import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
+import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
 
 export interface ResignTransitionResult {
   updatePayload: Partial<GameRoom>;
@@ -217,5 +219,217 @@ export function computeTimeoutTransition(
     timeoutWinnerPlayerId,
     timeoutWinnerDelta,
     isRanked: isRankedGame,
+  };
+}
+
+export interface AbandonmentTransitionResult {
+  updatePayload: Partial<GameRoom>;
+  abandonedPlayerId: string | null;
+  abandonedDelta: number;
+  winnerPlayerId: string | null;
+  winnerDelta: number;
+  isRanked: boolean;
+}
+
+/**
+ * Calculates updated game state upon game abandonment.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time abandonment resolution and Elo calculation.
+ * - Auxiliary Space Complexity: O(1) constant payload allocation.
+ * - Growth Rate: O(1) flat asymptotic execution cost independent of total moves or player rating history.
+ *
+ * @param game Active game room snapshot.
+ * @param abandonedColor The piece color of the player who abandoned.
+ * @param callerId Optional caller user ID for Elo processing idempotency.
+ * @throws TypeError if game is invalid or null.
+ * @throws RangeError if abandonedColor is not 'blue' or 'green'.
+ */
+export function computeAbandonmentTransition(
+  game: GameRoom,
+  abandonedColor: PieceColor,
+  callerId?: string | null
+): AbandonmentTransitionResult {
+  if (!game || typeof game !== 'object') {
+    throw new TypeError('Invalid game: GameRoom object is required.');
+  }
+  if (abandonedColor !== 'blue' && abandonedColor !== 'green') {
+    throw new RangeError(`Invalid abandonedColor: expected "blue" or "green", received "${abandonedColor}".`);
+  }
+  if (
+    typeof game.timeControlMinutes === 'number' &&
+    game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes
+  ) {
+    throw new Error(
+      `Correspondence games (${game.timeControlMinutes} min >= cutoff ${LOBBY_CONFIG.correspondenceCutoffMinutes} min) are exempt from abandonment rules and only conclude upon clock expiration or resignation.`
+    );
+  }
+
+  const isRankedGame = Boolean(game.isRanked);
+  const winner: PieceColor = abandonedColor === 'blue' ? 'green' : 'blue';
+
+  const updatePayload: Partial<GameRoom> = {
+    status: 'completed',
+    winner,
+    winReason: 'abandonment',
+    lastTurnStartTimeMs: null,
+    blueDisconnectedAt: null,
+    greenDisconnectedAt: null,
+  };
+
+  let abandonedPlayerId: string | null = null;
+  let abandonedDelta = 0;
+  let winnerPlayerId: string | null = null;
+  let winnerDelta = 0;
+
+  const abandonedPlayer = abandonedColor === 'blue' ? game.bluePlayer : game.greenPlayer;
+  if (abandonedPlayer?.id) {
+    abandonedPlayerId = abandonedPlayer.id;
+  }
+  const winningPlayer = abandonedColor === 'blue' ? game.greenPlayer : game.bluePlayer;
+  if (winningPlayer?.id) {
+    winnerPlayerId = winningPlayer.id;
+  }
+
+  if (winner && game.isRanked && game.bluePlayer && game.greenPlayer) {
+    const eloCalc = computeRankedGameEloResult(game, winner);
+    if (eloCalc) {
+      updatePayload.eloResult = eloCalc;
+      updatePayload.bluePlayer = {
+        ...game.bluePlayer,
+        elo: eloCalc.newBlueElo,
+      };
+      updatePayload.greenPlayer = {
+        ...game.greenPlayer,
+        elo: eloCalc.newGreenElo,
+      };
+
+      abandonedDelta = abandonedColor === 'blue' ? eloCalc.blueDelta : eloCalc.greenDelta;
+      winnerDelta = abandonedColor === 'blue' ? eloCalc.greenDelta : eloCalc.blueDelta;
+    }
+  }
+
+  const currentProcessed = Array.isArray(game.processedEloUserIds) ? game.processedEloUserIds : [];
+  if (callerId && (callerId === abandonedPlayerId || callerId === winnerPlayerId) && !currentProcessed.includes(callerId)) {
+    updatePayload.processedEloUserIds = [...currentProcessed, callerId];
+  }
+
+  return {
+    updatePayload,
+    abandonedPlayerId,
+    abandonedDelta,
+    winnerPlayerId,
+    winnerDelta,
+    isRanked: isRankedGame,
+  };
+}
+
+export interface AbandonmentEvaluation {
+  readonly isDisconnected: boolean;
+  readonly disconnectedColor?: PieceColor;
+  readonly shouldAbandon: boolean;
+  readonly remainingGraceSeconds?: number;
+}
+
+/**
+ * Evaluates whether an in-progress real-time game has an absent player eligible for abandonment.
+ *
+ * Rules:
+ * - Real-time games only (timeControlMinutes > 0 and timeControlMinutes < correspondenceCutoffMinutes).
+ * - Game must be 'in_progress'.
+ * - Abandonment countdown ONLY ticks down when it is the disconnected player's turn.
+ * - If remaining clock on the turn player is <= disconnectGracePeriodMs (60s), the player loses on time instead.
+ * - If remaining clock is > 60s and the player has been absent on their turn for >= 60s, game must be abandoned.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time mathematical arithmetic and conditional state checks.
+ * - Auxiliary Space Complexity: O(1) fixed result object allocation.
+ * - Growth Rate: O(1) flat asymptotic scaling ensuring negligible overhead at 100ms clock tick intervals.
+ *
+ * @param game Active game room snapshot or null/undefined.
+ * @param now Current timestamp in milliseconds (defaults to Date.now()).
+ * @param gracePeriodMs Disconnect grace period threshold (defaults to config value).
+ * @throws RangeError if now or gracePeriodMs is invalid, NaN, or non-positive.
+ */
+export function evaluateGameAbandonment(
+  game: GameRoom | null | undefined,
+  now: number = Date.now(),
+  gracePeriodMs: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.disconnectGracePeriodMs
+): AbandonmentEvaluation {
+  if (typeof now !== 'number' || Number.isNaN(now)) {
+    throw new RangeError(`Invalid now timestamp: expected number, received ${now}.`);
+  }
+  if (typeof gracePeriodMs !== 'number' || Number.isNaN(gracePeriodMs) || gracePeriodMs <= 0) {
+    throw new RangeError(`Invalid gracePeriodMs: expected positive number, received ${gracePeriodMs}.`);
+  }
+
+  if (!game || game.status !== 'in_progress') {
+    return { isDisconnected: false, shouldAbandon: false };
+  }
+  if (
+    typeof game.timeControlMinutes !== 'number' ||
+    game.timeControlMinutes <= 0 ||
+    game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes
+  ) {
+    return { isDisconnected: false, shouldAbandon: false };
+  }
+
+  const currentTurn = game.currentTurn;
+  const blueDc = typeof game.blueDisconnectedAt === 'number' && game.blueDisconnectedAt > 0;
+  const greenDc = typeof game.greenDisconnectedAt === 'number' && game.greenDisconnectedAt > 0;
+
+  if (!blueDc && !greenDc) {
+    return { isDisconnected: false, shouldAbandon: false };
+  }
+
+  const turnPlayerDc = currentTurn === 'blue' ? blueDc : greenDc;
+  const turnPlayerDcTime = currentTurn === 'blue' ? game.blueDisconnectedAt! : game.greenDisconnectedAt!;
+
+  // If the player currently on turn is NOT disconnected, but the other player is disconnected
+  if (!turnPlayerDc) {
+    const opponentColor: PieceColor = currentTurn === 'blue' ? 'green' : 'blue';
+    return {
+      isDisconnected: true,
+      disconnectedColor: opponentColor,
+      shouldAbandon: false,
+    };
+  }
+
+  // Turn player is disconnected.
+  // Evaluate their remaining clock.
+  const elapsedSinceTurnStart = typeof game.lastTurnStartTimeMs === 'number' && game.lastTurnStartTimeMs > 0
+    ? Math.max(0, now - game.lastTurnStartTimeMs)
+    : 0;
+  const currentClockMs = currentTurn === 'blue' ? game.blueTimeMs : game.greenTimeMs;
+  const remainingClockMs = currentClockMs - elapsedSinceTurnStart;
+
+  // If clock <= gracePeriodMs (60s), player loses on time instead of abandoning
+  if (remainingClockMs <= gracePeriodMs) {
+    return {
+      isDisconnected: true,
+      disconnectedColor: currentTurn,
+      shouldAbandon: false,
+    };
+  }
+
+  // Clock is > 60s. Countdown runs from when their absence on their turn began.
+  const turnAbsenceStart = Math.max(turnPlayerDcTime, game.lastTurnStartTimeMs || 0);
+  const absenceElapsedMs = Math.max(0, now - turnAbsenceStart);
+  const remainingGraceMs = gracePeriodMs - absenceElapsedMs;
+
+  if (remainingGraceMs <= 0) {
+    return {
+      isDisconnected: true,
+      disconnectedColor: currentTurn,
+      shouldAbandon: true,
+      remainingGraceSeconds: 0,
+    };
+  }
+
+  return {
+    isDisconnected: true,
+    disconnectedColor: currentTurn,
+    shouldAbandon: false,
+    remainingGraceSeconds: Math.ceil(remainingGraceMs / 1000),
   };
 }

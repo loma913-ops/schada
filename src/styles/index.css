@@ -586,6 +586,54 @@ body {
   }
 }
 
+/* Disconnection Status Badge */
+.player-disconnected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background-color: rgba(234, 88, 12, 0.16);
+  border: 1px solid var(--accent-orange);
+  color: var(--accent-orange);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  animation: pulseDisconnected 1.5s ease-in-out infinite;
+}
+
+.player-disconnected-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-orange);
+  display: inline-block;
+}
+
+[data-theme='light'] .player-disconnected-badge {
+  background-color: rgba(234, 88, 12, 0.12);
+}
+
+@media (max-width: 600px) {
+  .player-disconnected-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    gap: 0.25rem;
+  }
+}
+
+@keyframes pulseDisconnected {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
 /* Move History Table */
 .move-history-container {
   display: flex;

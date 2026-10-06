@@ -16,6 +16,7 @@ import type { UserProfile } from './localProvider';
 import { safeSetItem } from '../storage/storageCleanup';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { isPatronUser } from '@/components/common/PatronBadge';
+import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
 import type { ArenaPlayer } from './gameTypes';
 
 // Re-exported modular domain services
@@ -41,6 +42,7 @@ import {
   computeMoveTransition,
   computeResignTransition,
   computeTimeoutTransition,
+  computeAbandonmentTransition,
 } from './gameTransitions';
 import { localGameStore } from './localGameStore';
 import { setLobbyTimeoutHandler } from './lobbyService';
@@ -582,6 +584,196 @@ export async function timeoutGameAction(
   }
 }
 
+/**
+ * Updates a player's disconnected status timestamp in real time.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) single-document write/update.
+ * - Auxiliary Space Complexity: O(1) constant-size payload allocation.
+ * - Growth Rate: O(1) flat execution cost minimizing Firestore CRUD operations.
+ *
+ * @param gameId Unique identifier of the game room.
+ * @param color Color of the player ('blue' or 'green').
+ * @param disconnected Whether the player is currently disconnected.
+ * @throws TypeError if gameId is not a non-empty string.
+ * @throws RangeError if color is neither 'blue' nor 'green'.
+ */
+export async function setPlayerDisconnectedAction(
+  gameId: string,
+  color: PieceColor,
+  disconnected: boolean
+): Promise<void> {
+  if (typeof gameId !== 'string' || gameId.trim().length === 0) {
+    throw new TypeError(`Invalid gameId: expected non-empty string, received "${gameId}".`);
+  }
+  if (color !== 'blue' && color !== 'green') {
+    throw new RangeError(`Invalid color: expected "blue" or "green", received "${color}".`);
+  }
+
+  const updatePayload: Partial<GameRoom> = {
+    [color === 'blue' ? 'blueDisconnectedAt' : 'greenDisconnectedAt']: disconnected ? Date.now() : null,
+  };
+
+  if (isFirebaseConfigured() && db) {
+    try {
+      const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
+      await updateDoc(docRef, sanitize(updatePayload));
+    } catch (err) {
+      console.warn('Could not update player disconnect status in Firestore:', err);
+    }
+  } else {
+    const game = localGameStore.get(gameId);
+    if (
+      game &&
+      game.status === 'in_progress' &&
+      !(typeof game.timeControlMinutes === 'number' &&
+        game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes)
+    ) {
+      localGameStore.set({ ...game, ...updatePayload });
+    }
+  }
+}
+
+/**
+ * Resolves an abandoned game due to disconnected grace period expiration.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) atomic transactional update and user stats modification.
+ * - Auxiliary Space Complexity: O(1) memory overhead.
+ * - Growth Rate: O(1) flat growth rate ensuring stable scaling across concurrent games.
+ *
+ * @param gameId Unique identifier of the game room.
+ * @param abandonedColor Color of the player who abandoned ('blue' or 'green').
+ * @returns Updated user profile if current user's rating was affected, or null.
+ * @throws TypeError if gameId is not a non-empty string.
+ * @throws RangeError if abandonedColor is neither 'blue' nor 'green'.
+ */
+export async function abandonGameDueToDisconnectAction(
+  gameId: string,
+  abandonedColor: PieceColor
+): Promise<UserProfile | null> {
+  if (typeof gameId !== 'string' || gameId.trim().length === 0) {
+    throw new TypeError(`Invalid gameId: expected non-empty string, received "${gameId}".`);
+  }
+  if (abandonedColor !== 'blue' && abandonedColor !== 'green') {
+    throw new RangeError(`Invalid abandonedColor: expected "blue" or "green", received "${abandonedColor}".`);
+  }
+
+  if (pendingResolutionGameIds.has(gameId)) return null;
+  pendingResolutionGameIds.add(gameId);
+
+  try {
+    if (isFirebaseConfigured() && db) {
+      const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
+      let abandonedPlayerId: string | null = null;
+      let abandonedDelta = 0;
+      let winnerPlayerId: string | null = null;
+      let winnerDelta = 0;
+      let isRankedGame = false;
+
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(docRef);
+        if (!snap.exists()) return;
+
+        const game = snap.data() as GameRoom;
+        if (
+          game.status !== 'in_progress' ||
+          (typeof game.timeControlMinutes === 'number' &&
+            game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes)
+        ) {
+          return;
+        }
+
+        const callerId = auth?.currentUser?.uid;
+        const transition = computeAbandonmentTransition(game, abandonedColor, callerId);
+        abandonedPlayerId = transition.abandonedPlayerId;
+        abandonedDelta = transition.abandonedDelta;
+        winnerPlayerId = transition.winnerPlayerId;
+        winnerDelta = transition.winnerDelta;
+        isRankedGame = transition.isRanked;
+
+        tx.update(docRef, sanitize(transition.updatePayload));
+      });
+
+      if (winnerPlayerId && (!auth?.currentUser || auth.currentUser.uid === winnerPlayerId)) {
+        try {
+          const updated = await updateUserStats(
+            winnerPlayerId,
+            true,
+            false,
+            isRankedGame ? winnerDelta : 0
+          );
+          await markGameEloProcessed(gameId, winnerPlayerId);
+          return updated;
+        } catch (e) {
+          console.warn('Failed to update stats for winning player on abandonment:', e);
+        }
+      }
+
+      if (abandonedPlayerId && (!auth?.currentUser || auth.currentUser.uid === abandonedPlayerId)) {
+        try {
+          const updated = await updateUserStats(
+            abandonedPlayerId,
+            false,
+            false,
+            isRankedGame ? abandonedDelta : 0
+          );
+          await markGameEloProcessed(gameId, abandonedPlayerId);
+          return updated;
+        } catch (e) {
+          console.warn('Failed to update stats for abandoning player:', e);
+        }
+      }
+      return null;
+    }
+
+    const game = localGameStore.getRaw(gameId);
+    if (
+      !game ||
+      game.status !== 'in_progress' ||
+      (typeof game.timeControlMinutes === 'number' &&
+        game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes)
+    ) {
+      return null;
+    }
+
+    const transition = computeAbandonmentTransition(game, abandonedColor);
+    localGameStore.set({ ...game, ...transition.updatePayload });
+
+    if (transition.winnerPlayerId && (!transition.winnerPlayerId.startsWith('guest_') && transition.winnerPlayerId !== 'guest')) {
+      try {
+        await updateUserStats(
+          transition.winnerPlayerId,
+          true,
+          false,
+          transition.isRanked ? transition.winnerDelta : 0
+        );
+        await markGameEloProcessed(gameId, transition.winnerPlayerId);
+      } catch (e) {
+        console.warn('Failed to update stats for winning player on abandonment:', e);
+      }
+    }
+
+    if (transition.abandonedPlayerId) {
+      try {
+        const updated = await updateUserStats(
+          transition.abandonedPlayerId,
+          false,
+          false,
+          transition.isRanked ? transition.abandonedDelta : 0
+        );
+        await markGameEloProcessed(gameId, transition.abandonedPlayerId);
+        return updated;
+      } catch (e) {
+        console.warn('Failed to update stats for abandoning player:', e);
+      }
+    }
+    return null;
+  } finally {
+    pendingResolutionGameIds.delete(gameId);
+  }
+}
+
 export async function abandonGame(gameId: string): Promise<void> {
   const now = Date.now();
   const updatePayload: Partial<GameRoom> = {
@@ -620,4 +812,8 @@ export async function deleteGame(gameId: string): Promise<void> {
 // Wire up timeout handlers to avoid circular module dependencies
 localGameStore.setTimeoutHandler(timeoutGameAction);
 setLobbyTimeoutHandler(timeoutGameAction);
-setCleanupHandlers({ timeoutHandler: timeoutGameAction, abandonHandler: abandonGame });
+setCleanupHandlers({
+  timeoutHandler: timeoutGameAction,
+  abandonHandler: abandonGame,
+  abandonDueToDisconnectHandler: abandonGameDueToDisconnectAction,
+});

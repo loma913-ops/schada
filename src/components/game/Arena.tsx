@@ -17,6 +17,7 @@ import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 import { isPatronUser, type PatronTier, type PatronSubscriptionStatus } from '@/components/common/PatronBadge';
+import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
 
 /** Pure helper - defined at module scope so it is never re-created on render. */
 function getMaterialValue(pieces: Piece[]): number {
@@ -67,6 +68,9 @@ interface ArenaProps {
   onTimeout?: (timedOutColor: PieceColor) => void;
   onGameComplete?: (finalState: BoardState) => void;
   onExit: () => void;
+  blueDisconnected?: boolean;
+  greenDisconnected?: boolean;
+  abandonCountdownSeconds?: number | null;
 }
 
 export const Arena: React.FC<ArenaProps> = ({
@@ -91,6 +95,9 @@ export const Arena: React.FC<ArenaProps> = ({
   onTimeout: customTimeout,
   onGameComplete,
   onExit,
+  blueDisconnected,
+  greenDisconnected,
+  abandonCountdownSeconds,
 }) => {
   const [gameState, setGameState] = useState<BoardState>(syncedGameState || initialState);
   const [viewMoveIndex, setViewMoveIndex] = useState<number>(() => {
@@ -514,6 +521,9 @@ export const Arena: React.FC<ArenaProps> = ({
   // Algorithmic Complexity: O(1) constant time, verifying whether game has unlimited time controls.
   // Growth Rate: O(1) flat.
   const isUnlimited = timeControlMinutes <= 0;
+  const isCorrespondence =
+    typeof timeControlMinutes === 'number' &&
+    timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
 
   const topCaptured = displayedGameState.capturedPieces[topColor === 'blue' ? 'green' : 'blue'];
   const bottomCaptured = displayedGameState.capturedPieces[bottomColor === 'blue' ? 'green' : 'blue'];
@@ -544,6 +554,8 @@ export const Arena: React.FC<ArenaProps> = ({
           isUser={userColor === topColor}
           isThinking={isBotThinking && displayedGameState.currentTurn === topColor}
           isPatron={isPatronUser(topPlayer)}
+          isDisconnected={!isCorrespondence && (topColor === 'blue' ? blueDisconnected : greenDisconnected)}
+          abandonCountdownSeconds={!isCorrespondence && (topColor === 'blue' ? blueDisconnected : greenDisconnected) ? abandonCountdownSeconds : undefined}
         />
 
         {/* Board Component */}
@@ -576,6 +588,8 @@ export const Arena: React.FC<ArenaProps> = ({
           isUser={userColor === bottomColor}
           isThinking={isBotThinking && displayedGameState.currentTurn === bottomColor}
           isPatron={isPatronUser(bottomPlayer)}
+          isDisconnected={!isCorrespondence && (bottomColor === 'blue' ? blueDisconnected : greenDisconnected)}
+          abandonCountdownSeconds={!isCorrespondence && (bottomColor === 'blue' ? blueDisconnected : greenDisconnected) ? abandonCountdownSeconds : undefined}
         />
 
         {/* Mobile In-Game Action Bar */}

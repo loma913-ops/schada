@@ -8,6 +8,9 @@ import {
   resignGameAction,
   timeoutGameAction,
   abandonGame,
+  setPlayerDisconnectedAction,
+  abandonGameDueToDisconnectAction,
+  evaluateGameAbandonment,
   getLocalSessionToken,
   setLocalSessionToken,
   deleteGame,
@@ -25,6 +28,7 @@ import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { updateUserStats } from '@/services/firebase/authService';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
 import { safeSetItem } from '@/services/storage/storageCleanup';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { isGuestUser } from '@/services/firebase/gameTypes';
@@ -111,6 +115,40 @@ export const GameRoomView: React.FC = () => {
         console.warn('Failed to auto-timeout expired game:', err);
       });
     }
+  }, [game, gameId]);
+
+  const [abandonCountdownSeconds, setAbandonCountdownSeconds] = useState<number | null>(null);
+
+  // Auto-resolve if an absent player on turn has exceeded the 60-second abandonment grace period (Real-Time only)
+  useEffect(() => {
+    if (
+      !gameId ||
+      !game ||
+      game.status !== 'in_progress' ||
+      (typeof game.timeControlMinutes === 'number' &&
+        game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes)
+    ) {
+      setAbandonCountdownSeconds(null);
+      return;
+    }
+
+    const checkAbandonment = () => {
+      const evaluation = evaluateGameAbandonment(game, Date.now());
+      if (evaluation.shouldAbandon && evaluation.disconnectedColor) {
+        setAbandonCountdownSeconds(0);
+        abandonGameDueToDisconnectAction(gameId, evaluation.disconnectedColor).catch((err) => {
+          console.warn('Failed to auto-abandon match on disconnect:', err);
+        });
+      } else if (typeof evaluation.remainingGraceSeconds === 'number') {
+        setAbandonCountdownSeconds(evaluation.remainingGraceSeconds);
+      } else {
+        setAbandonCountdownSeconds(null);
+      }
+    };
+
+    checkAbandonment();
+    const interval = setInterval(checkAbandonment, MULTIPLAYER_SCALE_CONFIG.matchmaking.clockTickIntervalMs);
+    return () => clearInterval(interval);
   }, [game, gameId]);
 
   // 2. Determine player identity and join
@@ -288,6 +326,58 @@ export const GameRoomView: React.FC = () => {
       setActivityContext('online');
     };
   }, []);
+
+  // Clear disconnected flag upon actively viewing / rejoining the room (Real-Time only)
+  useEffect(() => {
+    if (
+      !gameId ||
+      !game ||
+      !userColor ||
+      isSpectator ||
+      game.status !== 'in_progress' ||
+      (typeof game.timeControlMinutes === 'number' &&
+        game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes)
+    ) {
+      return;
+    }
+    const isDc = userColor === 'blue' ? Boolean(game.blueDisconnectedAt) : Boolean(game.greenDisconnectedAt);
+    if (isDc) {
+      setPlayerDisconnectedAction(gameId, userColor, false);
+    }
+  }, [gameId, game?.blueDisconnectedAt, game?.greenDisconnectedAt, userColor, isSpectator, game?.status, game?.timeControlMinutes]);
+
+  // Mark player as disconnected when leaving or unmounting the room during an in-progress real-time game
+  const userColorRef = useRef(userColor);
+  userColorRef.current = userColor;
+  const gameRef = useRef(game);
+  gameRef.current = game;
+
+  useEffect(() => {
+    if (!gameId) return;
+
+    const handleLeave = () => {
+      const currentGame = gameRef.current;
+      const color = userColorRef.current;
+      if (!currentGame || !color || currentGame.status !== 'in_progress') return;
+      if (
+        currentGame.timeControlMinutes <= 0 ||
+        currentGame.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes
+      ) {
+        return;
+      }
+
+      setPlayerDisconnectedAction(gameId, color, true);
+    };
+
+    window.addEventListener('beforeunload', handleLeave);
+    window.addEventListener('pagehide', handleLeave);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleLeave);
+      window.removeEventListener('pagehide', handleLeave);
+      handleLeave();
+    };
+  }, [gameId]);
 
   // Handle game completion & ranked rating updates
   const applyUserEloUpdates = useCallback(
@@ -527,6 +617,19 @@ export const GameRoomView: React.FC = () => {
         onGameComplete={(completedState) => {
           applyUserEloUpdates(completedState);
         }}
+        blueDisconnected={
+          game.timeControlMinutes < LOBBY_CONFIG.correspondenceCutoffMinutes &&
+          Boolean(game.blueDisconnectedAt)
+        }
+        greenDisconnected={
+          game.timeControlMinutes < LOBBY_CONFIG.correspondenceCutoffMinutes &&
+          Boolean(game.greenDisconnectedAt)
+        }
+        abandonCountdownSeconds={
+          game.timeControlMinutes < LOBBY_CONFIG.correspondenceCutoffMinutes
+            ? abandonCountdownSeconds
+            : null
+        }
         onExit={async () => {
           const isGameOver = Boolean(game.boardState.isGameOver || game.status === 'completed');
           if (game.status === 'waiting' && isHost && gameId) {
@@ -539,9 +642,9 @@ export const GameRoomView: React.FC = () => {
               await applyUserEloUpdates();
             }
           } else if (game.status === 'in_progress' && userColor && !isSpectator && gameId) {
-            const updated = await resignGameAction(gameId, userColor);
-            if (updated) {
-              refreshUser(updated);
+            const isCorrespondence = game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
+            if (!isCorrespondence) {
+              await setPlayerDisconnectedAction(gameId, userColor, true);
             }
           }
           navigate('/');

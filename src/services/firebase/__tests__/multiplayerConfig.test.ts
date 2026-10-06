@@ -400,5 +400,60 @@ describe('MultiplayerScaleConfig validation', () => {
     expect(() => validateMultiplayerScaleConfig(emptyGuestRankedTooltipText as MultiplayerScaleConfig)).toThrowError(
       /Invalid matchmaking.guestRankedTooltipText/
     );
+
+    const invalidDisconnectGrace = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        disconnectGracePeriodMs: -1,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidDisconnectGrace as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.disconnectGracePeriodMs/
+    );
+
+    const emptyDisconnectionBadge = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        disconnectionBadgeText: '   ',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyDisconnectionBadge as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.disconnectionBadgeText/
+    );
+
+    const emptyDisconnectionCountdown = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        disconnectionCountdownPrefix: '',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyDisconnectionCountdown as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.disconnectionCountdownPrefix/
+    );
+
+    const emptyDisconnectionTooltip = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        disconnectionTooltipText: '',
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyDisconnectionTooltip as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.disconnectionTooltipText/
+    );
+
+    const emptyDisconnectionTooltipCountdown = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        disconnectionTooltipCountdownPrefix: '  ',
+      },
+    };
+    expect(() =>
+      validateMultiplayerScaleConfig(emptyDisconnectionTooltipCountdown as MultiplayerScaleConfig)
+    ).toThrowError(/Invalid matchmaking.disconnectionTooltipCountdownPrefix/);
   });
 });
