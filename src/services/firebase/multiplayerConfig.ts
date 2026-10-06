@@ -56,6 +56,7 @@ export interface MatchmakingConfig {
   readonly botBaseElo: number;
   readonly botEloStepPerLevel: number;
   readonly defaultCleanupIntervalMs: number;
+  readonly disconnectGracePeriodMs: number;
   readonly maxCleanupBatchSize: number;
   readonly clockTickIntervalMs: number;
   readonly liveRoomsPollIntervalMs: number;
@@ -69,6 +70,10 @@ export interface MatchmakingConfig {
   readonly guestRankedNoticeMessage: string;
   readonly guestRankedBadgeText: string;
   readonly guestRankedTooltipText: string;
+  readonly disconnectionBadgeText: string;
+  readonly disconnectionCountdownPrefix: string;
+  readonly disconnectionTooltipText: string;
+  readonly disconnectionTooltipCountdownPrefix: string;
 }
 
 export interface MultiplayerCollectionsConfig {
@@ -339,6 +344,12 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
+  if (typeof matchmaking.disconnectGracePeriodMs !== 'number' || matchmaking.disconnectGracePeriodMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.disconnectGracePeriodMs: expected positive number, received ${matchmaking.disconnectGracePeriodMs}.`
+    );
+  }
+
   if (
     typeof matchmaking.maxCleanupBatchSize !== 'number' ||
     matchmaking.maxCleanupBatchSize <= 0 ||
@@ -452,6 +463,18 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
+  const disconnectStrings = {
+    disconnectionBadgeText: matchmaking.disconnectionBadgeText,
+    disconnectionCountdownPrefix: matchmaking.disconnectionCountdownPrefix,
+    disconnectionTooltipText: matchmaking.disconnectionTooltipText,
+    disconnectionTooltipCountdownPrefix: matchmaking.disconnectionTooltipCountdownPrefix,
+  };
+  for (const [keyName, val] of Object.entries(disconnectStrings)) {
+    if (typeof val !== 'string' || val.trim().length === 0) {
+      throw new MultiplayerConfigError(`Invalid matchmaking.${keyName}: expected non-empty string.`);
+    }
+  }
+
   const { collections } = config;
   if (!collections || typeof collections !== 'object') {
     throw new MultiplayerConfigError('Collections configuration section is missing or invalid.');
@@ -555,6 +578,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     botBaseElo: 1000,
     botEloStepPerLevel: 80,
     defaultCleanupIntervalMs: 60_000,
+    disconnectGracePeriodMs: 60 * 1000, // 60 seconds
     maxCleanupBatchSize: 50,
     clockTickIntervalMs: 100,
     liveRoomsPollIntervalMs: 60_000,
@@ -568,6 +592,10 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     guestRankedNoticeMessage: 'Guests cannot play in ranked games. Please sign in or create an account to challenge the host, or watch as a spectator.',
     guestRankedBadgeText: '(Account required)',
     guestRankedTooltipText: 'Ranked match: account required to play',
+    disconnectionBadgeText: 'Disconnected',
+    disconnectionCountdownPrefix: 'Abandoning in ',
+    disconnectionTooltipText: 'Player disconnected',
+    disconnectionTooltipCountdownPrefix: 'Opponent disconnected. Abandoning in ',
   }),
   collections: Object.freeze({
     users: 'users',

@@ -27,6 +27,8 @@ export interface DigitalClockConfig {
     readonly msPerSecond: number;
     readonly secondsPerMinute: number;
     readonly msPerTenth: number;
+    readonly minutesPerHour: number;
+    readonly hoursPerDay: number;
   };
   readonly display: {
     readonly zeroPadLength: number;
@@ -86,10 +88,14 @@ export function validateDigitalClockConfig(config: DigitalClockConfig): void {
     typeof config.timeUnits.secondsPerMinute !== 'number' ||
     config.timeUnits.secondsPerMinute <= 0 ||
     typeof config.timeUnits.msPerTenth !== 'number' ||
-    config.timeUnits.msPerTenth <= 0
+    config.timeUnits.msPerTenth <= 0 ||
+    typeof config.timeUnits.minutesPerHour !== 'number' ||
+    config.timeUnits.minutesPerHour <= 0 ||
+    typeof config.timeUnits.hoursPerDay !== 'number' ||
+    config.timeUnits.hoursPerDay <= 0
   ) {
     throw new DigitalClockConfigError(
-      'Invalid timeUnits: expected positive numbers for msPerSecond, secondsPerMinute, and msPerTenth.'
+      'Invalid timeUnits: expected positive numbers for msPerSecond, secondsPerMinute, msPerTenth, minutesPerHour, and hoursPerDay.'
     );
   }
 
@@ -116,6 +122,8 @@ export const CANONICAL_DIGITAL_CLOCK_CONFIG: DigitalClockConfig = Object.freeze(
     msPerSecond: 1000,
     secondsPerMinute: 60,
     msPerTenth: 100,
+    minutesPerHour: 60,
+    hoursPerDay: 24,
   }),
   display: Object.freeze({
     zeroPadLength: 2,

@@ -36,6 +36,8 @@ export interface GameRoom {
   eloResult?: GameEloResult | null;
   processedEloUserIds?: string[];
   abandonedAt?: number;
+  blueDisconnectedAt?: number | null;
+  greenDisconnectedAt?: number | null;
 }
 
 export interface GameTimeoutResult {

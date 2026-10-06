@@ -3,6 +3,7 @@ import type { Piece, PieceColor } from '@/core/schada/types';
 import { DigitalClock } from './DigitalClock';
 import { PieceIcon } from '../board/PieceIcon';
 import { PatronBadge } from '../common/PatronBadge';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 
 interface PlayerCardProps {
   username: string;
@@ -16,6 +17,8 @@ interface PlayerCardProps {
   isThinking?: boolean;
   isUnlimited?: boolean;
   isPatron?: boolean;
+  isDisconnected?: boolean;
+  abandonCountdownSeconds?: number | null;
 }
 
 /**
@@ -40,6 +43,8 @@ export const PlayerCard: React.FC<PlayerCardProps> = memo(function PlayerCard({
   isThinking,
   isUnlimited,
   isPatron,
+  isDisconnected,
+  abandonCountdownSeconds,
 }) {
   const pawns = capturedPieces.filter((p) => p.type === 'pawn');
   const fieldOfficers = capturedPieces.filter((p) => p.type === 'field_officer');
@@ -172,7 +177,26 @@ export const PlayerCard: React.FC<PlayerCardProps> = memo(function PlayerCard({
         )}
       </div>
 
-      <DigitalClock remainingMs={remainingMs} isActive={isTurn} isUnlimited={isUnlimited} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        {isDisconnected && (
+          <div
+            className="player-disconnected-badge"
+            title={
+              abandonCountdownSeconds !== null && abandonCountdownSeconds !== undefined
+                ? `${MULTIPLAYER_SCALE_CONFIG.matchmaking.disconnectionTooltipCountdownPrefix}${abandonCountdownSeconds}s`
+                : MULTIPLAYER_SCALE_CONFIG.matchmaking.disconnectionTooltipText
+            }
+          >
+            <span className="player-disconnected-dot" />
+            <span>
+              {abandonCountdownSeconds !== null && abandonCountdownSeconds !== undefined
+                ? `${MULTIPLAYER_SCALE_CONFIG.matchmaking.disconnectionCountdownPrefix}${abandonCountdownSeconds}s`
+                : MULTIPLAYER_SCALE_CONFIG.matchmaking.disconnectionBadgeText}
+            </span>
+          </div>
+        )}
+        <DigitalClock remainingMs={remainingMs} isActive={isTurn} isUnlimited={isUnlimited} />
+      </div>
     </div>
   );
 });

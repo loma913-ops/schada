@@ -11,21 +11,28 @@ import {
 import { db, isFirebaseConfigured } from './config';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { isGameTimedOut } from './gameClock';
+import { evaluateGameAbandonment } from './gameTransitions';
 import { localGameStore } from './localGameStore';
 import { ABANDONED_GAME_EXPIRY_MS, type GameRoom } from './gameTypes';
+import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
 import type { PieceColor } from '@/core/schada/types';
 
 const SESSION_STORAGE_PREFIX = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.playerTokenPrefix;
 
 let cleanupTimeoutHandler: ((id: string, color: PieceColor) => Promise<unknown>) | null = null;
 let cleanupAbandonHandler: ((id: string) => Promise<unknown>) | null = null;
+let cleanupAbandonDueToDisconnectHandler: ((id: string, color: PieceColor) => Promise<unknown>) | null = null;
 
 export function setCleanupHandlers(handlers: {
   timeoutHandler?: ((id: string, color: PieceColor) => Promise<unknown>) | null;
   abandonHandler?: ((id: string) => Promise<unknown>) | null;
+  abandonDueToDisconnectHandler?: ((id: string, color: PieceColor) => Promise<unknown>) | null;
 }): void {
   if (handlers.timeoutHandler !== undefined) cleanupTimeoutHandler = handlers.timeoutHandler;
   if (handlers.abandonHandler !== undefined) cleanupAbandonHandler = handlers.abandonHandler;
+  if (handlers.abandonDueToDisconnectHandler !== undefined) {
+    cleanupAbandonDueToDisconnectHandler = handlers.abandonDueToDisconnectHandler;
+  }
 }
 
 /**
@@ -102,6 +109,13 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
           await cleanupTimeoutHandler(docSnap.id, timeoutCheck.timedOutColor).catch((err) => {
             console.warn('Failed to timeout in-progress game in cleanup:', docSnap.id, err);
           });
+        } else {
+          const abandonCheck = evaluateGameAbandonment(game, now);
+          if (abandonCheck.shouldAbandon && abandonCheck.disconnectedColor && cleanupAbandonDueToDisconnectHandler) {
+            await cleanupAbandonDueToDisconnectHandler(docSnap.id, abandonCheck.disconnectedColor).catch((err) => {
+              console.warn('Failed to auto-abandon in-progress game in cleanup:', docSnap.id, err);
+            });
+          }
         }
       }
 
@@ -123,6 +137,15 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
         let waitingUpdateCount = 0;
 
         for (const docSnap of snapWaiting.docs) {
+          const game = docSnap.data() as GameRoom;
+          // Protect correspondence games from being marked abandoned while waiting for opponents
+          if (
+            typeof game.timeControlMinutes === 'number' &&
+            game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes
+          ) {
+            continue;
+          }
+
           batchWaiting.update(docSnap.ref, {
             status: 'abandoned',
             abandonedAt: now,
@@ -144,6 +167,12 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
     for (const [id, game] of Object.entries(all)) {
       if (processedCount >= batchLimit) break;
       if (game.status === 'abandoned') {
+        if (
+          typeof game.timeControlMinutes === 'number' &&
+          game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes
+        ) {
+          continue;
+        }
         const abandonedTime = game.abandonedAt || game.createdAt;
         if (abandonedTime && now - abandonedTime >= maxAgeMs) {
           localGameStore.delete(id);
@@ -158,8 +187,20 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
         if (timeoutCheck.timedOut && timeoutCheck.timedOutColor && cleanupTimeoutHandler) {
           cleanupTimeoutHandler(id, timeoutCheck.timedOutColor).catch(() => {});
           processedCount++;
+        } else {
+          const abandonCheck = evaluateGameAbandonment(game, now);
+          if (abandonCheck.shouldAbandon && abandonCheck.disconnectedColor && cleanupAbandonDueToDisconnectHandler) {
+            cleanupAbandonDueToDisconnectHandler(id, abandonCheck.disconnectedColor).catch(() => {});
+            processedCount++;
+          }
         }
       } else if (game.status === 'waiting' && maxAgeMs > 0) {
+        if (
+          typeof game.timeControlMinutes === 'number' &&
+          game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes
+        ) {
+          continue;
+        }
         if (game.createdAt && now - game.createdAt >= maxAgeMs) {
           if (cleanupAbandonHandler) {
             cleanupAbandonHandler(id).catch(() => {});

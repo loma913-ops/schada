@@ -42,7 +42,8 @@ export type WinReason =
   | 'repetition'
   | 'blocked'
   | 'mutual_shuffle'
-  | 'agreement';
+  | 'agreement'
+  | 'abandonment';
 
 export interface ScoreBreakdown {
   goalScore: number;

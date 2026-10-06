@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cpu, Users, Settings2, Share2 } from 'lucide-react';
+import { Cpu, Users, Settings2, Share2, Mail } from 'lucide-react';
 import { OnlinePlayersCount } from './OnlinePlayersCount';
 
 import { FORMAT_CONFIG, type TimeControlPreset } from '@/core/schada/formatConfig';
@@ -9,7 +9,7 @@ export type TimeControlOption = TimeControlPreset;
 interface QuickPairingGridProps {
   onSelectTimeControl: (minutes: number, increment: number, isRanked: boolean) => Promise<void> | void;
   onStartPassAndPlay: () => void;
-  onOpenCustomModal: () => void;
+  onOpenCustomModal: (initialTab?: 'realtime' | 'correspondence') => void;
   onOpenComputerModal: () => void;
   onOpenCreateRoomModal: () => void;
 }
@@ -59,7 +59,7 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
         ))}
 
         {/* 12th Slot: Custom */}
-        <div className="pairing-card custom-card" onClick={onOpenCustomModal}>
+        <div className="pairing-card custom-card" onClick={() => onOpenCustomModal('realtime')}>
           <div className="time" style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <Settings2 size={18} style={{ opacity: 0.8 }} />
             <span>Custom</span>
@@ -95,6 +95,16 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
         >
           <Cpu size={22} className="lichess-cta-icon" />
           <span>Play Against Computer</span>
+        </button>
+
+        <button
+          type="button"
+          className="lichess-cta-btn"
+          onClick={() => onOpenCustomModal('correspondence')}
+          style={{ width: '100%', padding: '0.85rem 1.25rem', fontSize: '1.05rem', fontWeight: 600 }}
+        >
+          <Mail size={22} className="lichess-cta-icon" />
+          <span>Correspondence</span>
         </button>
       </div>
 

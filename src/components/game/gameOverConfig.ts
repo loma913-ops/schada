@@ -101,6 +101,7 @@ export function validateGameOverModalConfig(config: GameOverModalConfig): void {
     'blocked',
     'mutual_shuffle',
     'agreement',
+    'abandonment',
   ];
 
   for (const reason of requiredWinReasons) {
@@ -138,6 +139,7 @@ export const GAME_OVER_MODAL_CONFIG: GameOverModalConfig = {
       blocked: 'Game ended: High pieces blocked by opponent',
       mutual_shuffle: 'Game ended: Mutual consecutive shuffling',
       agreement: 'Draw agreed',
+      abandonment: 'Opponent abandoned the game',
     },
   },
 };
