@@ -45,5 +45,11 @@ describe('firebaseRuntimeConfig', () => {
       apiKey: '  ',
     };
     expect(() => validateFirebaseClientOptions(missingKey)).toThrow('required field "apiKey" is missing or empty');
+
+    const withMeasurementId = {
+      ...valid,
+      measurementId: 'G-EQVZT5ZPMJ',
+    };
+    expect(() => validateFirebaseClientOptions(withMeasurementId)).not.toThrow();
   });
 });

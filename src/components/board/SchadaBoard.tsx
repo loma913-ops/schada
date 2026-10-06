@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import type { BoardMatrix, Move, PieceColor, Square } from '@/core/schada/types';
 import { colRowToSquare } from '@/core/schada/vectors';
-import { getLegalMovesForSquare } from '@/core/schada/engine';
+import { getLegalMovesForSquare, getPiecesUnderAttack } from '@/core/schada/engine';
 import { BoardSquare } from './BoardSquare';
 import { haptics } from '@/services/device/haptics';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
+import { useGamePreferences } from '@/context/GamePreferencesContext';
 
 interface SchadaBoardProps {
   board: BoardMatrix;
@@ -99,10 +100,18 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = memo(({
     [disabled, playerColor, currentTurn, board, legalMoveMap, selectedSquare, onMakeMove]
   );
 
+  const { showThreatIndicators } = useGamePreferences();
+
   // Generate 64 squares in display order (cached by orientation)
   const squares: Square[] = useMemo(() => {
     return getBoardSquaresForOrientation(orientation);
   }, [orientation]);
+
+  // Compute threatened pieces on board updates (cached by board matrix & preference)
+  const attackedSquares = useMemo(() => {
+    if (!showThreatIndicators) return new Set<Square>();
+    return getPiecesUnderAttack(board);
+  }, [board, showThreatIndicators]);
 
   return (
     <div className="schada-board-wrapper">
@@ -112,6 +121,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = memo(({
           const isSelected = selectedSquare === sq;
           const isLastMove = lastMove?.from === sq || lastMove?.to === sq;
           const legalMoveTarget = legalMoveMap.get(sq);
+          const isUnderAttack = attackedSquares.has(sq);
 
           return (
             <BoardSquare
@@ -123,6 +133,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = memo(({
               legalMoveTarget={legalMoveTarget}
               onClick={handleSquareClick}
               orientation={orientation}
+              isUnderAttack={isUnderAttack}
             />
           );
         })}

@@ -125,6 +125,21 @@ export function validateRulesConfig(config: SchadaRulesConfig): void {
   }
 
   if (
+    typeof board.blueBaseRankIndex !== 'number' ||
+    typeof board.blueGoalRankIndex !== 'number' ||
+    typeof board.greenBaseRankIndex !== 'number' ||
+    typeof board.greenGoalRankIndex !== 'number' ||
+    board.blueBaseRankIndex !== 0 ||
+    board.blueGoalRankIndex !== 7 ||
+    board.greenBaseRankIndex !== 7 ||
+    board.greenGoalRankIndex !== 0
+  ) {
+    throw new SchadaRulesConfigError(
+      'Invalid board base/goal rank indices: expected Blue base=0/goal=7 and Green base=7/goal=0.'
+    );
+  }
+
+  if (
     !endConditions ||
     endConditions.threefoldRepetitionThreshold !== 3 ||
     endConditions.mutualShuffleHalfMovesThreshold !== 6

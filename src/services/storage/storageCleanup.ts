@@ -98,6 +98,9 @@ export function cleanupBrowserStorage(emergency: boolean = false): void {
     if (rawGames) {
       if (emergency) {
         localStorage.removeItem(localGamesKey);
+        // Also evict leaderboard cache in emergencies to reclaim space
+        localStorage.removeItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.cachedLeaderboard);
+        localStorage.removeItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.cachedLeaderboardTime);
       } else {
         try {
           const games = JSON.parse(rawGames);

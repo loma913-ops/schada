@@ -26,6 +26,7 @@ export interface FirebaseClientOptions {
   readonly storageBucket: string;
   readonly messagingSenderId: string;
   readonly appId: string;
+  readonly measurementId?: string;
 }
 
 export interface FirebaseRuntimeConfig {

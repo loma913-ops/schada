@@ -20,22 +20,28 @@ import {
 import { Arena, type ArenaPlayer } from './Arena';
 import type { PlayerEloUpdate } from './GameOverModal';
 import type { BoardState, Move, PieceColor } from '@/core/schada/types';
-import { Copy, Check, ArrowLeft, Loader2, Cpu } from 'lucide-react';
+import { Copy, Check, ArrowLeft, Loader2, Cpu, ShieldAlert, LogIn, Users } from 'lucide-react';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { updateUserStats } from '@/services/firebase/authService';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { safeSetItem } from '@/services/storage/storageCleanup';
+import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
+import { isGuestUser } from '@/services/firebase/gameTypes';
+import { AuthModal } from '@/components/auth/AuthModal';
 
 export const GameRoomView: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const { user, isLoading: authLoading, refreshUser } = useAuth();
+  const isGuest = isGuestUser(user);
   const navigate = useNavigate();
 
   const [game, setGame] = useState<GameRoom | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [spectateWaiting, setSpectateWaiting] = useState(false);
 
   // Guest prompt state
   const [guestName, setGuestName] = useState(
@@ -116,15 +122,16 @@ export const GameRoomView: React.FC = () => {
     const guestId = typeof localStorage !== 'undefined' ? localStorage.getItem(guestIdKey) : null;
 
     const isAlreadySeated = Boolean(
-      (existingToken &&
-        ((game.bluePlayer && game.bluePlayer.sessionToken === existingToken) ||
-          (game.greenPlayer && game.greenPlayer.sessionToken === existingToken))) ||
       (user &&
         ((game.bluePlayer && game.bluePlayer.id === user.id) ||
           (game.greenPlayer && game.greenPlayer.id === user.id))) ||
-      (guestId &&
-        ((game.bluePlayer && game.bluePlayer.id === guestId) ||
-          (game.greenPlayer && game.greenPlayer.id === guestId)))
+      (!game.isRanked &&
+        ((existingToken &&
+          ((game.bluePlayer && game.bluePlayer.sessionToken === existingToken) ||
+            (game.greenPlayer && game.greenPlayer.sessionToken === existingToken))) ||
+          (guestId &&
+            ((game.bluePlayer && game.bluePlayer.id === guestId) ||
+              (game.greenPlayer && game.greenPlayer.id === guestId)))))
     );
 
     if (isAlreadySeated) {
@@ -137,32 +144,44 @@ export const GameRoomView: React.FC = () => {
       return;
     }
 
-    // If game has empty seat and user is not logged in and hasn't confirmed guest name yet
+    // If game has empty seat and user is not logged in and hasn't confirmed guest name yet (casual games only)
     const guestConfirmedKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestConfirmed;
-    if (game.status === 'waiting' && !user && !localStorage.getItem(guestConfirmedKey)) {
+    if (game.status === 'waiting' && isGuest && !game.isRanked && !localStorage.getItem(guestConfirmedKey)) {
       setGuestPromptOpen(true);
       return;
     }
 
+    const isDonor = isPatronUser(user);
+
     // Auto join with either authenticated account or confirmed guest name
     const joinUser = user
-      ? { id: user.id, username: user.username, elo: user.eloRating, gamesPlayed: user.gamesPlayed }
+      ? {
+        id: user.id,
+        username: user.username,
+        elo: user.eloRating,
+        gamesPlayed: user.gamesPlayed,
+        isPatron: isDonor,
+        hasDonated: isDonor,
+        patronTier: user.patronTier,
+        patronExpiresAt: user.patronExpiresAt,
+        patronSubscriptionStatus: user.patronSubscriptionStatus,
+      }
       : {
-          id: 'guest_' + (guestId || Math.random().toString(36).substring(2, 8)),
-          username: guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
-          elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
-          gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
-        };
+        id: 'guest_' + (guestId || Math.random().toString(36).substring(2, 8)),
+        username: guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
+        elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
+        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: false,
+        hasDonated: false,
+      };
 
     joinGame(gameId, joinUser).then((res) => {
-      if (res.success) {
-        if (res.color) {
-          setJoinedColor(res.color);
-        }
-        setHasJoined(true);
+      if (res.role === 'player' && res.color) {
+        setJoinedColor(res.color);
       }
+      setHasJoined(true);
     });
-  }, [gameId, game, user, hasJoined, guestName]);
+  }, [gameId, game, user, hasJoined, guestName, authLoading]);
 
   const handleConfirmGuestName = (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,13 +205,13 @@ export const GameRoomView: React.FC = () => {
       username: trimmed,
       elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
       gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+      isPatron: false,
+      hasDonated: false,
     }).then((res) => {
-      if (res.success) {
-        if (res.color) {
-          setJoinedColor(res.color);
-        }
-        setHasJoined(true);
+      if (res.role === 'player' && res.color) {
+        setJoinedColor(res.color);
       }
+      setHasJoined(true);
     });
   };
 
@@ -207,7 +226,7 @@ export const GameRoomView: React.FC = () => {
   // Determine user's role and color with multi-tier identification:
   // 1. Session token in localStorage
   // 2. Authenticated user ID match
-  // 3. Persistent guest ID match
+  // 3. Persistent guest ID match (casual games only)
   const sessionToken = gameId ? getLocalSessionToken(gameId) : null;
   const guestId =
     typeof localStorage !== 'undefined'
@@ -216,19 +235,24 @@ export const GameRoomView: React.FC = () => {
 
   // Determine user's role and color:
   // For authenticated users, identity is strictly determined by user.id
-  // For guests, fallback to session token or guest ID
+  // For guests in casual games, fallback to session token or guest ID
+  // In ranked games, guests can NEVER be seated players
   const isBlue = user
     ? Boolean(game?.bluePlayer && game.bluePlayer.id === user.id)
-    : Boolean(
+    : !game?.isRanked
+      ? Boolean(
         (sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken) ||
         (guestId && game?.bluePlayer && game.bluePlayer.id === guestId)
-      );
+      )
+      : false;
   const isGreen = user
     ? Boolean(game?.greenPlayer && game.greenPlayer.id === user.id)
-    : Boolean(
+    : !game?.isRanked
+      ? Boolean(
         (sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken) ||
         (guestId && game?.greenPlayer && game.greenPlayer.id === guestId)
-      );
+      )
+      : false;
 
   // Maintain local session token synchronization if seated player token exists in room document
   useEffect(() => {
@@ -240,8 +264,13 @@ export const GameRoomView: React.FC = () => {
     }
   }, [gameId, isBlue, isGreen, game?.bluePlayer?.sessionToken, game?.greenPlayer?.sessionToken, sessionToken]);
 
-  const userColor: PieceColor | undefined = isBlue ? 'blue' : isGreen ? 'green' : (joinedColor || undefined);
+  const userColor: PieceColor | undefined = isBlue
+    ? 'blue'
+    : isGreen
+      ? 'green'
+      : (!game?.isRanked ? (joinedColor || undefined) : undefined);
   const isSpectator = !userColor;
+  const isHost = isBlue || isGreen;
 
   // Set in-game presence context while player in an active match
   const userId = user?.id;
@@ -359,7 +388,7 @@ export const GameRoomView: React.FC = () => {
   }
 
   const handlePlayAgainstComputer = async () => {
-    if (gameId) {
+    if (gameId && isHost) {
       await abandonGame(gameId);
     }
     window.scrollTo(0, 0);
@@ -374,7 +403,7 @@ export const GameRoomView: React.FC = () => {
   };
 
   const handleCancelAndReturn = async () => {
-    if (gameId) {
+    if (gameId && isHost) {
       await abandonGame(gameId);
     }
     window.scrollTo(0, 0);
@@ -414,21 +443,33 @@ export const GameRoomView: React.FC = () => {
 
   const bluePlayer: ArenaPlayer = game.bluePlayer
     ? {
-        id: game.bluePlayer.id,
-        username: game.bluePlayer.username,
-        elo: eloResult?.initialBlueElo ?? (game.eloResult ? (game.bluePlayer.elo - game.eloResult.blueDelta) : game.bluePlayer.elo),
-        gamesPlayed: blueGames,
-      }
+      id: game.bluePlayer.id,
+      username: game.bluePlayer.username,
+      elo: eloResult?.initialBlueElo ?? (game.eloResult ? (game.bluePlayer.elo - game.eloResult.blueDelta) : game.bluePlayer.elo),
+      gamesPlayed: blueGames,
+      isPatron: isPatronUser(game.bluePlayer),
+      hasDonated: Boolean(game.bluePlayer.hasDonated || game.bluePlayer.isPatron),
+      patronTier: game.bluePlayer.patronTier,
+      patronExpiresAt: game.bluePlayer.patronExpiresAt,
+      patronSubscriptionStatus: game.bluePlayer.patronSubscriptionStatus,
+    }
     : { id: 'blue', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
 
   const greenPlayer: ArenaPlayer = game.greenPlayer
     ? {
-        id: game.greenPlayer.id,
-        username: game.greenPlayer.username,
-        elo: eloResult?.initialGreenElo ?? (game.eloResult ? (game.greenPlayer.elo - game.eloResult.greenDelta) : game.greenPlayer.elo),
-        gamesPlayed: greenGames,
-      }
+      id: game.greenPlayer.id,
+      username: game.greenPlayer.username,
+      elo: eloResult?.initialGreenElo ?? (game.eloResult ? (game.greenPlayer.elo - game.eloResult.greenDelta) : game.greenPlayer.elo),
+      gamesPlayed: greenGames,
+      isPatron: isPatronUser(game.greenPlayer),
+      hasDonated: Boolean(game.greenPlayer.hasDonated || game.greenPlayer.isPatron),
+      patronTier: game.greenPlayer.patronTier,
+      patronExpiresAt: game.greenPlayer.patronExpiresAt,
+      patronSubscriptionStatus: game.greenPlayer.patronSubscriptionStatus,
+    }
     : { id: 'green', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
+
+  const host = game.bluePlayer || game.greenPlayer;
 
   return (
     <div className="game-room-container">
@@ -452,7 +493,7 @@ export const GameRoomView: React.FC = () => {
         onMakeMove={async (move: Move) => {
           if (!userColor || game.status === 'waiting') return;
           try {
-            await makeGameMove(gameId!, move, userColor);
+            await makeGameMove(gameId!, move, userColor, game);
           } catch (err) {
             console.error('Failed to make move:', err);
           }
@@ -488,7 +529,7 @@ export const GameRoomView: React.FC = () => {
         }}
         onExit={async () => {
           const isGameOver = Boolean(game.boardState.isGameOver || game.status === 'completed');
-          if (game.status === 'waiting' && gameId) {
+          if (game.status === 'waiting' && isHost && gameId) {
             await abandonGame(gameId);
           } else if (isGameOver) {
             // Await any in-flight or pending Elo update before unmounting
@@ -508,86 +549,272 @@ export const GameRoomView: React.FC = () => {
       />
 
       {/* Waiting for Opponent Overlay */}
-      {game.status === 'waiting' && (
+      {game.status === 'waiting' && !spectateWaiting && (
         <div className="waiting-modal-overlay">
           <div className="waiting-modal-card">
-            <div className="waiting-status-badge">
-              <Loader2 size={16} className="spin" color="var(--accent-gold)" />
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Awaiting connection
-              </span>
-            </div>
+            {isHost ? (
+              <>
+                <div className="waiting-status-badge">
+                  <Loader2 size={16} className="spin" color="var(--accent-gold)" />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    Awaiting connection
+                  </span>
+                </div>
 
-            <h2
-              style={{
-                fontSize: '1.35rem',
-                fontWeight: 700,
-                color: 'var(--text-primary)',
-                margin: '0 0 0.5rem',
-              }}
-            >
-              Waiting for other player to join.
-            </h2>
+                <h2
+                  style={{
+                    fontSize: '1.35rem',
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    margin: '0 0 0.5rem',
+                  }}
+                >
+                  Waiting for other player to join.
+                </h2>
 
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
-              Share this invite link with another player, or play against the computer now.
-            </p>
+                {host?.username && (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+                    Host:{' '}
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      {host.username}
+                      {isPatronUser(host) && <PatronBadge size={13} />}
+                    </span>
+                  </p>
+                )}
 
-            {/* Room Link & Copy */}
-            <div className="waiting-room-link-box">
-              <span className="waiting-room-link-text">
-                {shareableUrl}
-              </span>
-              <button
-                type="button"
-                className="action-btn"
-                style={{ padding: '0.35rem 0.65rem', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                onClick={handleCopyLink}
-              >
-                {copied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-            </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+                  Share this invite link with another player, or play against the computer now.
+                </p>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handlePlayAgainstComputer}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  width: '100%',
-                  padding: '0.8rem 1.25rem',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                }}
-              >
-                <Cpu size={18} />
-                <span>Play Against Computer</span>
-              </button>
+                {/* Room Link & Copy */}
+                <div className="waiting-room-link-box">
+                  <span className="waiting-room-link-text">
+                    {shareableUrl}
+                  </span>
+                  <button
+                    type="button"
+                    className="action-btn"
+                    style={{ padding: '0.35rem 0.65rem', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                    onClick={handleCopyLink}
+                  >
+                    {copied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
+                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
 
-              <button
-                type="button"
-                className="action-btn"
-                onClick={handleCancelAndReturn}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  width: '100%',
-                  padding: '0.65rem 1rem',
-                  fontSize: '0.9rem',
-                }}
-              >
-                <ArrowLeft size={16} />
-                <span>Cancel & Return to Lobby</span>
-              </button>
-            </div>
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handlePlayAgainstComputer}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      width: '100%',
+                      padding: '0.8rem 1.25rem',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Cpu size={18} />
+                    <span>Play Against Computer</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={handleCancelAndReturn}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      width: '100%',
+                      padding: '0.65rem 1rem',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Cancel & Return to Lobby</span>
+                  </button>
+                </div>
+              </>
+            ) : game.isRanked && isGuest ? (
+              <>
+                <div className="waiting-status-badge">
+                  <ShieldAlert size={16} color="var(--accent-gold)" />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    Ranked Match
+                  </span>
+                </div>
+
+                <h2
+                  style={{
+                    fontSize: '1.35rem',
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    margin: '0 0 0.5rem',
+                  }}
+                >
+                  {MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedNoticeTitle}
+                </h2>
+
+                {host?.username && (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+                    Host:{' '}
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      {host.username}
+                      {isPatronUser(host) && <PatronBadge size={13} />}
+                    </span>
+                  </p>
+                )}
+
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+                  {MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedNoticeMessage}
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => setAuthModalOpen(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      width: '100%',
+                      padding: '0.8rem 1.25rem',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <LogIn size={18} />
+                    <span>Sign In to Play</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => setSpectateWaiting(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      width: '100%',
+                      padding: '0.65rem 1rem',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <Users size={16} />
+                    <span>Watch as Spectator</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => navigate('/')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      width: '100%',
+                      padding: '0.65rem 1rem',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Return to Lobby</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="waiting-status-badge">
+                  <Loader2 size={16} className="spin" color="var(--accent-gold)" />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    Waiting for Match to Begin
+                  </span>
+                </div>
+
+                <h2
+                  style={{
+                    fontSize: '1.35rem',
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    margin: '0 0 0.5rem',
+                  }}
+                >
+                  Spectating Waiting Room
+                </h2>
+
+                {host?.username && (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+                    Host:{' '}
+                    <strong style={{ color: 'var(--text-primary)' }}>{host.username}</strong>
+                  </p>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => setSpectateWaiting(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      width: '100%',
+                      padding: '0.65rem 1rem',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <Users size={16} />
+                    <span>Watch Board</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => navigate('/')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      width: '100%',
+                      padding: '0.65rem 1rem',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Return to Lobby</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -632,6 +859,11 @@ export const GameRoomView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Auth Modal for signing in to play ranked games */}
+      {authModalOpen && (
+        <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
       )}
     </div>
   );

@@ -8,7 +8,6 @@ import {
   Crown,
   Trophy,
   Award,
-  Users,
   CheckCircle2,
   AlertCircle,
   Info,
@@ -21,9 +20,10 @@ import {
   Navigation,
 } from 'lucide-react';
 import type { BoardState, Move, Square, Piece, PieceType, MoveVector } from '@/core/schada/types';
-import { createInitialGameState, executeMove, getLegalMovesForSquare } from '@/core/schada/engine';
+import { createInitialGameState, executeMove, getLegalMovesForSquare, getPiecesUnderAttack } from '@/core/schada/engine';
 import { SCHADA_VECTORS, squareToColRow, colRowToSquare } from '@/core/schada/vectors';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
+import { useGamePreferences } from '@/context/GamePreferencesContext';
 import { BoardSquare } from '../board/BoardSquare';
 import { VectorOverlay } from '../board/VectorOverlay';
 import { PieceIcon } from '../board/PieceIcon';
@@ -154,8 +154,10 @@ export const RulesGuide: React.FC = () => {
   const [selectedBoardSquare, setSelectedBoardSquare] = useState<Square | null>(null);
   const [lastSandboxMove, setLastSandboxMove] = useState<Move | null>(null);
   const [sandboxFeedback, setSandboxFeedback] = useState<string>(
-    'Click any Blue piece on Rank 1 or 2 to see its opening move options!'
+    'Click any Blue piece on Rank 1 or 2 to see its opening move options.'
   );
+
+  const { showThreatIndicators } = useGamePreferences();
 
   const legalMovesForSelectedSquare = useMemo(() => {
     return selectedBoardSquare ? getLegalMovesForSquare(sandboxGameState.board, selectedBoardSquare) : [];
@@ -169,6 +171,11 @@ export const RulesGuide: React.FC = () => {
     return map;
   }, [legalMovesForSelectedSquare]);
 
+  const attackedSquares = useMemo(() => {
+    if (!showThreatIndicators) return new Set<Square>();
+    return getPiecesUnderAttack(sandboxGameState.board);
+  }, [sandboxGameState.board, showThreatIndicators]);
+
   const handleSquareClick = useCallback(
     (sq: Square) => {
       const move = legalMoveMap.get(sq);
@@ -179,9 +186,9 @@ export const RulesGuide: React.FC = () => {
         setSelectedBoardSquare(null);
 
         if (move.piece.type === 'field_officer') {
-          setSandboxFeedback(`⚡ Played ${move.from} → ${move.to}! Field Officer leaped over the friendly pawn.`);
+          setSandboxFeedback(`⚡ Played ${move.from} → ${move.to}. Field Officer leaped over the friendly pawn.`);
         } else {
-          setSandboxFeedback(`♟️ Played ${move.from} → ${move.to}! Pawn advanced.`);
+          setSandboxFeedback(`♟️ Played ${move.from} → ${move.to}. Pawn advanced.`);
         }
         return;
       }
@@ -195,7 +202,7 @@ export const RulesGuide: React.FC = () => {
           setSelectedBoardSquare(sq);
           const moves = getLegalMovesForSquare(sandboxGameState.board, sq);
           if (moves.length === 0) {
-            setSandboxFeedback(`Piece on ${sq} is an Officer: forward path is blocked by the pawn on rank 2!`);
+            setSandboxFeedback(`Piece on ${sq} is an Officer: forward path is blocked by the pawn on rank 2.`);
           } else {
             const formattedType = piece.type.replace('_', ' ');
             setSandboxFeedback(
@@ -215,7 +222,7 @@ export const RulesGuide: React.FC = () => {
     setSandboxGameState(createInitialGameState());
     setSelectedBoardSquare(null);
     setLastSandboxMove(null);
-    setSandboxFeedback(`Board reset to opening position. Exactly ${board.openingLegalMoveCount} legal moves available for Blue!`);
+    setSandboxFeedback(`Board reset to opening position. Exactly ${board.openingLegalMoveCount} legal moves available for Blue.`);
   }, [board.openingLegalMoveCount]);
 
   // Precomputed squares in row-major order: ranks 8 to 1, files a to h (O(1) space and time)
@@ -246,11 +253,11 @@ export const RulesGuide: React.FC = () => {
 
   let outcomeText = '';
   if (blueScore > greenScore) {
-    outcomeText = `🏆 Blue Wins (${blueScore} vs ${greenScore})!`;
+    outcomeText = `🏆 Blue Wins (${blueScore} vs ${greenScore}).`;
   } else if (greenScore > blueScore) {
-    outcomeText = `🏆 Green Wins (${greenScore} vs ${blueScore})!`;
+    outcomeText = `🏆 Green Wins (${greenScore} vs ${blueScore}).`;
   } else {
-    outcomeText = `⚖️ Tied (${blueScore} vs ${greenScore})! Decided by Tiebreakers.`;
+    outcomeText = `⚖️ Tied (${blueScore} vs ${greenScore}). Decided by Tiebreakers.`;
   }
 
   const blueGoalRank = board.blueGoalRankIndex + 1; // 8
@@ -268,22 +275,6 @@ export const RulesGuide: React.FC = () => {
           Invented by <strong>{gameMetadata.inventor}</strong> ({gameMetadata.cityOfOrigin},{' '}
           {gameMetadata.yearInvented})<br /><em>"{gameMetadata.tagline}"</em>
         </p>
-
-        {/* Quick Stat Chips */}
-        <div className="rules-stat-chips">
-          <span className="rules-chip">
-            <Users size={14} color="var(--accent-blue)" /> 2 Players (Blue vs Green)
-          </span>
-          <span className="rules-chip">
-            <Shield size={14} color="var(--accent-green)" /> {army.totalPiecesPerPlayer} Pieces per Army
-          </span>
-          <span className="rules-chip highlight">
-            <Sparkles size={14} color="var(--accent-gold)" /> The Squares Dictate Movement
-          </span>
-          <span className="rules-chip">
-            <Award size={14} color="var(--accent-gold)" /> Goal: {scoring.fieldOfficerGoalPoints} pts (FO) / {scoring.officerGoalPoints} pt (O)
-          </span>
-        </div>
       </div>
 
       {/* Complete Full Guide Content (Unified, Sequential) */}
@@ -302,12 +293,36 @@ export const RulesGuide: React.FC = () => {
             Schada is an elegant, non-random abstract strategy game. Here are the 4 fundamental rules you need to start playing immediately:
           </p>
 
+          {/* Pieces Overview: Row of Three */}
+          <div className="quick-start-pieces-row">
+            <div className="quick-start-piece-card">
+              <div className="quick-start-piece-icon">
+                <PieceIcon piece={sampleFieldOfficer} />
+              </div>
+              <span className="quick-start-piece-name">Field Officer</span>
+            </div>
+
+            <div className="quick-start-piece-card">
+              <div className="quick-start-piece-icon">
+                <PieceIcon piece={sampleOfficer} />
+              </div>
+              <span className="quick-start-piece-name">Officer</span>
+            </div>
+
+            <div className="quick-start-piece-card">
+              <div className="quick-start-piece-icon">
+                <PieceIcon piece={samplePawn} />
+              </div>
+              <span className="quick-start-piece-name">Pawn</span>
+            </div>
+          </div>
+
           <div className="quick-start-grid">
             <div className="quick-start-step">
               <div className="quick-step-num">1</div>
               <div className="quick-step-title">Squares Dictate Movement</div>
               <div className="quick-step-desc">
-                In Chess, pieces have moves. In Schada, <strong>the square you stand on dictates your move</strong>! Follow the lines engraved on your tile and count the dots. Each dot is 1 square of travel.
+                In Chess, pieces have moves. In Schada, <strong>the square you stand on dictates your move</strong>. Follow the lines on your tile and count the dots. Each dot is 1 square of travel.
               </div>
             </div>
 
@@ -315,7 +330,7 @@ export const RulesGuide: React.FC = () => {
               <div className="quick-step-num">2</div>
               <div className="quick-step-title">Full Distance Required</div>
               <div className="quick-step-desc">
-                You must travel the <strong>entire designated distance</strong> of the vector. If a line shows 2 or 3 dots, you cannot stop early on an intermediate square. Bent paths also turn corners in a single turn!
+                You must travel the <strong>entire designated distance</strong> of the vector. If a line shows 2 or 3 dots, you cannot stop early on an intermediate square. Bent paths also turn corners in a single turn.
               </div>
             </div>
 
@@ -333,7 +348,7 @@ export const RulesGuide: React.FC = () => {
               <div className="quick-step-desc">
                 Advance your High Pieces into the enemy back rank (Goal Line). Field Officers are worth{' '}
                 <strong>{scoring.fieldOfficerGoalPoints} points</strong>; Officers are worth{' '}
-                <strong>{scoring.officerGoalPoints} point</strong>. High pieces in the goal are <strong>immune to capture</strong>!
+                <strong>{scoring.officerGoalPoints} point</strong>. High pieces in the goal are <strong>immune to capture</strong>.
               </div>
             </div>
           </div>
@@ -347,7 +362,7 @@ export const RulesGuide: React.FC = () => {
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <li><strong>Do use Pawns as shields:</strong> Pawns have {scoring.pawnGoalPoints} goal points, making them ideal blockers and screeners for your {army.fieldOfficersCount} Field Officers.</li>
                 <li><strong>Do open with Field Officers:</strong> They can jump straight over your rank-2 pawns to rank 3 on turn 1.</li>
-                <li><strong>Do protect high pieces in the field:</strong> If they get captured, your potential goal score decreases!</li>
+                <li><strong>Do protect high pieces in the field:</strong> If they get captured, your potential goal score decreases.</li>
               </ul>
             </div>
 
@@ -357,237 +372,14 @@ export const RulesGuide: React.FC = () => {
               </div>
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <li><strong>Don't return to the Base Line:</strong> Once a high piece leaves rank 1, it is strictly forbidden from returning.</li>
-                <li><strong>Don't rush to end the game if trailing:</strong> The game ends the second your remaining high pieces reach the goal-only finish if you have more points!</li>
-                <li><strong>Don't expect Field Officers to jump enemies:</strong> Only friendly pieces can be leaped over!</li>
+                <li><strong>Don't rush to end the game if trailing:</strong> The game ends the second your remaining high pieces reach the goal-only finish if you have more points.</li>
+                <li><strong>Don't expect Field Officers to jump enemies:</strong> Only friendly pieces can be leaped over.</li>
               </ul>
             </div>
           </div>
         </section>
 
-        {/* Section 2: How Squares Move */}
-        <section className="rules-card">
-          <div className="rules-card-header">
-            <h2 className="rules-card-title">
-              <Sparkles size={22} color="var(--accent-gold)" />
-              How to Read Movement Squares
-            </h2>
-            <span className="rules-card-badge">Interactive Vector Inspector</span>
-          </div>
-
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1rem' }}>
-            In Schada, the <strong>square</strong> where your piece stands dictates its direction, distance, and turns.
-            Inspect how different lines and dots work:
-          </p>
-
-          {/* Preset Buttons */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                Select an Example:
-              </span>
-              <button
-                type="button"
-                className="rules-tab-btn"
-                style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                onClick={() => setShowFullGridPicker((prev) => !prev)}
-              >
-                <Grid size={13} /> {showFullGridPicker ? 'Hide 64-Square Grid' : 'Browse All 64 Squares'}
-              </button>
-            </div>
-
-            <div className="square-selector-chips">
-              {NOTABLE_SQUARES.map((n) => (
-                <button
-                  key={n.square}
-                  type="button"
-                  className={`square-chip-btn ${selectedVectorSquare === n.square ? 'active' : ''}`}
-                  onClick={() => setSelectedVectorSquare(n.square)}
-                >
-                  {n.label}
-                </button>
-              ))}
-            </div>
-
-            {showFullGridPicker && (
-              <div style={{ marginTop: '0.75rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                  Click any square on the 8×8 board to inspect its vector and possible moves:
-                </div>
-                <div className="rules-square-picker-grid">
-                  {all64Squares.map((sq) => {
-                    const [c, r] = squareToColRow(sq);
-                    const isLight = (c + r) % 2 === 1;
-                    const isCurrent = sq === selectedVectorSquare;
-                    const isTarget = targetSquares.has(sq);
-                    const isPath = !isTarget && pathSquares.has(sq);
-                    return (
-                      <button
-                        key={sq}
-                        type="button"
-                        className={`rules-picker-cell ${isLight ? 'light' : 'dark'} ${isCurrent ? 'active' : isTarget ? 'is-target' : isPath ? 'is-path' : ''
-                          }`}
-                        onClick={() => setSelectedVectorSquare(sq)}
-                        title={
-                          isCurrent
-                            ? `Selected origin square ${sq}`
-                            : isTarget
-                              ? `Possible move destination from ${selectedVectorSquare}: ${sq}`
-                              : isPath
-                                ? `Intermediate path waypoint for vector from ${selectedVectorSquare}`
-                                : `Inspect square ${sq}`
-                        }
-                      >
-                        {sq}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Vector Highlight Legend */}
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-gold)', display: 'inline-block' }} />
-                    Selected (<strong>{selectedVectorSquare}</strong>)
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-green)', border: '1px solid var(--accent-green-hover)', display: 'inline-block' }} />
-                    Possible Moves ({Array.from(targetSquares).join(', ') || 'None'})
-                  </span>
-                  {pathSquares.size > 0 && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(54, 146, 231, 0.65)', border: '1px solid var(--accent-blue)', display: 'inline-block' }} />
-                      Path Waypoints
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="square-viewer-container">
-            {/* Left: Zoomed Square Graphic */}
-            <div className="square-zoom-panel">
-              <div className={`square-zoom-box ${isVectorSquareLight ? 'light' : 'dark'}`}>
-                <VectorOverlay square={selectedVectorSquare} isSelected={true} />
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '6px',
-                    left: '8px',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                    fontFamily: 'var(--font-mono)',
-                    color: isVectorSquareLight ? 'var(--board-coord-light)' : 'var(--board-coord-dark)',
-                  }}
-                >
-                  {selectedVectorSquare[1]}
-                </span>
-                <span
-                  style={{
-                    position: 'absolute',
-                    bottom: '6px',
-                    right: '8px',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                    fontFamily: 'var(--font-mono)',
-                    color: isVectorSquareLight ? 'var(--board-coord-light)' : 'var(--board-coord-dark)',
-                  }}
-                >
-                  {selectedVectorSquare[0]}
-                </span>
-              </div>
-
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  Square <code>{selectedVectorSquare}</code>
-                </div>
-                {notableSquare && (
-                  <span className="rules-chip highlight" style={{ marginTop: '0.4rem' }}>
-                    {notableSquare.badge}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Right: Path Breakdown */}
-            <div>
-              {notableSquare && (
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.55, marginBottom: '1rem' }}>
-                  {notableSquare.description}
-                </p>
-              )}
-
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.6rem' }}>
-                Legal Movement Paths from {selectedVectorSquare}:
-              </div>
-
-              <div className="vector-list">
-                {activeVectors.length === 0 ? (
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
-                    No active vectors originating from this square.
-                  </div>
-                ) : (
-                  activeVectors.map((vec, idx) => {
-                    const destCol = vCol + vec.target[0];
-                    const destRow = vRow + vec.target[1];
-                    const destSquare = colRowToSquare(destCol, destRow);
-                    if (!destSquare) return null;
-
-                    const totalDots = vec.path.length + 1;
-                    const isBent = vec.path.length > 0 && vec.path.some((p) => {
-                      const stepDirCol = Math.sign(p[0]);
-                      const stepDirRow = Math.sign(p[1]);
-                      const finalDirCol = Math.sign(vec.target[0] - p[0]);
-                      const finalDirRow = Math.sign(vec.target[1] - p[1]);
-                      return stepDirCol !== finalDirCol || stepDirRow !== finalDirRow;
-                    });
-
-                    const pathSteps = vec.path
-                      .map(([dc, dr]) => colRowToSquare(vCol + dc, vRow + dr))
-                      .filter((step): step is Square => step !== null);
-
-                    return (
-                      <div key={idx} className="vector-item">
-                        <div className="vector-item-header">
-                          <span className="vector-item-dest">
-                            {isBent ? <CornerDownRight size={18} /> : <ArrowRight size={18} />}
-                            Destination: {destSquare}
-                          </span>
-                          <span className="vector-step-badge">
-                            {totalDots} {totalDots === 1 ? 'Square' : 'Squares'} ({totalDots} {totalDots === 1 ? 'Dot' : 'Dots'})
-                          </span>
-                        </div>
-
-                        <div className="vector-item-path">
-                          {pathSteps.length === 0 ? (
-                            <span>Direct move 1 square to <strong>{destSquare}</strong>.</span>
-                          ) : (
-                            <span>
-                              Travels through {pathSteps.join(' → ')} to land on <strong>{destSquare}</strong>.
-                              {isBent && ' (Mid-move turn required!)'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              <div className="rules-callout gold" style={{ marginTop: '1rem' }}>
-                <Info size={20} />
-                <div>
-                  <strong>Rule: Mandatory Full Distance</strong>
-                  <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
-                    You must travel the <em>full distance</em> indicated by the dots. A piece on <code>f2</code> moving towards <code>h1</code> cannot stop early on <code>g2</code> or <code>h2</code>!
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 3: The Three Pieces & Their Powers */}
+        {/* Section 2: The Three Pieces & Their Powers */}
         <section className="rules-card">
           <div className="rules-card-header">
             <h2 className="rules-card-title">
@@ -774,20 +566,243 @@ export const RulesGuide: React.FC = () => {
                 <>
                   <CheckCircle2 size={20} />
                   <span>
-                    <strong>Move Allowed!</strong> The Field Officer leaps over the friendly piece on <code>a2</code> and safely lands on <code>a3</code>.
+                    <strong>Move Allowed.</strong> The Field Officer leaps over the friendly piece on <code>a2</code> and safely lands on <code>a3</code>.
                   </span>
                 </>
               ) : (
                 <>
                   <XCircle size={20} />
                   <span>
-                    <strong>Move Blocked!</strong>{' '}
+                    <strong>Move Blocked.</strong>{' '}
                     {selectedPieceType !== 'field_officer'
                       ? `${selectedPieceType === 'officer' ? 'Officers' : 'Pawns'} cannot leap over any pieces. Intermediate square a2 must be completely empty.`
-                      : 'Field Officers can only leap over FRIENDLY pieces, never enemy pieces!'}
+                      : 'Field Officers can only leap over FRIENDLY pieces, never enemy pieces.'}
                   </span>
                 </>
               )}
+            </div>
+          </div>
+        </section>
+
+        {/* Section 3: How Squares Move */}
+        <section className="rules-card">
+          <div className="rules-card-header">
+            <h2 className="rules-card-title">
+              <Sparkles size={22} color="var(--accent-gold)" />
+              How to Read Movement Squares
+            </h2>
+            <span className="rules-card-badge">Interactive Vector Inspector</span>
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1rem' }}>
+            In Schada, the <strong>square</strong> where your piece stands dictates its direction, distance, and turns.
+            Inspect how different lines and dots work:
+          </p>
+
+          {/* Preset Buttons */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div className="rules-example-header">
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                Select an Example:
+              </span>
+              <button
+                type="button"
+                className={`rules-browse-gold-btn ${showFullGridPicker ? 'active' : ''}`}
+                onClick={() => setShowFullGridPicker((prev) => !prev)}
+                title={showFullGridPicker ? 'Hide full 64-square grid' : 'Browse all 64 squares on the board'}
+              >
+                <Grid size={14} /> {showFullGridPicker ? 'Hide 64-Square Grid' : 'Browse All 64 Squares'}
+              </button>
+            </div>
+
+            <div className="square-selector-chips">
+              {NOTABLE_SQUARES.map((n) => (
+                <button
+                  key={n.square}
+                  type="button"
+                  className={`square-chip-btn ${selectedVectorSquare === n.square ? 'active' : ''}`}
+                  onClick={() => setSelectedVectorSquare(n.square)}
+                >
+                  {n.label}
+                </button>
+              ))}
+            </div>
+
+            {showFullGridPicker && (
+              <div style={{ marginTop: '0.75rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                  Click any square on the 8×8 board to inspect its vector and possible moves:
+                </div>
+                <div className="rules-square-picker-grid">
+                  {all64Squares.map((sq) => {
+                    const [c, r] = squareToColRow(sq);
+                    const isLight = (c + r) % 2 === 1;
+                    const isCurrent = sq === selectedVectorSquare;
+                    const isTarget = targetSquares.has(sq);
+                    const isPath = !isTarget && pathSquares.has(sq);
+                    return (
+                      <button
+                        key={sq}
+                        type="button"
+                        className={`rules-picker-cell ${isLight ? 'light' : 'dark'} ${isCurrent ? 'active' : isTarget ? 'is-target' : isPath ? 'is-path' : ''
+                          }`}
+                        onClick={() => setSelectedVectorSquare(sq)}
+                        title={
+                          isCurrent
+                            ? `Selected origin square ${sq}`
+                            : isTarget
+                              ? `Possible move destination from ${selectedVectorSquare}: ${sq}`
+                              : isPath
+                                ? `Intermediate path waypoint for vector from ${selectedVectorSquare}`
+                                : `Inspect square ${sq}`
+                        }
+                      >
+                        {sq}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Vector Highlight Legend */}
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-gold)', display: 'inline-block' }} />
+                    Selected (<strong>{selectedVectorSquare}</strong>)
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-green)', border: '1px solid var(--accent-green-hover)', display: 'inline-block' }} />
+                    Possible Moves ({Array.from(targetSquares).join(', ') || 'None'})
+                  </span>
+                  {pathSquares.size > 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(54, 146, 231, 0.65)', border: '1px solid var(--accent-blue)', display: 'inline-block' }} />
+                      Path Waypoints
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="square-viewer-container">
+            {/* Left: Zoomed Square Graphic */}
+            <div className="square-zoom-panel">
+              <div className={`square-zoom-box ${isVectorSquareLight ? 'light' : 'dark'}`}>
+                <VectorOverlay square={selectedVectorSquare} isSelected={true} />
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '6px',
+                    left: '8px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    fontFamily: 'var(--font-mono)',
+                    color: isVectorSquareLight ? 'var(--board-coord-light)' : 'var(--board-coord-dark)',
+                  }}
+                >
+                  {selectedVectorSquare[1]}
+                </span>
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: '6px',
+                    right: '8px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    fontFamily: 'var(--font-mono)',
+                    color: isVectorSquareLight ? 'var(--board-coord-light)' : 'var(--board-coord-dark)',
+                  }}
+                >
+                  {selectedVectorSquare[0]}
+                </span>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Square <code>{selectedVectorSquare}</code>
+                </div>
+                {notableSquare && (
+                  <span className="rules-chip highlight" style={{ marginTop: '0.4rem' }}>
+                    {notableSquare.badge}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Path Breakdown */}
+            <div>
+              {notableSquare && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.55, marginBottom: '1rem' }}>
+                  {notableSquare.description}
+                </p>
+              )}
+
+              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.6rem' }}>
+                Legal Movement Paths from {selectedVectorSquare}:
+              </div>
+
+              <div className="vector-list">
+                {activeVectors.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                    No active vectors originating from this square.
+                  </div>
+                ) : (
+                  activeVectors.map((vec, idx) => {
+                    const destCol = vCol + vec.target[0];
+                    const destRow = vRow + vec.target[1];
+                    const destSquare = colRowToSquare(destCol, destRow);
+                    if (!destSquare) return null;
+
+                    const totalDots = vec.path.length + 1;
+                    const isBent = vec.path.length > 0 && vec.path.some((p) => {
+                      const stepDirCol = Math.sign(p[0]);
+                      const stepDirRow = Math.sign(p[1]);
+                      const finalDirCol = Math.sign(vec.target[0] - p[0]);
+                      const finalDirRow = Math.sign(vec.target[1] - p[1]);
+                      return stepDirCol !== finalDirCol || stepDirRow !== finalDirRow;
+                    });
+
+                    const pathSteps = vec.path
+                      .map(([dc, dr]) => colRowToSquare(vCol + dc, vRow + dr))
+                      .filter((step): step is Square => step !== null);
+
+                    return (
+                      <div key={idx} className="vector-item">
+                        <div className="vector-item-header">
+                          <span className="vector-item-dest">
+                            {isBent ? <CornerDownRight size={18} /> : <ArrowRight size={18} />}
+                            Destination: {destSquare}
+                          </span>
+                          <span className="vector-step-badge">
+                            {totalDots} {totalDots === 1 ? 'Square' : 'Squares'} ({totalDots} {totalDots === 1 ? 'Dot' : 'Dots'})
+                          </span>
+                        </div>
+
+                        <div className="vector-item-path">
+                          {pathSteps.length === 0 ? (
+                            <span>Direct move 1 square to <strong>{destSquare}</strong>.</span>
+                          ) : (
+                            <span>
+                              Travels through {pathSteps.join(' → ')} to land on <strong>{destSquare}</strong>.
+                              {isBent && ' (Mid-move turn required.)'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="rules-callout gold" style={{ marginTop: '1rem' }}>
+                <Info size={20} />
+                <div>
+                  <strong>Rule: Mandatory Full Distance</strong>
+                  <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
+                    You must travel the <em>full distance</em> indicated by the dots. A piece on <code>f2</code> moving towards <code>h1</code> cannot stop early on <code>g2</code> or <code>h2</code>.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -837,6 +852,7 @@ export const RulesGuide: React.FC = () => {
                     legalMoveTarget={legalTarget}
                     onClick={handleSquareClick}
                     orientation="blue"
+                    isUnderAttack={attackedSquares.has(sq)}
                   />
                 );
               })}
@@ -865,7 +881,7 @@ export const RulesGuide: React.FC = () => {
             <div>
               <strong>Capturing is by Replacement (Chess style)</strong>
               <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
-                When a piece lands on a square occupied by an enemy piece, the enemy is captured and removed. Any piece can capture any enemy piece (Pawns can capture High Pieces!). Capturing is <strong>not compulsory</strong>.
+                When a piece lands on a square occupied by an enemy piece, the enemy is captured and removed. Any piece can capture any enemy piece (Pawns can capture High Pieces.). Capturing is <strong>not compulsory</strong>.
               </div>
             </div>
           </div>
@@ -897,13 +913,13 @@ export const RulesGuide: React.FC = () => {
                   <span className="zone-badge">Target Zone</span>
                 </div>
                 <div className="zone-desc">
-                  Your primary destination! Each Field Officer in the goal line scores{' '}
+                  Your primary destination. Each Field Officer in the goal line scores{' '}
                   <strong>{scoring.fieldOfficerGoalPoints} points</strong>, and each Officer scores{' '}
                   <strong>{scoring.officerGoalPoints} point</strong>.
                   <ul style={{ marginTop: '0.4rem', paddingLeft: '1.2rem', lineHeight: 1.5 }}>
                     <li><strong>One-Way Entry:</strong> Once a high piece enters the goal line, it <strong>can never leave</strong> it.</li>
                     <li><strong>Shuffling:</strong> It may shuffle horizontally along the goal line to make room or block.</li>
-                    <li><strong>Golden Shield Invulnerability:</strong> High pieces in their goal line <strong>CANNOT BE CAPTURED</strong> by enemy pieces! (However, they can still capture enemies).</li>
+                    <li><strong>Golden Shield Invulnerability:</strong> High pieces in their goal line <strong>CANNOT BE CAPTURED</strong> by enemy pieces. (However, they can still capture enemies).</li>
                   </ul>
                 </div>
               </div>
@@ -961,7 +977,7 @@ export const RulesGuide: React.FC = () => {
             <div>
               <strong>Special Exemption: Pawns Have Total Freedom</strong>
               <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
-                Pawns are <strong>exempt</strong> from both Base Line and Goal Line restrictions. They can enter and leave both rows freely, using their versatility to support advances, block enemy high pieces, or deliver tactical surprises!
+                Pawns are <strong>exempt</strong> from both Base Line and Goal Line restrictions. They can enter and leave both rows freely, using their versatility to support advances, block enemy high pieces, or deliver tactical surprises.
               </div>
             </div>
           </div>
@@ -978,7 +994,7 @@ export const RulesGuide: React.FC = () => {
           </div>
 
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
-            Schada does not end in checkmate. Instead, the game ends immediately the instant all remaining high pieces of a player reach the goal line, or if pieces are blocked!
+            Schada does not end in checkmate. Instead, the game ends immediately the instant all remaining high pieces of a player reach the goal line, or if pieces are blocked.
           </p>
 
           <div style={{ background: 'var(--bg-tertiary)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.5rem' }}>
@@ -1153,7 +1169,7 @@ export const RulesGuide: React.FC = () => {
             <div>
               <strong>Golden Tactical Tip</strong>
               <div style={{ fontSize: '0.86rem', marginTop: '0.2rem' }}>
-                Do not end the game by rushing your last high piece into the goal line if your opponent has more points in their goal than you! Maneuver, capture their incoming officers, and protect your high-value Field Officers first.
+                Do not end the game by rushing your last high piece into the goal line if your opponent has more points in their goal than you. Maneuver, capture their incoming officers, and protect your high-value Field Officers first.
               </div>
             </div>
           </div>

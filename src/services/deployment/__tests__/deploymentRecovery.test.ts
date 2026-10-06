@@ -6,7 +6,7 @@ vi.hoisted(() => {
       addEventListener: () => {},
       removeEventListener: () => {},
       dispatchEvent: () => true,
-      location: { reload: () => {} },
+      location: { reload: () => {}, pathname: '/' },
     };
   }
   if (typeof (globalThis as any).Event === 'undefined') {
@@ -36,6 +36,13 @@ import {
   shouldTriggerChunkReload,
   executeDebouncedReload,
   initDeploymentRecovery,
+  isUserInActiveGame,
+  checkVersionManifest,
+  isUpdateAvailable,
+  setUpdateAvailable,
+  onUpdateAvailable,
+  triggerUpdateReload,
+  getClientBuildTime,
 } from '../deploymentRecoveryService';
 
 describe('deploymentRecoveryConfig', () => {
@@ -44,6 +51,14 @@ describe('deploymentRecoveryConfig', () => {
     expect(DEPLOYMENT_RECOVERY_CONFIG.debounceCooldownMs).toBeGreaterThan(0);
     expect(DEPLOYMENT_RECOVERY_CONFIG.storageKey.length).toBeGreaterThan(0);
     expect(DEPLOYMENT_RECOVERY_CONFIG.chunkErrorPatterns.length).toBeGreaterThan(0);
+    expect(DEPLOYMENT_RECOVERY_CONFIG.swRegistrationUrl.startsWith('/')).toBe(true);
+    expect(DEPLOYMENT_RECOVERY_CONFIG.swScope.startsWith('/')).toBe(true);
+    expect(DEPLOYMENT_RECOVERY_CONFIG.swUpdateCheckIntervalMs).toBeGreaterThan(0);
+    expect(DEPLOYMENT_RECOVERY_CONFIG.versionCheckEndpoint.startsWith('/')).toBe(true);
+    expect(DEPLOYMENT_RECOVERY_CONFIG.versionCheckIntervalMs).toBeGreaterThan(0);
+    expect(DEPLOYMENT_RECOVERY_CONFIG.activeGamePathPrefix.startsWith('/')).toBe(true);
+    expect(DEPLOYMENT_RECOVERY_CONFIG.nonActiveMatchReloadDelayMs).toBeGreaterThanOrEqual(0);
+    expect(DEPLOYMENT_RECOVERY_CONFIG.initialBuildTimeFallback).toBeGreaterThanOrEqual(0);
   });
 
   it('throws when config is null or undefined', () => {
@@ -109,9 +124,87 @@ describe('deploymentRecoveryConfig', () => {
       })
     ).toThrow('Invalid chunkErrorPatterns[1]: expected non-empty string');
   });
+
+  it('throws on invalid swRegistrationUrl and swScope', () => {
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        swRegistrationUrl: 'sw.js',
+      })
+    ).toThrow('Invalid swRegistrationUrl: expected path starting with "/"');
+
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        swScope: 'game',
+      })
+    ).toThrow('Invalid swScope: expected path starting with "/"');
+  });
+
+  it('throws on invalid intervals or endpoints', () => {
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        swUpdateCheckIntervalMs: -10,
+      })
+    ).toThrow('Invalid swUpdateCheckIntervalMs: expected positive number');
+
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        versionCheckEndpoint: 'version.json',
+      })
+    ).toThrow('Invalid versionCheckEndpoint: expected path starting with "/"');
+
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        versionCheckIntervalMs: 0,
+      })
+    ).toThrow('Invalid versionCheckIntervalMs: expected positive number');
+
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        activeGamePathPrefix: 'game',
+      })
+    ).toThrow('Invalid activeGamePathPrefix: expected path starting with "/"');
+
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        nonActiveMatchReloadDelayMs: -1,
+      })
+    ).toThrow('Invalid nonActiveMatchReloadDelayMs: expected non-negative number');
+
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        initialBuildTimeFallback: -5,
+      })
+    ).toThrow('Invalid initialBuildTimeFallback: expected non-negative number');
+  });
 });
 
 describe('deploymentRecoveryService', () => {
+  describe('getClientBuildTime', () => {
+    it('returns valid fallback when global __APP_BUILD_TIME__ is undefined', () => {
+      const buildTime = getClientBuildTime(DEPLOYMENT_RECOVERY_CONFIG);
+      expect(typeof buildTime).toBe('number');
+      expect(buildTime).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('isUserInActiveGame', () => {
+    it('accurately identifies active game routes based on prefix', () => {
+      expect(isUserInActiveGame('/game/room-123')).toBe(true);
+      expect(isUserInActiveGame('/game/')).toBe(true);
+      expect(isUserInActiveGame('/')).toBe(false);
+      expect(isUserInActiveGame('/learn')).toBe(false);
+      expect(isUserInActiveGame('/terms')).toBe(false);
+    });
+  });
+
   describe('isDynamicChunkLoadError', () => {
     it('returns true for known Vite chunk import errors', () => {
       expect(
@@ -132,6 +225,10 @@ describe('deploymentRecoveryService', () => {
 
       expect(
         isDynamicChunkLoadError({ reason: { message: 'Failed to fetch dynamically imported module' } })
+      ).toBe(true);
+
+      expect(
+        isDynamicChunkLoadError(new Error('Unable to preload CSS for /assets/index.css'))
       ).toBe(true);
     });
 
@@ -163,6 +260,63 @@ describe('deploymentRecoveryService', () => {
     });
   });
 
+  describe('checkVersionManifest', () => {
+    it('returns true when remote buildTime is newer than currentBuildTime', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ version: '1.1.2', buildTime: 200000 }),
+      }) as any;
+
+      const result = await checkVersionManifest(100000);
+      expect(result).toBe(true);
+
+      globalThis.fetch = originalFetch;
+    });
+
+    it('returns false when remote buildTime is older or equal', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ version: '1.1.1', buildTime: 100000 }),
+      }) as any;
+
+      const result = await checkVersionManifest(100000);
+      expect(result).toBe(false);
+
+      globalThis.fetch = originalFetch;
+    });
+
+    it('handles fetch network errors gracefully', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error')) as any;
+
+      const result = await checkVersionManifest(100000);
+      expect(result).toBe(false);
+
+      globalThis.fetch = originalFetch;
+    });
+  });
+
+  describe('update available event bus', () => {
+    it('notifies listeners when update is available and unsubscribes cleanly', () => {
+      setUpdateAvailable(false);
+      expect(isUpdateAvailable()).toBe(false);
+
+      const listenerA = vi.fn();
+      const unsubscribe = onUpdateAvailable(listenerA);
+
+      setUpdateAvailable(true);
+      expect(isUpdateAvailable()).toBe(true);
+      expect(listenerA).toHaveBeenCalledTimes(1);
+
+      unsubscribe();
+      setUpdateAvailable(false);
+      setUpdateAvailable(true);
+      expect(listenerA).toHaveBeenCalledTimes(1); // not called again
+    });
+  });
+
   describe('executeDebouncedReload and initDeploymentRecovery', () => {
     const originalSessionStorage = globalThis.sessionStorage;
     let mockSessionStorage: Record<string, string> = {};
@@ -191,7 +345,7 @@ describe('deploymentRecoveryService', () => {
       });
 
       (globalThis as any).window = {
-        location: { reload: reloadMock },
+        location: { reload: reloadMock, pathname: '/' },
         addEventListener: (event: string, handler: Function) => {
           if (!listeners[event]) listeners[event] = [];
           listeners[event].push(handler);
@@ -228,6 +382,12 @@ describe('deploymentRecoveryService', () => {
       // Second immediate attempt should be debounced
       const secondResult = executeDebouncedReload();
       expect(secondResult).toBe(false);
+      expect(reloadMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('triggerUpdateReload calls executeDebouncedReload', () => {
+      const result = triggerUpdateReload();
+      expect(result).toBe(true);
       expect(reloadMock).toHaveBeenCalledTimes(1);
     });
 

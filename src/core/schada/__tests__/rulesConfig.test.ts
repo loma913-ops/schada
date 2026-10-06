@@ -104,4 +104,17 @@ describe('SCHADA_RULES_CONFIG', () => {
       /Invalid board defaultOrientation/
     );
   });
+
+  it('throws descriptive error if board base/goal rank indices are invalid or altered', () => {
+    const invalidRankIndicesConfig: SchadaRulesConfig = {
+      ...SCHADA_RULES_CONFIG,
+      board: {
+        ...SCHADA_RULES_CONFIG.board,
+        blueGoalRankIndex: 6, // invalid
+      },
+    };
+    expect(() => validateRulesConfig(invalidRankIndicesConfig)).toThrowError(
+      /Invalid board base\/goal rank indices/
+    );
+  });
 });

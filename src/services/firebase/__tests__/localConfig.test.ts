@@ -13,7 +13,7 @@ describe('localConfig', () => {
     expect(LOCAL_CONFIG.events.userStatusChanged).toBe('schada_user_status_changed');
     expect(LOCAL_CONFIG.events.profileUpdated).toBe('schada_profile_updated');
     expect(LOCAL_CONFIG.events.gameSyncChannel).toBe('schada_game_sync_channel');
-    expect(Object.keys(LOCAL_CONFIG.defaultUsers).length).toBe(3);
+    expect(Object.keys(LOCAL_CONFIG.defaultUsers).length).toBe(4);
   });
 
   it('throws when config is null or undefined', () => {
@@ -102,4 +102,11 @@ describe('localConfig', () => {
       })
     ).toThrow('Invalid defaultUsers entry for "mock-invalid": malformed UserProfile.');
   });
+
+  it('correctly configures default patron user mock-grandmaster', () => {
+    const gm = LOCAL_CONFIG.defaultUsers['mock-grandmaster'];
+    expect(gm.isPatron).toBe(true);
+    expect(gm.hasDonated).toBe(true);
+  });
 });
+

@@ -3,6 +3,7 @@ import {
   query,
   where,
   limit,
+  orderBy,
   getDocs,
   onSnapshot,
   type QueryConstraint,
@@ -11,7 +12,7 @@ import { db, isFirebaseConfigured } from './config';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { isGameTimedOut } from './gameClock';
 import { localGameStore } from './localGameStore';
-import type { GameRoom } from './gameTypes';
+import { type GameRoom, isGuestUser } from './gameTypes';
 import type { PieceColor } from '@/core/schada/types';
 
 let lobbyTimeoutHandler: ((id: string, color: PieceColor) => Promise<unknown>) | null = null;
@@ -104,6 +105,7 @@ export async function getOpenRooms(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
       where('status', 'in', includeInProgress ? ['waiting', 'in_progress'] : ['waiting']),
+      orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
     const snap = await getDocs(q);
@@ -143,6 +145,7 @@ export async function getInProgressRooms(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
       where('status', '==', 'in_progress'),
+      orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
     const snap = await getDocs(q);
@@ -191,6 +194,7 @@ export function subscribeToOpenRooms(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
       where('status', 'in', statuses),
+      orderBy('createdAt', 'desc'),
       limit(maxRooms)
     );
     return onSnapshot(
@@ -229,6 +233,16 @@ export async function findOpenWaitingGame(
   candidateLimit: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.targetedMatchCandidateLimit,
   isRanked?: boolean
 ): Promise<GameRoom | null> {
+  const isGuestSeeker = isGuestUser({ id: excludeUserId });
+
+  // Guests are strictly forbidden from participating in ranked games
+  if (isGuestSeeker && isRanked === true) {
+    return null;
+  }
+
+  // Force casual games only for guest matchmaking
+  const effectiveIsRanked = isGuestSeeker ? false : isRanked;
+
   if (isFirebaseConfigured() && db) {
     const constraints: QueryConstraint[] = [
       where('isPrivate', '==', false),
@@ -236,9 +250,10 @@ export async function findOpenWaitingGame(
       where('timeControlMinutes', '==', timeControlMinutes),
       where('incrementSeconds', '==', incrementSeconds),
     ];
-    if (typeof isRanked === 'boolean') {
-      constraints.push(where('isRanked', '==', isRanked));
+    if (typeof effectiveIsRanked === 'boolean') {
+      constraints.push(where('isRanked', '==', effectiveIsRanked));
     }
+    constraints.push(orderBy('createdAt', 'asc'));
     constraints.push(limit(candidateLimit));
     const q = query(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
@@ -261,7 +276,7 @@ export async function findOpenWaitingGame(
   const match = Object.values(all).find((r) => {
     if (r.isPrivate || r.status !== 'waiting') return false;
     if (r.timeControlMinutes !== timeControlMinutes || (r.incrementSeconds || 0) !== incrementSeconds) return false;
-    if (typeof isRanked === 'boolean' && r.isRanked !== isRanked) return false;
+    if (typeof effectiveIsRanked === 'boolean' && r.isRanked !== effectiveIsRanked) return false;
     const isHost =
       (r.bluePlayer && r.bluePlayer.id === excludeUserId) ||
       (r.greenPlayer && r.greenPlayer.id === excludeUserId);

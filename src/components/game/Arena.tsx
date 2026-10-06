@@ -16,6 +16,7 @@ import { GameOverModal, type PlayerEloUpdate } from './GameOverModal';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
+import { isPatronUser, type PatronTier, type PatronSubscriptionStatus } from '@/components/common/PatronBadge';
 
 /** Pure helper - defined at module scope so it is never re-created on render. */
 function getMaterialValue(pieces: Piece[]): number {
@@ -37,6 +38,11 @@ export interface ArenaPlayer {
   username: string;
   elo: number;
   gamesPlayed?: number;
+  isPatron?: boolean;
+  hasDonated?: boolean;
+  patronTier?: PatronTier;
+  patronExpiresAt?: string | null;
+  patronSubscriptionStatus?: PatronSubscriptionStatus;
 }
 
 interface ArenaProps {
@@ -162,6 +168,17 @@ export const Arena: React.FC<ArenaProps> = ({
 
       lastAudibleMoveIndexRef.current = Math.max(lastAudibleMoveIndexRef.current, incomingLen - 1);
       prevMoveCountRef.current = incomingLen;
+
+      // If incoming synced state matches our local optimistic state move count and game over status,
+      // it is a server echo of our own move - skip redundant re-rendering
+      if (
+        incomingLen === currentLocalLen &&
+        syncedGameState.isGameOver === gameStateRef.current.isGameOver
+      ) {
+        return;
+      }
+
+      gameStateRef.current = syncedGameState;
       setGameState(syncedGameState);
     }
   }, [syncedGameState]);
@@ -325,6 +342,7 @@ export const Arena: React.FC<ArenaProps> = ({
       }
 
       const nextState = executeMove(currentState, move);
+      gameStateRef.current = nextState;
       const newMoveIndex = nextState.moveHistory.length - 1;
       lastAudibleMoveIndexRef.current = newMoveIndex;
       prevMoveCountRef.current = nextState.moveHistory.length;
@@ -343,6 +361,7 @@ export const Arena: React.FC<ArenaProps> = ({
     }
 
     const nextState = executeMove(currentState, move);
+    gameStateRef.current = nextState;
     const newMoveIndex = nextState.moveHistory.length - 1;
     lastAudibleMoveIndexRef.current = newMoveIndex;
     prevMoveCountRef.current = nextState.moveHistory.length;
@@ -436,7 +455,7 @@ export const Arena: React.FC<ArenaProps> = ({
   // - Random-access history scrubbing for UI renders: O(1) constant time array lookup.
   const cumulativeGameStates = useMemo(() => {
     return computeCumulativeGameStates(gameState.moveHistory, gameState);
-  }, [gameState]);
+  }, [gameState.moveHistory, gameState.isGameOver]);
 
   const isViewingHistory =
     gameState.moveHistory.length > 0 && viewMoveIndex < gameState.moveHistory.length - 1;
@@ -524,6 +543,7 @@ export const Arena: React.FC<ArenaProps> = ({
           materialAdvantage={materialScores.topAdvantage > 0 ? materialScores.topAdvantage : undefined}
           isUser={userColor === topColor}
           isThinking={isBotThinking && displayedGameState.currentTurn === topColor}
+          isPatron={isPatronUser(topPlayer)}
         />
 
         {/* Board Component */}
@@ -555,6 +575,7 @@ export const Arena: React.FC<ArenaProps> = ({
           materialAdvantage={materialScores.bottomAdvantage > 0 ? materialScores.bottomAdvantage : undefined}
           isUser={userColor === bottomColor}
           isThinking={isBotThinking && displayedGameState.currentTurn === bottomColor}
+          isPatron={isPatronUser(bottomPlayer)}
         />
 
         {/* Mobile In-Game Action Bar */}

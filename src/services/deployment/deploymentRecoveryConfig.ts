@@ -2,8 +2,9 @@
  * Deployment Recovery Configuration and Error Handlers.
  *
  * Centralizes configuration for detecting chunk load failures after
- * new client deployments, debouncing auto-reload loops, and tracking
- * recovery storage keys.
+ * new client deployments, debouncing auto-reload loops, tracking
+ * recovery storage keys, service worker update polling, version
+ * manifest verification, and active gameplay reload deferral timers.
  * Validates configuration to eliminate hard-coded fallback values.
  */
 
@@ -18,6 +19,14 @@ export interface DeploymentRecoveryConfig {
   readonly storageKey: string;
   readonly debounceCooldownMs: number;
   readonly chunkErrorPatterns: readonly string[];
+  readonly swRegistrationUrl: string;
+  readonly swScope: string;
+  readonly swUpdateCheckIntervalMs: number;
+  readonly versionCheckEndpoint: string;
+  readonly versionCheckIntervalMs: number;
+  readonly activeGamePathPrefix: string;
+  readonly nonActiveMatchReloadDelayMs: number;
+  readonly initialBuildTimeFallback: number;
 }
 
 /**
@@ -66,6 +75,86 @@ export function validateDeploymentRecoveryConfig(config: DeploymentRecoveryConfi
       );
     }
   }
+
+  if (
+    typeof config.swRegistrationUrl !== 'string' ||
+    config.swRegistrationUrl.trim().length === 0 ||
+    !config.swRegistrationUrl.startsWith('/')
+  ) {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid swRegistrationUrl: expected path starting with "/", received "${config.swRegistrationUrl}".`
+    );
+  }
+
+  if (
+    typeof config.swScope !== 'string' ||
+    config.swScope.trim().length === 0 ||
+    !config.swScope.startsWith('/')
+  ) {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid swScope: expected path starting with "/", received "${config.swScope}".`
+    );
+  }
+
+  if (
+    typeof config.swUpdateCheckIntervalMs !== 'number' ||
+    isNaN(config.swUpdateCheckIntervalMs) ||
+    config.swUpdateCheckIntervalMs <= 0
+  ) {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid swUpdateCheckIntervalMs: expected positive number, received ${config.swUpdateCheckIntervalMs}.`
+    );
+  }
+
+  if (
+    typeof config.versionCheckEndpoint !== 'string' ||
+    config.versionCheckEndpoint.trim().length === 0 ||
+    !config.versionCheckEndpoint.startsWith('/')
+  ) {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid versionCheckEndpoint: expected path starting with "/", received "${config.versionCheckEndpoint}".`
+    );
+  }
+
+  if (
+    typeof config.versionCheckIntervalMs !== 'number' ||
+    isNaN(config.versionCheckIntervalMs) ||
+    config.versionCheckIntervalMs <= 0
+  ) {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid versionCheckIntervalMs: expected positive number, received ${config.versionCheckIntervalMs}.`
+    );
+  }
+
+  if (
+    typeof config.activeGamePathPrefix !== 'string' ||
+    config.activeGamePathPrefix.trim().length === 0 ||
+    !config.activeGamePathPrefix.startsWith('/')
+  ) {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid activeGamePathPrefix: expected path starting with "/", received "${config.activeGamePathPrefix}".`
+    );
+  }
+
+  if (
+    typeof config.nonActiveMatchReloadDelayMs !== 'number' ||
+    isNaN(config.nonActiveMatchReloadDelayMs) ||
+    config.nonActiveMatchReloadDelayMs < 0
+  ) {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid nonActiveMatchReloadDelayMs: expected non-negative number, received ${config.nonActiveMatchReloadDelayMs}.`
+    );
+  }
+
+  if (
+    typeof config.initialBuildTimeFallback !== 'number' ||
+    isNaN(config.initialBuildTimeFallback) ||
+    config.initialBuildTimeFallback < 0
+  ) {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid initialBuildTimeFallback: expected non-negative number, received ${config.initialBuildTimeFallback}.`
+    );
+  }
 }
 
 export const DEPLOYMENT_RECOVERY_CONFIG: DeploymentRecoveryConfig = Object.freeze({
@@ -76,7 +165,19 @@ export const DEPLOYMENT_RECOVERY_CONFIG: DeploymentRecoveryConfig = Object.freez
     'error loading dynamically imported module',
     'Importing a module script failed',
     'error loading dynamically imported module script',
+    'Unable to preload CSS',
+    'failed to load module script',
+    'Loading chunk',
+    'Load failed',
   ]),
+  swRegistrationUrl: '/sw.js',
+  swScope: '/',
+  swUpdateCheckIntervalMs: 120000, // 2 minutes
+  versionCheckEndpoint: '/version.json',
+  versionCheckIntervalMs: 120000, // 2 minutes
+  activeGamePathPrefix: '/game/',
+  nonActiveMatchReloadDelayMs: 500,
+  initialBuildTimeFallback: 0,
 });
 
 // Immediately validate deployment recovery configuration at module load time

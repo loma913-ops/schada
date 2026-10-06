@@ -7,6 +7,8 @@ import { safeSetItem } from '@/services/storage/storageCleanup';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
 import { useNavigate } from 'react-router-dom';
+import { isPatronUser } from '@/components/common/PatronBadge';
+import { isGuestUser } from '@/services/firebase/gameTypes';
 
 interface CreateRoomModalProps {
   isOpen: boolean;
@@ -16,7 +18,7 @@ interface CreateRoomModalProps {
 export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isGuest = !user;
+  const isGuest = isGuestUser(user);
 
   const [timeControl, setTimeControl] = useState<number>(FORMAT_CONFIG.defaultMatchMinutes);
   const [increment, setIncrement] = useState<number>(FORMAT_CONFIG.defaultIncrementSeconds);
@@ -45,18 +47,27 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
           ? storedGuestName
           : MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
 
+      const isDonor = isPatronUser(user);
+
       const creator = user
         ? {
             id: user.id,
             username: user.username,
             elo: user.eloRating,
             gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+            isPatron: isDonor,
+            hasDonated: isDonor,
+            patronTier: user.patronTier,
+            patronExpiresAt: user.patronExpiresAt,
+            patronSubscriptionStatus: user.patronSubscriptionStatus,
           }
         : {
             id: guestId,
             username: guestName,
             elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
             gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
+            isPatron: false,
+            hasDonated: false,
           };
 
       const result = await createGame({
@@ -170,7 +181,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                   title={isGuest ? 'Sign in to play Ranked matches' : undefined}
                   onClick={() => !isGuest && setIsRanked(true)}
                 >
-                  Ranked (Elo) {isGuest && <span className="auth-required-badge">(Account required)</span>}
+                  Ranked (Elo) {isGuest && <span className="auth-required-badge">{MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedBadgeText}</span>}
                 </button>
                 <button
                   type="button"

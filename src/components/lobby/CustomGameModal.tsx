@@ -3,6 +3,8 @@ import { X, Play } from 'lucide-react';
 import type { PieceColor } from '@/core/schada/types';
 import { useAuth } from '@/context/AuthContext';
 import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { isGuestUser } from '@/services/firebase/gameTypes';
 
 interface CustomGameModalProps {
   isOpen: boolean;
@@ -16,7 +18,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
   onCreateGame,
 }) => {
   const { user } = useAuth();
-  const isGuest = !user;
+  const isGuest = isGuestUser(user);
 
   const [minutes, setMinutes] = useState(FORMAT_CONFIG.defaultMatchMinutes);
   const [increment, setIncrement] = useState(FORMAT_CONFIG.defaultIncrementSeconds);
@@ -105,7 +107,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
               title={isGuest ? 'Sign in to play Ranked matches' : undefined}
               onClick={() => !isGuest && setIsRanked(true)}
             >
-              Ranked (Elo) {isGuest && <span className="auth-required-badge">(Account required)</span>}
+              Ranked (Elo) {isGuest && <span className="auth-required-badge">{MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedBadgeText}</span>}
             </button>
             <button
               type="button"

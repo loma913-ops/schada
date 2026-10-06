@@ -6,6 +6,7 @@ import {
   executeMove,
   createEmptyBoard,
   isSquareAttacked,
+  getPiecesUnderAttack,
   isMutualShuffling,
   areNonGoalHighPiecesBlocked,
   isPieceObstructedByEnemy,
@@ -427,6 +428,105 @@ describe('Schada Game Engine', () => {
 
       // Officer cannot jump enemy blocker
       expect(isSquareAttacked(board, 'a3', 'blue')).toBe(false);
+    });
+  });
+
+  describe('getPiecesUnderAttack', () => {
+    it('returns empty set in the initial game state as no pieces can be captured yet', () => {
+      const state = createInitialGameState();
+      const attacked = getPiecesUnderAttack(state.board);
+      expect(attacked.size).toBe(0);
+    });
+
+    it('identifies an enemy piece threatened by an opposing piece', () => {
+      const board = createEmptyBoard();
+      // Blue Field Officer on a1 (vector to a3)
+      board['a1'] = {
+        id: 'blue_fo',
+        type: 'field_officer',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+      // Green pawn on a3
+      board['a3'] = {
+        id: 'green_pawn',
+        type: 'pawn',
+        color: 'green',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+
+      const attacked = getPiecesUnderAttack(board);
+      expect(attacked.has('a3')).toBe(true);
+      expect(attacked.has('a1')).toBe(false);
+      expect(attacked.size).toBe(1);
+    });
+
+    it('excludes high pieces that safely reside in their goal line (immune to capture)', () => {
+      const board = createEmptyBoard();
+      // Green piece threatening a8
+      board['a6'] = {
+        id: 'green_pawn',
+        type: 'pawn',
+        color: 'green',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+      // Blue Field Officer safely in its goal rank (rank 8 / row 7)
+      board['a8'] = {
+        id: 'blue_fo',
+        type: 'field_officer',
+        color: 'blue',
+        hasLeftBase: true,
+        hasReachedGoal: true,
+      };
+
+      const attacked = getPiecesUnderAttack(board);
+      // Even if geometrically targeted, high pieces in goal are immune to capture
+      expect(attacked.has('a8')).toBe(false);
+      expect(attacked.size).toBe(0);
+    });
+
+    it('identifies attacked pieces for both sides simultaneously', () => {
+      const board = createEmptyBoard();
+      // Blue Field Officer on a1 targeting a3
+      board['a1'] = {
+        id: 'blue_fo',
+        type: 'field_officer',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+      // Green pawn on a3 (targeted by a1)
+      board['a3'] = {
+        id: 'green_pawn',
+        type: 'pawn',
+        color: 'green',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+      // Green piece on h8 targeting h6
+      board['h8'] = {
+        id: 'green_officer',
+        type: 'officer',
+        color: 'green',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+      // Blue pawn on h6 (targeted by h8)
+      board['h6'] = {
+        id: 'blue_pawn',
+        type: 'pawn',
+        color: 'blue',
+        hasLeftBase: false,
+        hasReachedGoal: false,
+      };
+
+      const attacked = getPiecesUnderAttack(board);
+      expect(attacked.has('a3')).toBe(true);
+      expect(attacked.has('h6')).toBe(true);
+      expect(attacked.size).toBe(2);
     });
   });
 

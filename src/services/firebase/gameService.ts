@@ -14,6 +14,9 @@ import { createInitialGameState } from '@/core/schada/engine';
 import { updateUserStats } from './authService';
 import type { UserProfile } from './localProvider';
 import { safeSetItem } from '../storage/storageCleanup';
+import { ELO_CONFIG } from '@/core/elo/eloConfig';
+import { isPatronUser } from '@/components/common/PatronBadge';
+import type { ArenaPlayer } from './gameTypes';
 
 // Re-exported modular domain services
 export * from './gameTypes';
@@ -26,6 +29,7 @@ export * from './gameCleanupService';
 
 import {
   ABANDONED_GAME_EXPIRY_MS,
+  isGuestUser,
   type GamePlayer,
   type GameRoom,
   type CreateGameParams,
@@ -93,14 +97,19 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
     id: params.creator.id,
     username: params.creator.username,
     elo: params.creator.elo,
-    gamesPlayed: typeof params.creator.gamesPlayed === 'number' ? params.creator.gamesPlayed : 0,
+    gamesPlayed:
+      typeof params.creator.gamesPlayed === 'number'
+        ? params.creator.gamesPlayed
+        : ELO_CONFIG.defaultAssumedGamesPlayed,
     sessionToken,
+    isPatron: isPatronUser(params.creator),
+    hasDonated: Boolean(params.creator.hasDonated || params.creator.isPatron),
+    patronTier: params.creator.patronTier,
+    patronExpiresAt: params.creator.patronExpiresAt,
+    patronSubscriptionStatus: params.creator.patronSubscriptionStatus,
   };
 
-  const isGuest =
-    !params.creator?.id ||
-    params.creator.id.startsWith('guest_') ||
-    params.creator.id === 'guest';
+  const isGuest = isGuestUser(params.creator);
   const isRanked = isGuest ? false : Boolean(params.isRanked);
 
   const initialBoard = createInitialGameState();
@@ -137,7 +146,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
 
 export async function joinGame(
   gameId: string,
-  user: { id: string; username: string; elo: number; gamesPlayed?: number }
+  user: ArenaPlayer
 ): Promise<JoinGameResult> {
   const existingToken = getLocalSessionToken(gameId);
 
@@ -150,6 +159,15 @@ export async function joinGame(
         return { success: false, role: 'spectator', error: 'Game not found.' };
       }
       const game = snap.data() as GameRoom;
+
+      // Guests are strictly forbidden from playing in ranked games
+      if (game.isRanked && isGuestUser(user)) {
+        return {
+          success: false,
+          role: 'spectator',
+          error: MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedErrorMessage,
+        };
+      }
 
       // Check if existing token matches already assigned player
       if (existingToken) {
@@ -182,8 +200,16 @@ export async function joinGame(
           id: user.id,
           username: user.username,
           elo: user.elo,
-          gamesPlayed: typeof user.gamesPlayed === 'number' ? user.gamesPlayed : 0,
+          gamesPlayed:
+            typeof user.gamesPlayed === 'number'
+              ? user.gamesPlayed
+              : ELO_CONFIG.defaultAssumedGamesPlayed,
           sessionToken: newToken,
+          isPatron: isPatronUser(user),
+          hasDonated: Boolean(user.hasDonated || user.isPatron),
+          patronTier: user.patronTier,
+          patronExpiresAt: user.patronExpiresAt,
+          patronSubscriptionStatus: user.patronSubscriptionStatus,
         };
 
         let assignedColor: PieceColor;
@@ -215,6 +241,15 @@ export async function joinGame(
     return { success: false, role: 'spectator', error: 'Game not found.' };
   }
 
+  // Guests are strictly forbidden from playing in ranked games
+  if (game.isRanked && isGuestUser(user)) {
+    return {
+      success: false,
+      role: 'spectator',
+      error: MULTIPLAYER_SCALE_CONFIG.matchmaking.guestRankedErrorMessage,
+    };
+  }
+
   if (existingToken) {
     if (game.bluePlayer && game.bluePlayer.sessionToken === existingToken) {
       return { success: true, role: 'player', color: 'blue', sessionToken: existingToken };
@@ -243,8 +278,16 @@ export async function joinGame(
       id: user.id,
       username: user.username,
       elo: user.elo,
-      gamesPlayed: typeof user.gamesPlayed === 'number' ? user.gamesPlayed : 0,
+      gamesPlayed:
+        typeof user.gamesPlayed === 'number'
+          ? user.gamesPlayed
+          : ELO_CONFIG.defaultAssumedGamesPlayed,
       sessionToken: newToken,
+      isPatron: isPatronUser(user),
+      hasDonated: Boolean(user.hasDonated || user.isPatron),
+      patronTier: user.patronTier,
+      patronExpiresAt: user.patronExpiresAt,
+      patronSubscriptionStatus: user.patronSubscriptionStatus,
     };
 
     let assignedColor: PieceColor;
@@ -318,23 +361,27 @@ export function subscribeToGame(
 export async function makeGameMove(
   gameId: string,
   move: Move,
-  playerColor: PieceColor
+  playerColor: PieceColor,
+  currentGame?: GameRoom
 ): Promise<void> {
   const now = Date.now();
 
   if (isFirebaseConfigured() && db) {
     const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) {
-      throw new Error('Game not found.');
+    let game = currentGame;
+    if (!game) {
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) {
+        throw new Error('Game not found.');
+      }
+      game = snap.data() as GameRoom;
     }
-    const game = snap.data() as GameRoom;
     const updatePayload = computeMoveTransition(game, move, playerColor, now);
     await updateDoc(docRef, sanitize(updatePayload));
     return;
   }
 
-  const game = localGameStore.get(gameId);
+  const game = currentGame || localGameStore.get(gameId);
   if (!game) {
     throw new Error('Game is not in progress.');
   }

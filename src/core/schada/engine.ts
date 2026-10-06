@@ -284,6 +284,98 @@ export function isSquareAttacked(
 }
 
 /**
+ * Detects all squares containing pieces that are currently threatened with legal capture
+ * by an opponent's piece.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(P * V) = O(P), where P <= 32 is the count of active pieces on the board
+ *   and V <= 4 is the constant maximum number of vectors per square.
+ *   Operates in a single pass over active pieces, avoiding redundant O(P * N) nested scans.
+ * - Space Complexity: O(T), where T <= P is the number of threatened squares added to the Set.
+ *
+ * Rules & Edge Cases:
+ * - Both Blue and Green pieces under attack are included.
+ * - High pieces inside their goal rank are immune to capture and are therefore excluded.
+ * - Respects base line / goal line movement constraints and intermediate path leaps/obstructions.
+ */
+export function getPiecesUnderAttack(board: BoardMatrix): Set<Square> {
+  const attackedSquares = new Set<Square>();
+
+  for (const [sq, piece] of Object.entries(board)) {
+    if (!piece) continue;
+    const fromSquare = sq as Square;
+    const [fromCol, fromRow] = squareToColRow(fromSquare);
+    const color = piece.color;
+    const isHighPiece = piece.type === 'field_officer' || piece.type === 'officer';
+    const baseRank = color === 'blue' ? 0 : 7;
+    const goalRank = color === 'blue' ? 7 : 0;
+
+    const vectors = SCHADA_VECTORS[fromSquare];
+    if (!vectors) continue;
+
+    for (const vector of vectors) {
+      const [dc, dr] = vector.target;
+      const destCol = fromCol + dc;
+      const destRow = fromRow + dr;
+
+      // 1. Boundary check: destination must reside on the 8x8 grid
+      if (destCol < 0 || destCol > 7 || destRow < 0 || destRow > 7) {
+        continue;
+      }
+
+      const destSquare = colRowToSquare(destCol, destRow)!;
+      const destPiece = board[destSquare];
+
+      // 2. Only squares occupied by opponent pieces can be under attack
+      if (!destPiece || destPiece.color === color) {
+        continue;
+      }
+
+      // 3. High pieces in their goal line are IMMUNE to capture
+      const isTargetHighPiece = destPiece.type === 'field_officer' || destPiece.type === 'officer';
+      const enemyGoalRank = destPiece.color === 'blue' ? 7 : 0;
+      if (isTargetHighPiece && destRow === enemyGoalRank) {
+        continue;
+      }
+
+      // 4. Base Line Restriction:
+      // Once an attacking high piece leaves its base line, it cannot return to it
+      if (isHighPiece && piece.hasLeftBase && destRow === baseRank) {
+        continue;
+      }
+
+      // 5. Goal Line Restriction:
+      // Once an attacking high piece reaches its goal line, it cannot leave its goal line
+      if (isHighPiece && piece.hasReachedGoal && destRow !== goalRank) {
+        continue;
+      }
+
+      // 6. Validate intermediate path obstruction
+      let blocked = false;
+      for (const [stepDc, stepDr] of vector.path) {
+        const stepCol = fromCol + stepDc;
+        const stepRow = fromRow + stepDr;
+        const stepSq = colRowToSquare(stepCol, stepRow)!;
+        const occupant = board[stepSq];
+        if (occupant) {
+          if (piece.type === 'field_officer' && occupant.color === color) {
+            continue; // Field officer friendly leap allowed
+          }
+          blocked = true;
+          break;
+        }
+      }
+
+      if (!blocked) {
+        attackedSquares.add(destSquare);
+      }
+    }
+  }
+
+  return attackedSquares;
+}
+
+/**
  * Checks if all remaining high pieces of a player have reached their goal line.
  */
 export function haveAllRemainingHighPiecesReachedGoal(board: BoardMatrix, color: PieceColor): boolean {

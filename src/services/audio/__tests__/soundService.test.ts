@@ -251,10 +251,17 @@ describe('SoundService', () => {
     (globalThis as any).Audio = savedAudio;
   });
 
-  it('immediately plays from HTMLAudioElement pool when AudioContext is suspended on desktop', () => {
+  it('resumes AudioContext and plays buffer when AudioContext is suspended on desktop', async () => {
     const mockResume = vi.fn().mockResolvedValue(undefined);
+    const mockStart = vi.fn();
     class SuspendedContext {
       state = 'suspended';
+      createBufferSource = vi.fn().mockReturnValue({
+        connect: vi.fn(),
+        start: mockStart,
+        disconnect: vi.fn(),
+        onended: null,
+      });
       createGain = vi.fn();
       createOscillator = vi.fn();
       decodeAudioData = vi.fn().mockResolvedValue({} as AudioBuffer);
@@ -269,12 +276,46 @@ describe('SoundService', () => {
     }
 
     const service = new SoundService();
+    (service as any).ensureContext();
+    (service as any).moveBuffer = {} as AudioBuffer;
+
     service.playMove();
 
     // Verify background resume was triggered
     expect(mockResume).toHaveBeenCalled();
 
-    // Verify audio element from pool was played immediately
+    // Allow async resume to resolve
+    await Promise.resolve();
+
+    // Verify buffer was played directly once resumed without HTML5 fallback
+    expect(mockStart).toHaveBeenCalled();
+  });
+
+  it('falls back to HTMLAudioElement when AudioContext resume fails', async () => {
+    const mockResume = vi.fn().mockRejectedValue(new Error('Autoplay blocked'));
+    class FailedResumeContext {
+      state = 'suspended';
+      createGain = vi.fn();
+      createOscillator = vi.fn();
+      destination = {};
+      resume = mockResume;
+      currentTime = 0;
+    }
+
+    (globalThis as any).AudioContext = FailedResumeContext;
+    if (globalThis.window) {
+      (globalThis.window as any).AudioContext = FailedResumeContext;
+    }
+
+    const service = new SoundService();
+    service.playMove();
+
+    expect(mockResume).toHaveBeenCalled();
+
+    // Allow promise rejection to propagate to .catch
+    await Promise.resolve();
+    await Promise.resolve();
+
     const playedInstance = MockAudio.instances.find((inst) => inst.play.mock.calls.length > 0);
     expect(playedInstance).toBeDefined();
   });

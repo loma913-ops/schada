@@ -15,6 +15,30 @@ import {
 import { db, isFirebaseConfigured } from './config';
 import { localBackend, type UserProfile, type LocalFriendRequest } from './localProvider';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
+import { isPatronUser } from '@/components/common/PatronBadge';
+import { safeGetItem, safeSetItem } from '@/services/storage/storageCleanup';
+
+// ---------------------------------------------------------------------------
+// In-memory friends profile cache
+// ---------------------------------------------------------------------------
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+  inflight?: Promise<T>;
+}
+const friendsCache = new Map<string, CacheEntry<UserProfile[]>>();
+const friendsInflight = new Map<string, Promise<UserProfile[]>>();
+
+/** Evicts the cached friends list for a specific user. Call after any friendship mutation. */
+export function invalidateFriendsCache(userId: string): void {
+  friendsCache.delete(userId);
+}
+
+// ---------------------------------------------------------------------------
+// Username search LRU cache (in-memory, 60s TTL)
+// ---------------------------------------------------------------------------
+const searchCache = new Map<string, { result: UserProfile | null; expiresAt: number }>();
+
 
 export async function searchUserByExactUsername(
   username: string
@@ -22,6 +46,13 @@ export async function searchUserByExactUsername(
   const clean = username.trim().toLowerCase();
   if (!clean) return null;
 
+  // Username search LRU cache: avoid re-querying the same term within TTL
+  const cached = searchCache.get(clean);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.result;
+  }
+
+  let result: UserProfile | null = null;
   if (isFirebaseConfigured() && db) {
     const q = query(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
@@ -29,13 +60,16 @@ export async function searchUserByExactUsername(
       limit(1)
     );
     const snap = await getDocs(q);
-    if (!snap.empty) {
-      return snap.docs[0].data() as UserProfile;
-    }
-    return null;
+    result = snap.empty ? null : (snap.docs[0].data() as UserProfile);
+  } else {
+    result = localBackend.findUserByExactUsername(clean);
   }
 
-  return localBackend.findUserByExactUsername(clean);
+  searchCache.set(clean, {
+    result,
+    expiresAt: Date.now() + MULTIPLAYER_SCALE_CONFIG.presence.usernameSearchCacheTtlMs,
+  });
+  return result;
 }
 
 export async function sendFriendRequest(
@@ -65,19 +99,34 @@ export async function sendFriendRequest(
       throw new Error('Friend request already sent.');
     }
 
+    const isDonor = isPatronUser(currentUser);
     const docRef = await addDoc(collection(db, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), {
       fromUserId: currentUser.id,
       fromUsername: currentUser.username,
+      fromUserIsPatron: isDonor,
+      fromUserPatronTier: currentUser.patronTier ?? null,
+      fromUserPatronExpiresAt: currentUser.patronExpiresAt ?? null,
+      fromUserPatronSubscriptionStatus: currentUser.patronSubscriptionStatus ?? null,
       toUserId: targetUser.id,
       toUsername: targetUser.username,
       status: 'pending',
       createdAt: serverTimestamp(),
     });
 
+    // Invalidate cached friends list for both parties since a request was sent
+    invalidateFriendsCache(currentUser.id);
+    invalidateFriendsCache(targetUser.id);
+    // Also evict the search cache entry so a fresh profile is read on next lookup
+    searchCache.delete(targetUser.username.trim().toLowerCase());
+
     return {
       id: docRef.id,
       fromUserId: currentUser.id,
       fromUsername: currentUser.username,
+      fromUserIsPatron: isDonor,
+      fromUserPatronTier: currentUser.patronTier,
+      fromUserPatronExpiresAt: currentUser.patronExpiresAt,
+      fromUserPatronSubscriptionStatus: currentUser.patronSubscriptionStatus,
       toUserId: targetUser.id,
       toUsername: targetUser.username,
       status: 'pending',
@@ -115,6 +164,8 @@ export async function respondToFriendRequest(
         { since: serverTimestamp() }
       );
       await batch.commit();
+      invalidateFriendsCache(fromUserId);
+      invalidateFriendsCache(toUserId);
     } else {
       await updateDoc(reqRef, {
         status: 'declined',
@@ -142,41 +193,76 @@ export async function respondToFriendRequest(
  */
 export async function getFriendsList(userId: string): Promise<UserProfile[]> {
   if (isFirebaseConfigured() && db) {
-    // Primary: read the userFriends subcollection (fast path)
-    const friendsSnap = await getDocs(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends));
-    const knownFriendIds = new Set(friendsSnap.docs.map((d) => d.id));
+    // In-memory cache: return immediately if within TTL
+    const now = Date.now();
+    const cacheHit = friendsCache.get(userId);
+    if (cacheHit && now < cacheHit.expiresAt) return cacheHit.value;
 
-    // Migration fallback: only check legacy friendRequests if no friends were found in subcollection
-    if (knownFriendIds.size === 0) {
-      const [sentSnap, receivedSnap] = await Promise.all([
-        getDocs(query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('fromUserId', '==', userId), where('status', '==', 'accepted'))),
-        getDocs(query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('toUserId',   '==', userId), where('status', '==', 'accepted'))),
-      ]);
+    // In-flight deduplication: coalesce concurrent calls for the same userId
+    const existing = friendsInflight.get(userId);
+    if (existing) return existing;
 
-      const backfillBatch = writeBatch(db!);
-      let backfillCount = 0;
-      for (const reqDoc of [...sentSnap.docs, ...receivedSnap.docs]) {
-        const data = reqDoc.data();
-        const friendId = data.fromUserId === userId ? data.toUserId : data.fromUserId;
-        if (!knownFriendIds.has(friendId)) {
-          knownFriendIds.add(friendId);
-          backfillBatch.set(
-            doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, friendId),
-            { since: serverTimestamp() }
-          );
-          backfillBatch.set(
-            doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, friendId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, userId),
-            { since: serverTimestamp() }
-          );
-          backfillCount += 2;
-        }
-      }
-      if (backfillCount > 0) {
-        backfillBatch.commit().catch(console.error);
+    const fetchPromise = _fetchFriendsList(userId).then((profiles) => {
+      friendsCache.set(userId, {
+        value: profiles,
+        expiresAt: Date.now() + MULTIPLAYER_SCALE_CONFIG.presence.friendsCacheTtlMs,
+      });
+      friendsInflight.delete(userId);
+      return profiles;
+    }).catch((err) => {
+      friendsInflight.delete(userId);
+      throw err;
+    });
+    friendsInflight.set(userId, fetchPromise);
+    return fetchPromise;
+  }
+
+  return localBackend.getFriends(userId);
+}
+
+async function _fetchFriendsList(userId: string): Promise<UserProfile[]> {
+  if (!db) return [];
+
+  const MIGRATION_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.legacyFriendsMigratedPrefix + userId;
+  const alreadyMigrated = safeGetItem(MIGRATION_KEY) === '1';
+
+  // Primary: read the userFriends subcollection (fast path)
+  const friendsSnap = await getDocs(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends));
+  const knownFriendIds = new Set(friendsSnap.docs.map((d) => d.id));
+
+  // Migration fallback: only check legacy friendRequests if no friends found AND not yet migrated
+  if (knownFriendIds.size === 0 && !alreadyMigrated) {
+    const [sentSnap, receivedSnap] = await Promise.all([
+      getDocs(query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('fromUserId', '==', userId), where('status', '==', 'accepted'))),
+      getDocs(query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('toUserId',   '==', userId), where('status', '==', 'accepted'))),
+    ]);
+
+    const backfillBatch = writeBatch(db!);
+    let backfillCount = 0;
+    for (const reqDoc of [...sentSnap.docs, ...receivedSnap.docs]) {
+      const data = reqDoc.data();
+      const friendId = data.fromUserId === userId ? data.toUserId : data.fromUserId;
+      if (!knownFriendIds.has(friendId)) {
+        knownFriendIds.add(friendId);
+        backfillBatch.set(
+          doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, friendId),
+          { since: serverTimestamp() }
+        );
+        backfillBatch.set(
+          doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, friendId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, userId),
+          { since: serverTimestamp() }
+        );
+        backfillCount += 2;
       }
     }
+    if (backfillCount > 0) {
+      backfillBatch.commit().catch(console.error);
+    }
+    // Record migration as complete so subsequent polls skip the two legacy queries
+    safeSetItem(MIGRATION_KEY, '1');
+  }
 
-    if (knownFriendIds.size === 0) return [];
+  if (knownFriendIds.size === 0) return [];
 
     // Fetch friend profiles in batched queries of up to friendBatchLookupSize IDs instead of N individual getDoc calls
     const friendIdList = [...knownFriendIds];
@@ -207,10 +293,8 @@ export async function getFriendsList(userId: string): Promise<UserProfile[]> {
     }
 
     return profiles;
-  }
-
-  return localBackend.getFriends(userId);
 }
+
 
 
 export async function removeFriend(userId: string, friendId: string): Promise<void> {
@@ -219,6 +303,8 @@ export async function removeFriend(userId: string, friendId: string): Promise<vo
     batch.delete(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, friendId));
     batch.delete(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, friendId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, userId));
     await batch.commit();
+    invalidateFriendsCache(userId);
+    invalidateFriendsCache(friendId);
     return;
   }
 

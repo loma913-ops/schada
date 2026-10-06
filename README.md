@@ -31,7 +31,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
   - **Pawn (8 per side)**: Support blocker. Can capture and move according to square vectors, but cannot score goal points.
 - **Base Line & Goal Line Restrictions**:
   - High pieces can shuffle along their base line, but once they leave it, they **cannot return**.
-  - Once high pieces reach their goal line (Rank 8 for Blue, Rank 1 for Green), they **cannot leave**, and are **immune to enemy capture**.
+  - Once high pieces reach their goal line (Rank 8 for Blue, Rank 1 for Green), they **cannot leave**, and are **immune to enemy capture** (marked with a gold shield badge).
 - **Victory & Scoring**:
   - The game concludes when all surviving high pieces of a player reach their goal line, upon opponent piece elimination or immobilization (no legal moves), 3-fold repetition, 6-ply mutual high-piece base/goal shuffling, or when high pieces outside the goal are blocked by enemy pieces.
   - Scoring is determined by goal line points ($\text{Field Officer} = 2, \text{Officer} = 1$).
@@ -45,16 +45,21 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Historical End-Condition Engine**: Bilateral goal reached, piece elimination, 3-fold repetition, mutual shuffle, and enemy blockades.
 - **Move History Navigator & Replay Controls**: Stepping controls and keyboard shortcuts to review board positions.
 - **Comprehensive Match Stats & Post-Game Elo Summary**: Game-over modal with synchronized rating point deltas and match details.
-- **Competitive Integrity & Matchmaking Separation**: Strict rated and casual matchmaking separation for authenticated users and guests.
+- **Competitive Integrity & Guest Ranked Restriction**: Guests are strictly prohibited from participating in ranked matches; rated play requires an authenticated account.
 - **Lichess-Inspired Minimalist UX**: Responsive arena with clocks, notation, controls, and dark/light mode.
-- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves with lightweight atomic Firestore updates and snapshot reconciliation.
-- **Cross-Platform Hybrid Audio Engine**: Web Audio API with realistic synthesized fallbacks and zero-latency desktop and mobile playback.
+- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves with direct atomic updates bypassing redundant document reads and deduplicated server-echo reconciliation.
+- **Cross-Platform Hybrid Audio Engine**: Web Audio API with immediate transient attack playback, realistic synthesized fallbacks, and zero-latency desktop and mobile sound.
 - **Authoritative Symmetrical Elo Engine**: Immutable initial/final Elo ratings and deltas stored in match documents for symmetrical cross-client synchronization.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
-- **Zero-Friction Deployment Recovery**: Automatic chunk failure detection and session refresh post-deployment.
-- **Optimized Firestore CRUD Architecture**: Direct atomic updates without heavy locks and throttled presence updates.
+- **Zero-Cache Deployment & Session Recovery**: Immediate cache bypass, background service worker updates, and seamless auto-recovery without hard reload.
+- **Optimized Firestore CRUD Architecture**: Composite index-aligned FIFO lobby/matchmaking queries, localStorage SWR leaderboard cache with immediate Elo-change invalidation, in-memory friends profile and username search caches, time-bounded cleanup queries, and self-healing ordered Elo reconciliation with automatic fallback.
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 - **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
+- **Threat Detection Indicators**: Real-time visual attack badges on vulnerable pieces with toggleable player preferences.
+- **Goal Invulnerability Shield Badges**: Golden shield badges displayed on goal-line high pieces denoting capture immunity.
+- **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.
+- **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
+- **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.
 
 ---
 
@@ -124,7 +129,7 @@ cd schada
 # 2. Install dependencies
 npm install
 
-# 3. Run unit test suite (31 test suites, 262+ tests)
+# 3. Run unit test suite (47 test suites, 420+ tests)
 npm test
 
 # 4. Start local development server with HMR
@@ -146,18 +151,27 @@ npm run lint
 npm run build
 ```
 
-### Connecting to GCP / Firebase
+### Connecting to GCP / Firebase & Stripe
 
 Create a `.env` file from `.env.example`:
 
 ```bash
+# Firebase Web App Configuration
 VITE_FIREBASE_API_KEY=your_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your_project_id
 VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
+
+# Stripe Donation & Payment Configuration
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+VITE_STRIPE_PAYMENT_LINK=https://donate.stripe.com/test_...
+VITE_STRIPE_PAYMENT_LINK_LIFETIME=https://donate.stripe.com/test_...
 ```
+
+`VITE_FIREBASE_MEASUREMENT_ID` is required when Firebase is configured and analytics is enabled; startup throws a descriptive error if it is missing or malformed. Analytics behavior (enable flag, event names, privacy signals) is configured in `src/services/firebase/analyticsConfig.ts`.
 
 To connect to the local Firebase Emulator Suite:
 ```bash
@@ -176,35 +190,47 @@ The live application is hosted on **Firebase Hosting** and backed by **Cloud Fir
 
 ---
 
-### Routine Update Workflow
+### Deployment Workflow
 
-Whenever you introduce new features, engine tuning, or style updates:
+Always run the pre-deploy checks first, then deploy in the order below. Firestore must go first whenever rules or indexes change so new queries are backed by indexes before the hosting bundle lands.
 
 ```bash
-# 1. Verify engine and component tests
-npm test
+# 1. Verify all tests pass and the build is clean
+npm test && npm run build
 
-# 2. Build production assets into /dist
-npm run build
+# 2. Deploy Firestore rules and indexes first
+#    - firestore.rules takes effect immediately
+#    - New composite indexes begin building (takes 2–10 min depending on volume)
+npx firebase-tools deploy --only firestore
 
-# 3. Deploy frontend bundle to Firebase Hosting
+# 3. Deploy the frontend hosting bundle
 npx firebase-tools deploy --only hosting
 ```
 
-Your live site at `https://schada.org` updates immediately. Stale client browsers automatically refresh chunk assets thanks to the `deploymentRecoveryService`.
+Your live site at `https://schada.org` updates immediately after step 3. Clients never need to empty cache or perform a hard reload to see changes:
+
+- **Zero-Cache Entry Points**: `index.html`, `sw.js`, `manifest.webmanifest`, and `version.json` are served with `Cache-Control: no-cache, no-store, must-revalidate` (across both Firebase Hosting and Nginx / Cloud Run), while hashed assets in `/assets/` are cached immutably for 1 year.
+- **Service Worker Auto-Claim & Lifecycle**: Background update checks trigger on app mount, visibility change, window focus, network reconnection, and periodic intervals. When a new service worker installs, it immediately activates (`skipWaiting`) and claims clients (`clientsClaim`).
+- **Safe Dynamic Reloading**: Active browser sessions receive the `controllerchange` event. If the player is in an active match, reload is cleanly deferred until the game concludes or manually confirmed via the update banner; idle and lobby tabs reload automatically.
+- **Resilient Version Polling**: Remote `/version.json` manifest checks provide a lightweight fallback across all browsers and private browsing modes.
+
+> **Note on index build time:** After step 2, new composite indexes show as **Building** in the [Firebase Console → Firestore → Indexes](https://console.firebase.google.com/project/schada-online/firestore/indexes). The app remains fully operational during this window — ordered queries fall back automatically until indexes are **Enabled**.
 
 ---
 
-### Deploying Firestore Rules & Indexes
+### Routine Hosting-Only Update
 
-When modifying `firestore.rules` or composite index configurations in `firestore.indexes.json`:
+When only source code changes (no `firestore.rules` or `firestore.indexes.json` modifications):
 
 ```bash
-# Deploy only Firestore rules and indexes
-npx firebase-tools deploy --only firestore
+npm test && npm run build && npx firebase-tools deploy --only hosting
 ```
 
-To deploy both frontend assets and Firestore configuration in a single command:
+---
+
+### Full Combined Deploy
+
+To deploy everything (Firestore rules, indexes, and hosting) in a single command:
 
 ```bash
 npm run build && npx firebase-tools deploy

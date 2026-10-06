@@ -735,7 +735,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
         if (!db) return;
         const now = Date.now();
         if (!force && inFlightRefreshPromise) return inFlightRefreshPromise;
-        if (!force && now - lastServerCountsRefreshTime < 10_000) return;
+        if (!force && now - lastServerCountsRefreshTime < MULTIPLAYER_SCALE_CONFIG.presence.serverCountsCooldownMs) return;
 
         lastServerCountsRefreshTime = now;
 
