@@ -174,6 +174,87 @@ function formatLoss(delta: number, config: AnalysisConfig): string {
 }
 
 /**
+ * Computes the visible display width of a string in monospace terminal columns,
+ * correctly ignoring ANSI styling escape sequences and accounting for wide emojis.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(L) where L is the character length of the string.
+ * - Auxiliary Space Complexity: O(L) for the stripped string buffer.
+ *
+ * Growth Rate:
+ * - Linear O(L) in character length.
+ */
+function getVisibleWidth(str: string): number {
+  const clean = str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  let width = 0;
+  for (const char of clean) {
+    const cp = char.codePointAt(0) ?? 0;
+    // Ignore variation selectors (U+FE00..U+FE0F, U+E0100..U+E01EF) and zero-width spaces/joiners
+    if (
+      (cp >= 0xfe00 && cp <= 0xfe0f) ||
+      (cp >= 0xe0100 && cp <= 0xe01ef) ||
+      cp === 0x200b ||
+      cp === 0x200c ||
+      cp === 0x200d
+    ) {
+      continue;
+    }
+    // Wide emojis and East Asian Wide characters occupy 2 display cells in terminal emulators
+    if (
+      (cp >= 0x1f000 && cp <= 0x1faff) ||
+      (cp >= 0x1100 && cp <= 0x115f) ||
+      (cp >= 0x2e80 && cp <= 0xa4cf && cp !== 0x303f) ||
+      (cp >= 0xac00 && cp <= 0xd7a3) ||
+      (cp >= 0xf900 && cp <= 0xfaff) ||
+      (cp >= 0xfe10 && cp <= 0xfe19) ||
+      (cp >= 0xfe30 && cp <= 0xfe6f) ||
+      (cp >= 0xff00 && cp <= 0xff60) ||
+      (cp >= 0xffe0 && cp <= 0xffe6) ||
+      (cp >= 0x20000 && cp <= 0x3fffd)
+    ) {
+      width += 2;
+    } else {
+      width += 1;
+    }
+  }
+  return width;
+}
+
+/**
+ * Right-pads a string with spaces until its visible terminal column width reaches targetWidth.
+ * Correctly accounts for embedded ANSI escape codes and wide Unicode glyphs.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(L + W) where L is string length and W is target column width.
+ * - Auxiliary Space Complexity: O(L + W).
+ *
+ * Growth Rate:
+ * - Linear O(L + W).
+ */
+function padEndVisual(str: string, targetWidth: number): string {
+  const currentWidth = getVisibleWidth(str);
+  const needed = Math.max(0, targetWidth - currentWidth);
+  return str + ' '.repeat(needed);
+}
+
+/**
+ * Left-pads a string with spaces until its visible terminal column width reaches targetWidth.
+ * Correctly accounts for embedded ANSI escape codes and wide Unicode glyphs.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(L + W) where L is string length and W is target column width.
+ * - Auxiliary Space Complexity: O(L + W).
+ *
+ * Growth Rate:
+ * - Linear O(L + W).
+ */
+function padStartVisual(str: string, targetWidth: number): string {
+  const currentWidth = getVisibleWidth(str);
+  const needed = Math.max(0, targetWidth - currentWidth);
+  return ' '.repeat(needed) + str;
+}
+
+/**
  * Renders the complete terminal report with formatted tables and ANSI colors.
  *
  * Algorithmic Complexity:
@@ -199,17 +280,26 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
     }
   }
 
+  const tableHeader = `${BOLD}${padEndVisual('Ply', w.ply)} ${padEndVisual('Turn', w.turn)} ${padEndVisual(
+    'Move',
+    w.move
+  )} ${padEndVisual('Quality', w.badge)} ${padStartVisual('Eval', w.eval)} ${padStartVisual(
+    'Loss',
+    w.loss
+  )}  ${'Best Move'}${RESET_COLOR}`;
+  const tableWidth = getVisibleWidth(tableHeader);
+  const tableDivider = `${DIM}${'-'.repeat(tableWidth)}${RESET_COLOR}`;
+
   console.log(`\n${BOLD}Move-by-Move Analysis (${report.totalPlies} plies, ${report.durationMs}ms):${RESET_COLOR}`);
-  console.log(`${DIM}----------------------------------------------------------------------------${RESET_COLOR}`);
-  console.log(
-    `${BOLD}${'Ply'.padEnd(w.ply)} ${'Turn'.padEnd(w.turn)} ${'Move'.padEnd(w.move)} ${'Quality'.padEnd(w.badge)} ${'Eval'.padStart(w.eval)} ${'Loss'.padStart(w.loss)}  ${'Best Move'}${RESET_COLOR}`
-  );
-  console.log(`${DIM}----------------------------------------------------------------------------${RESET_COLOR}`);
+  console.log(tableDivider);
+  console.log(tableHeader);
+  console.log(tableDivider);
 
   for (const m of report.moves) {
     const badge = badges[m.quality];
     const plyLabel = m.turn === 'blue' ? `${m.moveNumber}.` : `${m.moveNumber}...`;
-    const qualityLabel = `${badge.ansiColor}${badge.symbol} ${badge.label}${RESET_COLOR}`;
+    const sym = padEndVisual(badge.symbol, 2);
+    const qualityLabel = `${badge.ansiColor}${sym} ${badge.label}${RESET_COLOR}`;
     const evalStr = formatEval(m.evalAfter, config);
     const lossStr = m.quality === 'book' ? '-' : formatLoss(m.evalDelta, config);
     const altBest =
@@ -220,13 +310,17 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
           : '';
 
     console.log(
-      `${plyLabel.padEnd(w.ply)} ${m.turn.padEnd(w.turn)} ${BOLD}${m.playedNotation.padEnd(w.move)}${RESET_COLOR} ${qualityLabel.padEnd(
-        w.badge + 11 // Account for ANSI escape byte length
-      )} ${evalStr.padStart(w.eval)} ${lossStr.padStart(w.loss)}  ${altBest}`
+      `${padEndVisual(plyLabel, w.ply)} ${padEndVisual(m.turn, w.turn)} ${BOLD}${padEndVisual(
+        m.playedNotation,
+        w.move
+      )}${RESET_COLOR} ${padEndVisual(qualityLabel, w.badge)} ${padStartVisual(evalStr, w.eval)} ${padStartVisual(
+        lossStr,
+        w.loss
+      )}  ${altBest}`
     );
   }
 
-  console.log(`${DIM}----------------------------------------------------------------------------${RESET_COLOR}`);
+  console.log(tableDivider);
 
   // Next Move Prediction (if game is unfinished)
   if (report.nextMove) {
@@ -241,7 +335,12 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
     );
     console.log(`\n  ${DIM}Top Continuation Candidates:${RESET_COLOR}`);
     report.nextMove.candidateMoves.forEach((cand, idx) => {
-      console.log(`    ${idx + 1}. ${BOLD}${cand.notation.padEnd(w.move)}${RESET_COLOR} (eval: ${formatEval(cand.score, config)})`);
+      console.log(
+        `    ${idx + 1}. ${BOLD}${padEndVisual(cand.notation, w.move)}${RESET_COLOR} (eval: ${formatEval(
+          cand.score,
+          config
+        )})`
+      );
     });
   }
 
@@ -266,19 +365,29 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
     'blunder',
   ];
 
-  console.log(`  ${'Classification'.padEnd(w.distributionCol)} ${'Blue'.padStart(w.countCol)} ${'Green'.padStart(w.countCol)}`);
-  console.log(`  ${DIM}----------------------------------${RESET_COLOR}`);
+  const distHeader = `  ${padEndVisual('Classification', w.distributionCol)} ${padStartVisual(
+    'Blue',
+    w.countCol
+  )} ${padStartVisual('Green', w.countCol)}`;
+  const distWidth = getVisibleWidth(distHeader) - 2;
+  const distDivider = `  ${DIM}${'-'.repeat(distWidth)}${RESET_COLOR}`;
+
+  console.log(distHeader);
+  console.log(distDivider);
   for (const q of qualities) {
     const badge = badges[q];
     const blueCount = report.blueBreakdown[q];
     const greenCount = report.greenBreakdown[q];
+    const sym = padEndVisual(badge.symbol, 2);
+    const classText = `${badge.ansiColor}${sym}  ${badge.label}${RESET_COLOR}`;
     console.log(
-      `  ${badge.ansiColor}${badge.symbol.padEnd(3)} ${badge.label.padEnd(16)}${RESET_COLOR} ${String(blueCount).padStart(w.countCol)} ${String(
-        greenCount
-      ).padStart(w.countCol)}`
+      `  ${padEndVisual(classText, w.distributionCol)} ${padStartVisual(
+        String(blueCount),
+        w.countCol
+      )} ${padStartVisual(String(greenCount), w.countCol)}`
     );
   }
-  console.log(`  ${DIM}----------------------------------${RESET_COLOR}\n`);
+  console.log(`${distDivider}\n`);
 }
 
 async function main(): Promise<void> {

@@ -95,7 +95,7 @@ The Schada AI engine (`src/core/bot`) is implemented from scratch in TypeScript 
 - **Zobrist Transposition Table**: 262,144-entry (2¹⁸) hash table storing exact scores, upper bounds, and lower bounds with depth-preferred replacement.
 - **Move Ordering**: Prioritizes PV moves > MVV-LVA Captures > Goal Entry > Killer Moves > History Heuristic > Shortest-Path Distance Gains.
 - **Quiescence Search**: Resolves volatile capture chains and goal-line entries beyond the horizon to prevent tactical blunders.
-- **Opening Book**: Pre-compiled database of historical opening variations (e.g., *Twin Pillars Defense*, *Wing Outpost Variation*, *Eastern/Western Sentinels*).
+- **Opening Book**: Universal engine-calibrated database of 294 positions covering all 14 legal Blue opening moves (e.g., *Flank Flow*, *Center Flow*, *Pawn Strikes*, *Wing Outposts*) with tactical vector safety and Boltzmann-distributed selection weights.
 - **Distance Tables**: Precomputed breadth-first search (BFS) shortest-path tables (`DISTANCE_TABLES`) quantifying exact minimum moves to the goal rank for every square.
 
 ### Standalone Championship Simulator (CLI)

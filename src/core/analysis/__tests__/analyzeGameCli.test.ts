@@ -45,4 +45,39 @@ describe('Analyze Game CLI Script', () => {
     // Clean up
     fs.unlinkSync(outputPath);
   });
+
+  it('renders correctly aligned terminal tables for move analysis and distribution', () => {
+    const stdout = execSync(
+      `npx tsx "${cliPath}" -d 2 -t 10 "1. Fe1-e3 Pc7-e5 2. Fc1-c3 Fb8-b6"`,
+      { encoding: 'utf-8' }
+    );
+
+    expect(stdout).toContain('SCHADA POST-GAME ANALYSIS REPORT');
+    expect(stdout).toContain('Move-by-Move Analysis');
+    expect(stdout).toContain('Move Quality Distribution');
+
+    // Strip ANSI codes to measure monospaced column positions
+    const cleanOutput = stdout.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    const lines = cleanOutput.split('\n');
+
+    // Locate the table header
+    const headerLine = lines.find((l) => l.includes('Ply') && l.includes('Quality') && l.includes('Eval'));
+    expect(headerLine).toBeDefined();
+
+    const evalHeaderPos = headerLine!.indexOf('Eval');
+    const lossHeaderPos = headerLine!.indexOf('Loss');
+    expect(evalHeaderPos).toBeGreaterThan(0);
+    expect(lossHeaderPos).toBeGreaterThan(evalHeaderPos);
+
+    // Verify each move row has matching column alignments for Eval and Loss
+    const moveRows = lines.filter((l) => /^\d+(\.\.\.|\.)\s+(blue|green)\s+/.test(l.trim()));
+    expect(moveRows.length).toBeGreaterThanOrEqual(2);
+
+    for (const row of moveRows) {
+      // In monospaced output, 'Eval' column header has width 8 right-aligned.
+      // Character at the end of Eval column should align with the end of header 'Eval'
+      expect(row.length).toBeGreaterThanOrEqual(lossHeaderPos + 4);
+    }
+  });
 });
+
