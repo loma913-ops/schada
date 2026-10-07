@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "simulate": "tsx scripts/simulateTournaments.ts"
+    "simulate": "tsx scripts/simulateTournaments.ts",
+    "analyze": "tsx scripts/analyzeGame.ts"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

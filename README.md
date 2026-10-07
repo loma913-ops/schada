@@ -67,6 +67,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Partitioned Lobby Sections**: Dedicated "My Games" section pinned at the top for player's active and waiting games, alongside filtered "Available Games".
 - **Defense-in-Depth Security Hardening**: Granular Firestore authorization rules, sensitive PII segregation, and comprehensive HTTP security headers with strict cache invalidation.
 - **Standalone Bot Championship Simulator**: Local CLI tool pitting all 8 AI tiers against each other in multi-tournament brackets with Elo calibration, game notation, and cross-table export.
+- **Standalone Game Analysis Engine**: Post-game 10-tier move quality classifier, player accuracy calculator, and continuation predictor powered by Tier 8 Master search.
 
 ---
 
@@ -228,6 +229,27 @@ npm run simulate -- --tournaments 500 --time-limit 50 --output-dir ./tournament_
 ```
 
 > **Note:** The tournament simulation runs 100% locally and offline in CPU memory, writing game notation and results directly to disk. It never connects to Firebase or touches any database.
+
+### Running Game Analysis (Local CLI)
+
+You can analyze played matches turn-by-turn with 10-tier move classifications (Brilliant, Great, Best, Excellent, Good, Book, Inaccuracy, Mistake, Miss, Blunder), player accuracy %, and next continuation move predictions:
+
+```bash
+# Analyze a tournament game file
+npm run analyze -- tournament_output/games/t0001_m1_quarterfinals_advanced_vs_intermediate.txt
+
+# Analyze raw notation directly from the command line
+npm run analyze -- "1. Fe1-e3 Pc7-e5 2. Fc1-c3 Fb8-b6 3. Fa1-a3 Fh8-h6"
+
+# Deep analysis with custom search depth and time budget
+npm run analyze -- -d 7 -t 200 tournament_output/games/t0001_m1_quarterfinals_advanced_vs_intermediate.txt
+
+# Output machine-readable JSON to stdout or save to file
+npm run analyze -- --json path/to/game.txt
+npm run analyze -- --output ./analysis_report.json path/to/game.txt
+```
+
+> **Note:** The analysis engine executes 100% locally and offline in Node.js, replaying moves through the rules engine and evaluating positions using the Tier 8 Master search.
 
 ### Connecting to GCP / Firebase & Stripe
 
