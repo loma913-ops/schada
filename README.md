@@ -16,6 +16,8 @@ Schada combines a fast, minimalist, Lichess-inspired user experience with a math
 6. [Updating & Deploying to Production](#6-updating--deploying-to-production)
 7. [Project Architecture & Structure](#7-project-architecture--structure)
 8. [Editing `src/core/schada/vectors.ts`](#8-editing-srccoreschadavectorsts)
+9. [Security & Threat Modeling](#9-security--threat-modeling)
+10. [Knowledge Graph (graphify)](#10-knowledge-graph-graphify)
 
 ---
 
@@ -63,6 +65,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
 - **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.
 - **Partitioned Lobby Sections**: Dedicated "My Games" section pinned at the top for player's active and waiting games, alongside filtered "Available Games".
+- **Defense-in-Depth Security Hardening**: Granular Firestore authorization rules, sensitive PII segregation, and comprehensive HTTP security headers with strict cache invalidation.
 
 ---
 
@@ -417,7 +420,16 @@ Always update **both** squares simultaneously to preserve board balance and engi
 
 ---
 
-## Knowledge Graph (graphify)
+## 9. Security & Threat Modeling
+
+Schada employs an authoritative defense-in-depth security model:
+- **Zero-Trust Client Mindset**: Authoritative game state immutability, bounded Elo deltas, monotonic match counters, and granular room lifecycle rules enforced authoritatively at the database boundary via `firestore.rules`.
+- **Sensitive PII Segregation**: Registered user email addresses are omitted from public Firestore documents, eliminating database enumeration while hydrating seamlessly in memory via Firebase Auth tokens.
+- **HTTP Security Headers**: Strict hosting security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and CSP) deployed with zero-reload cache-control preservation.
+
+---
+
+## 10. Knowledge Graph (graphify)
 
 This project is graphified — a queryable knowledge graph of the full codebase can be built and explored using [graphify](https://github.com/safishamsi/graphifyy).
 
