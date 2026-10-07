@@ -42,3 +42,6 @@ Thumbs.db
 
 # Graphify — generated knowledge graph outputs
 graphify-out/
+
+# Bot Championship simulation outputs
+tournament_output/

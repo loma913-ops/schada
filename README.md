@@ -66,6 +66,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.
 - **Partitioned Lobby Sections**: Dedicated "My Games" section pinned at the top for player's active and waiting games, alongside filtered "Available Games".
 - **Defense-in-Depth Security Hardening**: Granular Firestore authorization rules, sensitive PII segregation, and comprehensive HTTP security headers with strict cache invalidation.
+- **Standalone Bot Championship Simulator**: Local CLI tool pitting all 8 AI tiers against each other in multi-tournament brackets with Elo calibration, game notation, and cross-table export.
 
 ---
 
@@ -95,6 +96,60 @@ The Schada AI engine (`src/core/bot`) is implemented from scratch in TypeScript 
 - **Quiescence Search**: Resolves volatile capture chains and goal-line entries beyond the horizon to prevent tactical blunders.
 - **Opening Book**: Pre-compiled database of historical opening variations (e.g., *Twin Pillars Defense*, *Wing Outpost Variation*, *Eastern/Western Sentinels*).
 - **Distance Tables**: Precomputed breadth-first search (BFS) shortest-path tables (`DISTANCE_TABLES`) quantifying exact minimum moves to the goal rank for every square.
+
+### Standalone Championship Simulator (CLI)
+
+Schada includes a standalone, command-line championship simulator (`scripts/simulateTournaments.ts`) designed to pit all 8 AI tiers against each other in single-elimination tournament brackets. This utility allows developers to calibrate bot Elo ratings, discover engine balance anomalies, and generate complete game notations.
+
+> **100% Local & Offline**: The tournament simulator executes entirely in-memory using Node.js CPU workers and writes results directly to local disk. It **never connects to Firebase, requires zero network access, and never touches any database.**
+
+#### How It Works
+- **Championship Bracket**: Each tournament seeds all 8 bots in a single-elimination knockout bracket (4 Quarterfinals → 2 Semifinals → 1 Championship Final = 7 matches per tournament).
+- **Random Seeding & Colors**: Shuffles seeds every tournament to ensure a diverse spread of matchups across all tiers, and assigns Blue/Green colors randomly (50/50) per match to eliminate first-move bias.
+- **Draw Resolution**: In the rare event of a true draw (equal goal scores, surviving pieces, and rank distances), an immediate rematch is played with swapped colors until a decisive winner advances.
+- **Elo Rating Calibration**: All 8 bots start at **1200 Elo**. Ratings update immediately after every match using the canonical `eloService` ($K=40$ for the first 15 games, $K=20$ thereafter). Ratings persist across all tournaments within a run and cleanly reset to 1200 whenever a new simulation is launched.
+
+#### How to Run
+
+```bash
+# 1. Run with default settings (1,000 tournaments, 50ms per-move budget)
+npm run simulate
+
+# 2. Quick test run (10 tournaments, 10ms budget)
+npm run simulate -- -n 10 -t 10
+
+# 3. Custom calibration run with specific output path
+npm run simulate -- --tournaments 500 --time-limit 50 --output-dir ./tournament_output
+
+# 4. View all available CLI flags and usage
+npm run simulate -- --help
+# or via tsx directly:
+npx tsx scripts/simulateTournaments.ts --help
+```
+
+#### CLI Options & Flags
+
+| Flag | Short | Default | Description |
+|:---|:---:|:---:|:---|
+| `--tournaments <count>` | `-n` | `1000` | Number of championship tournaments to simulate |
+| `--time-limit <ms>` | `-t` | `50` | Search budget per move in milliseconds |
+| `--max-moves <count>` | `-m` | `300` | Maximum half-moves safety limit before terminal score adjudication |
+| `--output-dir <path>` | `-o` | `./tournament_output` | Destination directory for all generated reports and notation files |
+| `--help` | `-h` | — | Display usage banner and option descriptions |
+
+#### Generated Output Artifacts
+
+Upon completion (or during live execution), the simulator writes the following files to your specified `--output-dir`:
+
+- **`<output-dir>/games/`**: Individual `.txt` notation files for every match played (`t0001_m1_quarterfinals_novice_vs_casual.txt`), formatted with event metadata, player Elo deltas, final scores, and numbered turn notation.
+- **`<output-dir>/tournaments/`**: Individual `.json` result files for each tournament (`tournament_0001.json`), containing bracket progression, match pairings, winners, and a concluding `finalRankings` array sorted #1 (Champion) down to #8 (Quarterfinalist) with bot names, final Elo, match wins, and match losses.
+- **`<output-dir>/bot_summary.json`**: Machine-readable JSON summary containing overall championship rankings across all tournaments, final Elo standings, peak/lowest ratings, win/loss records, Blue vs. Green win splits, victory condition distributions, and full 8×8 head-to-head match matrices.
+- **`<output-dir>/bot_summary.md`**: Publication-ready Markdown report featuring:
+  - Final tournament championship standings across all tournament games (ranked #1 to #8 by championships won, match win rate, and final Elo).
+  - Elo ratings leaderboard with gains/losses, peak ratings, and side splits.
+  - Complete 8×8 head-to-head cross-table (Row vs. Column records).
+  - Win reason distribution table (Goal Reached, Elimination, Blockade, Repetition, Mutual Shuffle).
+  - Engine balance and calibration observations.
 
 ---
 
@@ -156,6 +211,23 @@ npm run lint
 # Compile TypeScript and build production bundle
 npm run build
 ```
+
+### Running Bot Tournament Simulations (Local CLI)
+
+You can run automated bot championship simulations locally from the terminal without running the web server:
+
+```bash
+# Run default 1,000-tournament simulation (50ms per move)
+npm run simulate
+
+# Quick test simulation (10 tournaments, 10ms move budget)
+npm run simulate -- -n 10 -t 10
+
+# Custom simulation with specific output directory
+npm run simulate -- --tournaments 500 --time-limit 50 --output-dir ./tournament_output
+```
+
+> **Note:** The tournament simulation runs 100% locally and offline in CPU memory, writing game notation and results directly to disk. It never connects to Firebase or touches any database.
 
 ### Connecting to GCP / Firebase & Stripe
 
