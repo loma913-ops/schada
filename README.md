@@ -232,7 +232,7 @@ npm run simulate -- --tournaments 500 --time-limit 50 --output-dir ./tournament_
 
 ### Running Game Analysis (Local CLI)
 
-You can analyze played matches turn-by-turn with 10-tier move classifications (Brilliant, Great, Best, Excellent, Good, Book, Inaccuracy, Mistake, Miss, Blunder), player accuracy %, and next continuation move predictions:
+You can analyze played matches turn-by-turn with 10-tier move classifications (Brilliant, Great, Best, Excellent, Good, Book, Inaccuracy, Mistake, Miss, Blunder), Lichess-calibrated player accuracy % (volatility-weighted and harmonic mean), and next continuation move predictions:
 
 ```bash
 # Analyze a tournament game file

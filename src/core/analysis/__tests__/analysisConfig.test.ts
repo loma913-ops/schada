@@ -83,14 +83,14 @@ describe('Analysis Configuration', () => {
   });
 
   it('throws AnalysisConfigError on invalid accuracy or formatting parameters', () => {
-    const badSaturation: AnalysisConfig = {
+    const badCeiling: AnalysisConfig = {
       ...CANONICAL_ANALYSIS_CONFIG,
       accuracy: {
         ...CANONICAL_ANALYSIS_CONFIG.accuracy,
-        evaluationSaturationThreshold: -10,
+        evalCeiling: -10,
       },
     };
-    expect(() => validateAnalysisConfig(badSaturation)).toThrow(AnalysisConfigError);
+    expect(() => validateAnalysisConfig(badCeiling)).toThrow(AnalysisConfigError);
 
     const badCentipoints: AnalysisConfig = {
       ...CANONICAL_ANALYSIS_CONFIG,

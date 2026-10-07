@@ -58,13 +58,25 @@ export interface AnalysisSearchConfig {
 }
 
 export interface AnalysisAccuracyConfig {
-  readonly winProbScale: number;
+  readonly winProbMultiplier: number;
+  readonly evalCeiling: number;
+  readonly modelCoefficients: {
+    readonly a: number;
+    readonly k: number;
+    readonly b: number;
+    readonly uncertaintyBonus: number;
+  };
+  readonly volatility: {
+    readonly windowSizeDivisor: number;
+    readonly minWindowSize: number;
+    readonly maxWindowSize: number;
+    readonly minWeight: number;
+    readonly maxWeight: number;
+  };
   readonly minAccuracy: number;
   readonly maxAccuracy: number;
   readonly perfectAccuracy: number;
-  readonly evaluationSaturationThreshold: number;
   readonly accuracyDecimals: number;
-  readonly quadraticExponent: number;
 }
 
 export interface AnalysisCliFormattingConfig {
@@ -189,13 +201,25 @@ export const CANONICAL_ANALYSIS_CONFIG: AnalysisConfig = Object.freeze({
     }),
   }),
   accuracy: Object.freeze({
-    winProbScale: 300,
+    winProbMultiplier: -0.00368208,
+    evalCeiling: 1000,
+    modelCoefficients: Object.freeze({
+      a: 103.1668100711649,
+      k: 0.04354415386753951,
+      b: -3.166924740191411,
+      uncertaintyBonus: 1.0,
+    }),
+    volatility: Object.freeze({
+      windowSizeDivisor: 10,
+      minWindowSize: 2,
+      maxWindowSize: 8,
+      minWeight: 0.5,
+      maxWeight: 12,
+    }),
     minAccuracy: 0,
     maxAccuracy: 100,
     perfectAccuracy: 100,
-    evaluationSaturationThreshold: 10000,
     accuracyDecimals: 1,
-    quadraticExponent: 2,
   }),
   formatting: Object.freeze({
     maxNotationDisplayWidth: 10,
@@ -315,22 +339,42 @@ export function validateAnalysisConfig(config: AnalysisConfig): void {
     }
   }
 
-  // Validate Accuracy Config
+  // Validate Accuracy Config (Lichess empirical model)
   const a = config.accuracy;
   if (!a || typeof a !== 'object') {
     throw new AnalysisConfigError('Accuracy configuration section is missing.');
   }
-  if (a.winProbScale <= 0 || a.minAccuracy < 0 || a.maxAccuracy <= a.minAccuracy) {
-    throw new AnalysisConfigError('Invalid accuracy scaling parameters.');
+  if (typeof a.winProbMultiplier !== 'number' || a.winProbMultiplier >= 0) {
+    throw new AnalysisConfigError('Invalid winProbMultiplier: must be a negative number.');
   }
-  if (a.evaluationSaturationThreshold <= 0) {
-    throw new AnalysisConfigError('Invalid evaluationSaturationThreshold: must be greater than 0.');
+  if (!Number.isInteger(a.evalCeiling) || a.evalCeiling <= 0) {
+    throw new AnalysisConfigError('Invalid evalCeiling: must be a positive integer.');
+  }
+  if (!a.modelCoefficients || typeof a.modelCoefficients !== 'object') {
+    throw new AnalysisConfigError('Accuracy modelCoefficients section is missing.');
+  }
+  const mc = a.modelCoefficients;
+  if (mc.a <= 0 || mc.k <= 0 || mc.uncertaintyBonus < 0) {
+    throw new AnalysisConfigError('Invalid modelCoefficients parameters in accuracy configuration.');
+  }
+  if (!a.volatility || typeof a.volatility !== 'object') {
+    throw new AnalysisConfigError('Accuracy volatility section is missing.');
+  }
+  const vol = a.volatility;
+  if (
+    vol.windowSizeDivisor <= 0 ||
+    vol.minWindowSize <= 0 ||
+    vol.maxWindowSize < vol.minWindowSize ||
+    vol.minWeight <= 0 ||
+    vol.maxWeight < vol.minWeight
+  ) {
+    throw new AnalysisConfigError('Invalid volatility sliding window parameters in accuracy configuration.');
+  }
+  if (a.minAccuracy < 0 || a.maxAccuracy <= a.minAccuracy || a.perfectAccuracy > a.maxAccuracy) {
+    throw new AnalysisConfigError('Invalid accuracy scaling bounds.');
   }
   if (!Number.isInteger(a.accuracyDecimals) || a.accuracyDecimals < 0) {
     throw new AnalysisConfigError('Invalid accuracyDecimals: must be a non-negative integer.');
-  }
-  if (a.quadraticExponent <= 0) {
-    throw new AnalysisConfigError('Invalid quadraticExponent: must be greater than 0.');
   }
 
   // Validate Formatting Config
