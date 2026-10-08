@@ -84,6 +84,7 @@ export interface BotTierConfig {
   readonly level: number;
   readonly name: string;
   readonly elo: number;
+  /** Maximum search tree lookahead horizon measured in plies (half-moves). */
   readonly maxDepth: number;
   readonly description: string;
   readonly blunderRate: number;
@@ -430,7 +431,7 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
       level: 4,
       name: 'Competent',
       elo: 1150,
-      maxDepth: 3,
+      maxDepth: 4,
       description: 'Solid tactician that screens friendly officers with pawns, sorts captures first, and avoids traps.',
       blunderRate: 0.05,
       useMoveOrdering: true,
@@ -448,7 +449,7 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
       level: 5,
       name: 'Intermediate',
       elo: 1500,
-      maxDepth: 4,
+      maxDepth: 7,
       description: 'Pacing-conscious engine that checks terminal point totals and delays ending the match if trailing.',
       blunderRate: 0.0,
       useMoveOrdering: true,
@@ -466,7 +467,7 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
       level: 6,
       name: 'Advanced',
       elo: 1800,
-      maxDepth: 5,
+      maxDepth: 11,
       description: 'Deep tactical search resolving capture chains, using pawn springboards for leaping Field Officers.',
       blunderRate: 0.0,
       useMoveOrdering: true,
@@ -484,7 +485,7 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
       level: 7,
       name: 'Expert',
       elo: 2100,
-      maxDepth: 6,
+      maxDepth: 14,
       description: 'Commands goal-line turret sentinels, controls key vector hubs, and optimizes fractional tiebreakers.',
       blunderRate: 0.0,
       useMoveOrdering: true,
@@ -502,7 +503,7 @@ export const BOT_ENGINE_CONFIG: BotEngineConfig = Object.freeze({
       level: 8,
       name: 'Master',
       elo: 2400,
-      maxDepth: 8,
+      maxDepth: 16,
       description: 'Full graph flow mastery; coordinates multi-piece pawn walls, suffocating blockades, and endgame conversion.',
       blunderRate: 0.0,
       useMoveOrdering: true,

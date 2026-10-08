@@ -310,19 +310,23 @@ function pvs(
 
   // Null-Move Pruning (Levels 7-8)
   const searchParams = BOT_ENGINE_CONFIG.searchParameters;
-  if (ctx.tier.useNullMovePruning && allowNull && depth >= searchParams.nullMoveMinDepth && ply > 0) {
+  const isBetaFinite = Number.isFinite(beta) && Math.abs(beta) < TERMINAL_WIN - searchParams.terminalNearWinCutoff;
+  if (ctx.tier.useNullMovePruning && allowNull && depth >= searchParams.nullMoveMinDepth && ply > 0 && isBetaFinite) {
     const isBlue = board.currentTurn === 'blue';
     const highRemain = isBlue
       ? board.blueHighTotal - board.blueHighInGoal
       : board.greenHighTotal - board.greenHighInGoal;
 
     if (highRemain > 1) {
-      board.currentTurn = isBlue ? 'green' : 'blue';
-      const nullScore = -pvs(board, depth - 1 - searchParams.nullMoveReduction, -beta, -beta + 1, ply + 1, ctx, false);
-      board.currentTurn = isBlue ? 'blue' : 'green';
+      const staticEval = evaluateBoard(board, board.currentTurn, ctx.tier, ply);
+      if (staticEval >= beta) {
+        board.currentTurn = isBlue ? 'green' : 'blue';
+        const nullScore = -pvs(board, depth - 1 - searchParams.nullMoveReduction, -beta, -beta + 1, ply + 1, ctx, false);
+        board.currentTurn = isBlue ? 'blue' : 'green';
 
-      if (ctx.timedOut) return alpha;
-      if (nullScore >= beta) return beta;
+        if (ctx.timedOut) return alpha;
+        if (nullScore >= beta) return beta;
+      }
     }
   }
 

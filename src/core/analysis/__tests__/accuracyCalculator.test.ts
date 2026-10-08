@@ -104,4 +104,33 @@ describe('Accuracy Calculator', () => {
     expect(greenStats.accuracy).toBe(100);
     expect(greenStats.breakdown.book).toBe(1);
   });
+
+  it('throws AnalysisConfigError if a move ply references an invalid weight index', () => {
+    const move1 = createMockMove('e1', 'e3', 'Fe1-e3');
+    const corruptMoves: EvaluatedMove[] = [
+      {
+        ply: 999, // Out of bounds ply
+        turn: 'blue',
+        moveNumber: 1,
+        playedMove: move1,
+        playedNotation: 'Fe1-e3',
+        bestMove: move1,
+        bestNotation: 'Fe1-e3',
+        evalBefore: 10,
+        evalAfter: 0,
+        evalDelta: 10,
+        quality: 'good',
+      },
+    ];
+
+    expect(() => calculatePlayerAccuracy(corruptMoves, 'blue')).toThrow(
+      /Missing volatility weight at ply 999/
+    );
+  });
+
+  it('returns perfectAccuracy when player has zero moves', () => {
+    const stats = calculatePlayerAccuracy([], 'blue');
+    expect(stats.accuracy).toBe(100);
+    expect(stats.moveCount).toBe(0);
+  });
 });

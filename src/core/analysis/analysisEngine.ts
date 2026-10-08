@@ -266,11 +266,14 @@ export function analyzeGame(
         bestMove: topNextMove,
         notation: topNextMove.notation,
         evaluation: topNextCandidate.score,
-        candidateMoves: finalCandidates.slice(0, config.search.topCandidateMovesLimit).map((c) => ({
-          move: finalFastBoard.toStandardMove(c.move),
-          notation: finalFastBoard.toStandardMove(c.move).notation,
-          score: c.score,
-        })),
+        candidateMoves: finalCandidates.slice(0, config.search.topCandidateMovesLimit).map((c) => {
+          const stdMove = finalFastBoard.toStandardMove(c.move);
+          return {
+            move: stdMove,
+            notation: stdMove.notation,
+            score: c.score,
+          };
+        }),
       };
     }
   }

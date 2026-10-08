@@ -35,7 +35,7 @@ export const OPENING_BOOK: Readonly<Record<string, readonly OpeningMoveCandidate
     cand('c1', 'c3', 15, "The Center Flow Opening: Western Vector"),
     cand('g1', 'g3', 15, "The Flank Flow Opening: Eastern Wing"),
     cand('f2', 'd4', 6, "The Center Strike System: Eastern Advance"),
-    cand('d2', 'b4', 6, "The Western Flank Advance: Pacing Thrust"),
+    cand('d2', 'b4', 6, "The Pokshtya Flank Advance"),
     cand('g2', 'e4', 6, "The Eastern Diagonal Screen"),
     cand('c2', 'd3', 5, "The Vanguard Flow System: Western Advance"),
     cand('b2', 'c3', 5, "The Western Diagonal Screen"),

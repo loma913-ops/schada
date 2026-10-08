@@ -85,6 +85,13 @@ describe('Game Parser', () => {
     expect(() => parseGameInput(illegalGame)).toThrow(AnalysisConfigError);
   });
 
+  it('throws AnalysisConfigError when moving opponent piece or from empty square', () => {
+    // White/Blue on turn 1 tries to move Green's officer on b8
+    expect(() => parseGameInput('1. Fb8-b6')).toThrow(/does not contain an active player piece/);
+    // Square e4 is initially empty
+    expect(() => parseGameInput('1. e4-e5')).toThrow(/does not contain an active player piece/);
+  });
+
   it('throws AnalysisConfigError on empty move data', () => {
     expect(() => parseGameInput('   ')).toThrow(AnalysisConfigError);
   });

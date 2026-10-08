@@ -109,8 +109,8 @@ export const CANONICAL_ANALYSIS_CONFIG: AnalysisConfig = Object.freeze({
   search: Object.freeze({
     defaultDepth: 6,
     minDepth: 1,
-    maxDepth: 12,
-    defaultTimeLimitMs: 100,
+    maxDepth: 20,
+    defaultTimeLimitMs: 250,
     minTimeLimitMs: 10,
     maxTimeLimitMs: 5000,
     masterTierLevel: 8,
@@ -297,6 +297,9 @@ export function validateAnalysisConfig(config: AnalysisConfig): void {
       'Threshold deltas must be strictly monotonically increasing (good < inaccuracy < mistake).'
     );
   }
+  if (t.blunderDelta < t.mistakeDelta) {
+    throw new AnalysisConfigError('blunderDelta must be greater than or equal to mistakeDelta.');
+  }
   if (t.missMinDelta <= 0 || t.missMinOpportunityAdvantage <= 0) {
     throw new AnalysisConfigError('Miss thresholds must be positive values.');
   }
@@ -354,7 +357,7 @@ export function validateAnalysisConfig(config: AnalysisConfig): void {
     throw new AnalysisConfigError('Accuracy modelCoefficients section is missing.');
   }
   const mc = a.modelCoefficients;
-  if (mc.a <= 0 || mc.k <= 0 || mc.uncertaintyBonus < 0) {
+  if (mc.a <= 0 || mc.k <= 0 || typeof mc.b !== 'number' || mc.uncertaintyBonus < 0) {
     throw new AnalysisConfigError('Invalid modelCoefficients parameters in accuracy configuration.');
   }
   if (!a.volatility || typeof a.volatility !== 'object') {
@@ -382,6 +385,9 @@ export function validateAnalysisConfig(config: AnalysisConfig): void {
   if (!f || typeof f !== 'object') {
     throw new AnalysisConfigError('Formatting configuration section is missing.');
   }
+  if (!Number.isInteger(f.maxNotationDisplayWidth) || f.maxNotationDisplayWidth <= 0) {
+    throw new AnalysisConfigError('Invalid maxNotationDisplayWidth: must be a positive integer.');
+  }
   if (f.centipointsPerPoint <= 0 || f.evalDecimals < 0 || f.lossDecimals < 0) {
     throw new AnalysisConfigError('Invalid numerical formatting parameters in config.');
   }
@@ -394,6 +400,7 @@ export function validateAnalysisConfig(config: AnalysisConfig): void {
     widths.badge <= 0 ||
     widths.eval <= 0 ||
     widths.loss <= 0 ||
+    widths.altBest <= 0 ||
     widths.distributionCol <= 0 ||
     widths.countCol <= 0
   ) {

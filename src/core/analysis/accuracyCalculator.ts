@@ -1,5 +1,9 @@
 import type { AnalysisConfig } from './analysisConfig';
-import { CANONICAL_ANALYSIS_CONFIG, validateAnalysisConfig } from './analysisConfig';
+import {
+  CANONICAL_ANALYSIS_CONFIG,
+  validateAnalysisConfig,
+  AnalysisConfigError,
+} from './analysisConfig';
 import type { EvaluatedMove, MoveQuality, PlayerQualityBreakdown } from './analysisTypes';
 import type { PieceColor } from '../schada/types';
 
@@ -210,7 +214,11 @@ export function calculatePlayerAccuracy(
       acc = calculateMoveAccuracy(beforeCp, afterCp, config);
     }
     moveAccuracies.push(acc);
-    playerWeights.push(weights[m.ply - 1] ?? 1.0);
+    const moveWeight = weights[m.ply - 1];
+    if (typeof moveWeight !== 'number') {
+      throw new AnalysisConfigError(`Missing volatility weight at ply ${m.ply}.`);
+    }
+    playerWeights.push(moveWeight);
   }
 
   // 4. Volatility-weighted mean

@@ -120,6 +120,13 @@ export function replayNotationTokens(tokens: readonly string[]): {
     const fromSquare = match[2].toLowerCase() as Square;
     const toSquare = match[3].toLowerCase() as Square;
 
+    const pieceOnSquare = currentState.board[fromSquare];
+    if (!pieceOnSquare || pieceOnSquare.color !== currentState.currentTurn) {
+      throw new AnalysisConfigError(
+        `Illegal move "${token}" at ply ${ply + 1} for ${currentState.currentTurn}: square ${fromSquare} does not contain an active player piece.`
+      );
+    }
+
     const legalFromSquare = getLegalMovesForSquare(currentState.board, fromSquare);
     const candidateMoves = legalFromSquare.filter((m) => {
       if (m.to !== toSquare) return false;

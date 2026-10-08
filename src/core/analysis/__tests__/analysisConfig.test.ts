@@ -100,5 +100,47 @@ describe('Analysis Configuration', () => {
       },
     };
     expect(() => validateAnalysisConfig(badCentipoints)).toThrow(AnalysisConfigError);
+
+    const badBlunder: AnalysisConfig = {
+      ...CANONICAL_ANALYSIS_CONFIG,
+      thresholds: {
+        ...CANONICAL_ANALYSIS_CONFIG.thresholds,
+        blunderDelta: 100, // Less than mistakeDelta (250)
+      },
+    };
+    expect(() => validateAnalysisConfig(badBlunder)).toThrow(AnalysisConfigError);
+
+    const badNotationWidth: AnalysisConfig = {
+      ...CANONICAL_ANALYSIS_CONFIG,
+      formatting: {
+        ...CANONICAL_ANALYSIS_CONFIG.formatting,
+        maxNotationDisplayWidth: 0,
+      },
+    };
+    expect(() => validateAnalysisConfig(badNotationWidth)).toThrow(AnalysisConfigError);
+
+    const badAltBest: AnalysisConfig = {
+      ...CANONICAL_ANALYSIS_CONFIG,
+      formatting: {
+        ...CANONICAL_ANALYSIS_CONFIG.formatting,
+        tableColumnWidths: {
+          ...CANONICAL_ANALYSIS_CONFIG.formatting.tableColumnWidths,
+          altBest: 0,
+        },
+      },
+    };
+    expect(() => validateAnalysisConfig(badAltBest)).toThrow(AnalysisConfigError);
+
+    const badModelB: AnalysisConfig = {
+      ...CANONICAL_ANALYSIS_CONFIG,
+      accuracy: {
+        ...CANONICAL_ANALYSIS_CONFIG.accuracy,
+        modelCoefficients: {
+          ...CANONICAL_ANALYSIS_CONFIG.accuracy.modelCoefficients,
+          b: 'invalid' as unknown as number,
+        },
+      },
+    };
+    expect(() => validateAnalysisConfig(badModelB)).toThrow(AnalysisConfigError);
   });
 });
