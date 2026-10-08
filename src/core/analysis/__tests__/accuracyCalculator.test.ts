@@ -3,6 +3,8 @@ import {
   evaluationToWinProbability,
   calculateMoveAccuracy,
   calculatePlayerAccuracy,
+  createEmptyQualityBreakdown,
+  createEmptyAnalysisReport,
 } from '../accuracyCalculator';
 import type { EvaluatedMove } from '../analysisTypes';
 import type { Move, Square } from '../../schada/types';
@@ -132,5 +134,31 @@ describe('Accuracy Calculator', () => {
     const stats = calculatePlayerAccuracy([], 'blue');
     expect(stats.accuracy).toBe(100);
     expect(stats.moveCount).toBe(0);
+  });
+
+  it('creates empty quality breakdown with all 10 tiers initialized to 0', () => {
+    const breakdown = createEmptyQualityBreakdown();
+    expect(breakdown.brilliant).toBe(0);
+    expect(breakdown.great).toBe(0);
+    expect(breakdown.best).toBe(0);
+    expect(breakdown.excellent).toBe(0);
+    expect(breakdown.good).toBe(0);
+    expect(breakdown.book).toBe(0);
+    expect(breakdown.inaccuracy).toBe(0);
+    expect(breakdown.mistake).toBe(0);
+    expect(breakdown.miss).toBe(0);
+    expect(breakdown.blunder).toBe(0);
+    expect(Object.keys(breakdown)).toHaveLength(10);
+  });
+
+  it('creates empty analysis report adhering to canonical config accuracy defaults', () => {
+    const report = createEmptyAnalysisReport();
+    expect(report.moves).toHaveLength(0);
+    expect(report.totalPlies).toBe(0);
+    expect(report.blueAccuracy).toBe(100);
+    expect(report.greenAccuracy).toBe(100);
+    expect(report.blueBreakdown.best).toBe(0);
+    expect(report.greenBreakdown.blunder).toBe(0);
+    expect(report.isComplete).toBe(true);
   });
 });

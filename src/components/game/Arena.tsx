@@ -16,6 +16,9 @@ import { GameOverModal, type PlayerEloUpdate } from './GameOverModal';
 import { AnalysisModal } from './AnalysisModal';
 import { analysisWorkerClient } from '@/core/analysis/analysisWorkerClient';
 import type { MoveQuality } from '@/core/analysis/analysisConfig';
+import { CANONICAL_ANALYSIS_CONFIG } from '@/core/analysis/analysisConfig';
+import type { GameAnalysisReport } from '@/core/analysis/analysisTypes';
+import { createEmptyAnalysisReport } from '@/core/analysis/accuracyCalculator';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
@@ -141,6 +144,8 @@ export const Arena: React.FC<ArenaProps> = ({
   const [analyzedQualities, setAnalyzedQualities] = useState<Record<number, MoveQuality>>({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState<{ current: number; total: number } | null>(null);
+  const [postGameAnalysis, setPostGameAnalysis] = useState<GameAnalysisReport | null>(null);
+  const [isPostGameAnalyzing, setIsPostGameAnalyzing] = useState(false);
 
   const handleGameOverEffectsPlayed = useCallback(() => {
     setGameOverEffectsPlayed(true);
@@ -198,6 +203,8 @@ export const Arena: React.FC<ArenaProps> = ({
       setIsAnalyzing(false);
       setAnalysisProgress(null);
       setAnalyzedQualities({});
+      setPostGameAnalysis(null);
+      setIsPostGameAnalyzing(false);
     }
   }, [gameState.isGameOver]);
 
@@ -220,6 +227,33 @@ export const Arena: React.FC<ArenaProps> = ({
       setShowGameOverModal(true);
       setGameOverEffectsPlayed(false);
       onGameComplete?.(gameState);
+
+      // Trigger automatic background analysis for GameOverModal
+      if (gameState.moveHistory.length === 0) {
+        setPostGameAnalysis(createEmptyAnalysisReport());
+        setIsPostGameAnalyzing(false);
+      } else {
+        setIsPostGameAnalyzing(true);
+        setPostGameAnalysis(null);
+        analysisWorkerClient.startAnalysis(
+          gameState.moveHistory,
+          CANONICAL_ANALYSIS_CONFIG.search.postGameDepth,
+          CANONICAL_ANALYSIS_CONFIG.search.postGameTimeLimitMs,
+          {
+            onPlyEvaluated: () => {},
+            onComplete: (report) => {
+              if (report) {
+                setPostGameAnalysis(report);
+              }
+              setIsPostGameAnalyzing(false);
+            },
+            onError: (err) => {
+              console.error('Post-game background analysis error:', err);
+              setIsPostGameAnalyzing(false);
+            },
+          }
+        );
+      }
     }
     prevIsGameOverRef.current = gameState.isGameOver;
   }, [gameState.isGameOver, onGameComplete, gameState]);
@@ -870,6 +904,9 @@ export const Arena: React.FC<ArenaProps> = ({
             setGameOverEffectsPlayed(true);
             setIsReviewMode(true);
           }}
+          analysisReport={postGameAnalysis}
+          isAnalyzing={isPostGameAnalyzing}
+          moveHistory={gameState.moveHistory}
         />
       )}
 

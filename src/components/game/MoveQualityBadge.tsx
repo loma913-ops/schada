@@ -13,13 +13,14 @@ export interface MoveQualityBadgeProps {
   readonly size?: number;
   readonly config?: AnalysisDisplayConfig;
   readonly className?: string;
+  readonly forceRender?: boolean;
 }
 
 /**
  * Renders the graphical vector move quality badge matching the chess platform specification.
  * Solid colored circle with centered white glyph, native HTML tooltip title, and fixed dimensions.
  *
- * Excludes categories not in displayedQualities (such as excellent, good, book).
+ * Excludes categories not in displayedQualities (such as excellent, good, book) unless forceRender is true.
  *
  * Algorithmic Complexity:
  * - Time Complexity: O(1) constant time rendering.
@@ -33,6 +34,7 @@ export const MoveQualityBadge: React.FC<MoveQualityBadgeProps> = ({
   size,
   config = CANONICAL_ANALYSIS_DISPLAY_CONFIG,
   className = '',
+  forceRender = false,
 }) => {
   validateAnalysisDisplayConfig(config);
 
@@ -42,7 +44,7 @@ export const MoveQualityBadge: React.FC<MoveQualityBadgeProps> = ({
     );
   }
 
-  if (!config.displayedQualities.includes(quality)) {
+  if (!forceRender && !config.displayedQualities.includes(quality)) {
     return null;
   }
 
@@ -143,6 +145,38 @@ export const MoveQualityBadge: React.FC<MoveQualityBadgeProps> = ({
           >
             ??
           </text>
+        );
+      case 'good':
+        return (
+          <path
+            d="M5.5 10.5 L8.5 13.5 L14.5 7.5"
+            stroke="#ffffff"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        );
+      case 'excellent':
+        return (
+          <path
+            d="M6.5 9.5v5m2 0h3.5a1.2 1.2 0 0 0 1.2-1l.7-3a1.2 1.2 0 0 0-1.2-1.3H11V6.2a1.3 1.3 0 0 0-1.3-1.3l-.9 1.6L6.5 9.5"
+            stroke="#ffffff"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        );
+      case 'book':
+        return (
+          <path
+            d="M5 6.5 C6.5 5.5 8.5 5.5 10 7 C11.5 5.5 13.5 5.5 15 6.5 V14.5 C13.5 13.5 11.5 13.5 10 15 C8.5 13.5 6.5 13.5 5 14.5 Z M10 7 V15"
+            stroke="#ffffff"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
         );
       default:
         return null;

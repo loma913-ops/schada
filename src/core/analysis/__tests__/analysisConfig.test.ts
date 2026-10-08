@@ -57,6 +57,24 @@ describe('Analysis Configuration', () => {
       },
     };
     expect(() => validateAnalysisConfig(badCandLimit)).toThrow(AnalysisConfigError);
+
+    const badPostGameDepth: AnalysisConfig = {
+      ...CANONICAL_ANALYSIS_CONFIG,
+      search: {
+        ...CANONICAL_ANALYSIS_CONFIG.search,
+        postGameDepth: 0,
+      },
+    };
+    expect(() => validateAnalysisConfig(badPostGameDepth)).toThrow(AnalysisConfigError);
+
+    const badPostGameTime: AnalysisConfig = {
+      ...CANONICAL_ANALYSIS_CONFIG,
+      search: {
+        ...CANONICAL_ANALYSIS_CONFIG.search,
+        postGameTimeLimitMs: 5, // Less than minTimeLimitMs (10)
+      },
+    };
+    expect(() => validateAnalysisConfig(badPostGameTime)).toThrow(AnalysisConfigError);
   });
 
   it('throws AnalysisConfigError on non-monotonic thresholds', () => {

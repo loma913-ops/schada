@@ -25,12 +25,15 @@ describe('AnalysisWorkerClient', () => {
 
     const plyResults: Array<{ ply: number; quality: string }> = [];
 
+    let completedReport: any = null;
+
     await new Promise<void>((resolve, reject) => {
       client.startAnalysis(sampleMoves, 1, 50, {
         onPlyEvaluated: (plyIndex, evaluatedMove) => {
           plyResults.push({ ply: plyIndex, quality: evaluatedMove.quality });
         },
-        onComplete: () => {
+        onComplete: (report) => {
+          completedReport = report;
           resolve();
         },
         onError: (err) => {
@@ -42,21 +45,31 @@ describe('AnalysisWorkerClient', () => {
     expect(plyResults.length).toBe(2);
     expect(plyResults[0].ply).toBe(0);
     expect(plyResults[1].ply).toBe(1);
+    expect(completedReport).not.toBeNull();
+    expect(completedReport.moves).toHaveLength(2);
+    expect(typeof completedReport.blueAccuracy).toBe('number');
+    expect(typeof completedReport.greenAccuracy).toBe('number');
     expect(client.isRunning()).toBe(false);
   });
 
   it('handles empty move list cleanly and immediately completes', async () => {
     const client = new AnalysisWorkerClient();
+    let emptyReport: any = null;
 
     await new Promise<void>((resolve) => {
       client.startAnalysis([], 1, 50, {
         onPlyEvaluated: vi.fn(),
-        onComplete: () => {
+        onComplete: (report) => {
+          emptyReport = report;
           resolve();
         },
       });
     });
 
+    expect(emptyReport).not.toBeNull();
+    expect(emptyReport.moves).toHaveLength(0);
+    expect(emptyReport.blueAccuracy).toBe(100);
+    expect(emptyReport.greenAccuracy).toBe(100);
     expect(client.isRunning()).toBe(false);
   });
 

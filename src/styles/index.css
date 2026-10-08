@@ -1052,6 +1052,28 @@ body {
   position: relative;
 }
 
+.game-over-modal-content {
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.game-over-modal-header {
+  flex-shrink: 0;
+}
+
+.game-over-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.game-over-modal-footer {
+  flex-shrink: 0;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -1075,6 +1097,42 @@ body {
 
 .modal-close-btn:hover {
   color: var(--text-primary);
+}
+
+@keyframes skeletonPulse {
+  0%, 100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.modal-skeleton {
+  background-color: var(--border-strong);
+  border-radius: var(--radius-sm);
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.modal-skeleton-badge {
+  border-radius: 50%;
+}
+
+.modal-skeleton-label {
+  width: 65px;
+  height: 12px;
+}
+
+.modal-skeleton-count {
+  width: 22px;
+  height: 12px;
+  margin: 0 auto;
+}
+
+.modal-skeleton-accuracy {
+  width: 45px;
+  height: 14px;
+  margin: 0 auto;
 }
 
 /* Auth Modal Tabs */
@@ -2809,6 +2867,17 @@ body {
     max-height: 90vh;
     overflow-y: auto;
     animation: slideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .modal-content.game-over-modal-content {
+    padding: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .modal-content.game-over-modal-content .game-over-modal-footer {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 

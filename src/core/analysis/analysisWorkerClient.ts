@@ -1,5 +1,5 @@
 import type { Move } from '../schada/types';
-import type { EvaluatedMove } from './analysisTypes';
+import type { EvaluatedMove, GameAnalysisReport } from './analysisTypes';
 import type {
   AnalysisWorkerInboundMessage,
   AnalysisWorkerOutboundMessage,
@@ -7,6 +7,7 @@ import type {
 import { createInitialGameState } from '../schada/engine';
 import { evaluateSinglePly } from './analysisEngine';
 import { CANONICAL_ANALYSIS_CONFIG } from './analysisConfig';
+import { calculatePlayerAccuracy, createEmptyAnalysisReport } from './accuracyCalculator';
 
 export interface AnalysisProgress {
   readonly current: number;
@@ -19,7 +20,7 @@ export interface AnalysisCallbacks {
     evaluatedMove: EvaluatedMove,
     progress: AnalysisProgress
   ) => void;
-  readonly onComplete: () => void;
+  readonly onComplete: (report?: GameAnalysisReport) => void;
   readonly onError?: (error: Error) => void;
 }
 
@@ -64,7 +65,7 @@ export class AnalysisWorkerClient {
           const cb = this.activeCallbacks;
           this.activeId = null;
           this.activeCallbacks = null;
-          cb?.onComplete();
+          cb?.onComplete(msg.report);
         } else if (msg.type === 'ANALYSIS_ERROR') {
           const cb = this.activeCallbacks;
           this.activeId = null;
@@ -101,7 +102,7 @@ export class AnalysisWorkerClient {
         if (this.activeId === id) {
           this.activeId = null;
           this.activeCallbacks = null;
-          callbacks.onComplete();
+          callbacks.onComplete(createEmptyAnalysisReport());
         }
       }, 0);
       return id;
@@ -152,8 +153,10 @@ export class AnalysisWorkerClient {
     timeLimitMs: number,
     callbacks: AnalysisCallbacks
   ): void {
+    const startTime = performance.now();
     let currentState = createInitialGameState();
     const moveHistory: Move[] = [];
+    const evaluatedMoves: EvaluatedMove[] = [];
     let ply = 0;
 
     const step = () => {
@@ -161,7 +164,21 @@ export class AnalysisWorkerClient {
       if (ply >= moves.length) {
         this.activeId = null;
         this.activeCallbacks = null;
-        callbacks.onComplete();
+        const blueStats = calculatePlayerAccuracy(evaluatedMoves, 'blue', CANONICAL_ANALYSIS_CONFIG);
+        const greenStats = calculatePlayerAccuracy(evaluatedMoves, 'green', CANONICAL_ANALYSIS_CONFIG);
+        const report: GameAnalysisReport = {
+          metadata: {},
+          moves: evaluatedMoves,
+          blueAccuracy: blueStats.accuracy,
+          greenAccuracy: greenStats.accuracy,
+          blueBreakdown: blueStats.breakdown,
+          greenBreakdown: greenStats.breakdown,
+          isComplete: currentState.isGameOver,
+          totalPlies: evaluatedMoves.length,
+          analyzedAt: new Date().toISOString(),
+          durationMs: Math.round(performance.now() - startTime),
+        };
+        callbacks.onComplete(report);
         return;
       }
 
@@ -178,6 +195,8 @@ export class AnalysisWorkerClient {
         );
 
         if (this.activeId !== id) return;
+
+        evaluatedMoves.push(evaluatedMove);
 
         callbacks.onPlyEvaluated(ply, evaluatedMove, {
           current: ply + 1,

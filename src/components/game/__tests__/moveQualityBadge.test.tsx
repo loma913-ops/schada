@@ -91,4 +91,25 @@ describe('MoveQualityBadge Component', () => {
       'AnalysisDisplayConfigError'
     );
   });
+
+  it('renders all 10 qualities when forceRender is true', () => {
+    const qualities = [
+      'brilliant',
+      'great',
+      'best',
+      'excellent',
+      'good',
+      'book',
+      'inaccuracy',
+      'mistake',
+      'miss',
+      'blunder',
+    ] as const;
+
+    for (const q of qualities) {
+      const html = renderToStaticMarkup(<MoveQualityBadge quality={q} forceRender />);
+      expect(html).toContain(`data-quality="${q}"`);
+      expect(html).toContain('<svg');
+    }
+  });
 });

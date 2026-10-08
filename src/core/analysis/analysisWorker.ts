@@ -3,7 +3,8 @@ import type { Move } from '../schada/types';
 import { createInitialGameState } from '../schada/engine';
 import { evaluateSinglePly } from './analysisEngine';
 import { CANONICAL_ANALYSIS_CONFIG } from './analysisConfig';
-import type { EvaluatedMove } from './analysisTypes';
+import type { EvaluatedMove, GameAnalysisReport } from './analysisTypes';
+import { calculatePlayerAccuracy } from './accuracyCalculator';
 
 export interface StartAnalysisWorkerMessage {
   readonly type: 'START_ANALYSIS';
@@ -36,6 +37,7 @@ export interface PlyEvaluatedWorkerMessage {
 export interface AnalysisCompletedWorkerMessage {
   readonly type: 'ANALYSIS_COMPLETED';
   readonly id: string;
+  readonly report?: GameAnalysisReport;
 }
 
 export interface AnalysisErrorWorkerMessage {
@@ -65,10 +67,12 @@ self.onmessage = (event: MessageEvent<AnalysisWorkerInboundMessage>) => {
   if (data.type === 'START_ANALYSIS') {
     const { id, moves, depth, timeLimitMs } = data;
     currentAnalysisId = id;
+    const startTime = performance.now();
 
     try {
       let currentState = createInitialGameState();
       const moveHistory: Move[] = [];
+      const evaluatedMoves: EvaluatedMove[] = [];
 
       for (let ply = 0; ply < moves.length; ply++) {
         // Stop immediately if cancelled mid-analysis
@@ -91,6 +95,8 @@ self.onmessage = (event: MessageEvent<AnalysisWorkerInboundMessage>) => {
           return;
         }
 
+        evaluatedMoves.push(evaluatedMove);
+
         const response: PlyEvaluatedWorkerMessage = {
           type: 'PLY_EVALUATED',
           id,
@@ -108,9 +114,26 @@ self.onmessage = (event: MessageEvent<AnalysisWorkerInboundMessage>) => {
       }
 
       if (currentAnalysisId === id) {
+        const blueStats = calculatePlayerAccuracy(evaluatedMoves, 'blue', CANONICAL_ANALYSIS_CONFIG);
+        const greenStats = calculatePlayerAccuracy(evaluatedMoves, 'green', CANONICAL_ANALYSIS_CONFIG);
+
+        const report: GameAnalysisReport = {
+          metadata: {},
+          moves: evaluatedMoves,
+          blueAccuracy: blueStats.accuracy,
+          greenAccuracy: greenStats.accuracy,
+          blueBreakdown: blueStats.breakdown,
+          greenBreakdown: greenStats.breakdown,
+          isComplete: currentState.isGameOver,
+          totalPlies: evaluatedMoves.length,
+          analyzedAt: new Date().toISOString(),
+          durationMs: Math.round(performance.now() - startTime),
+        };
+
         const completeResponse: AnalysisCompletedWorkerMessage = {
           type: 'ANALYSIS_COMPLETED',
           id,
+          report,
         };
         self.postMessage(completeResponse);
         currentAnalysisId = null;
