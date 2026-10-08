@@ -476,7 +476,7 @@ export function searchBestMove(
   const candidateScores: Array<{ move: FastMove; score: number }> = [];
 
   for (let d = 1; d <= maxDepth; d++) {
-    candidateScores.length = 0;
+    const currentIterationScores: Array<{ move: FastMove; score: number }> = [];
     let iterationBestScore = -Infinity;
     let iterationBestMove = bestMove;
 
@@ -491,7 +491,7 @@ export function searchBestMove(
 
       if (ctx.timedOut) break;
 
-      candidateScores.push({ move, score });
+      currentIterationScores.push({ move, score });
       if (score > iterationBestScore) {
         iterationBestScore = score;
         iterationBestMove = move;
@@ -499,9 +499,14 @@ export function searchBestMove(
     }
 
     if (ctx.timedOut) {
+      if (candidateScores.length === 0 && currentIterationScores.length > 0) {
+        candidateScores.push(...currentIterationScores);
+      }
       break;
     }
 
+    candidateScores.length = 0;
+    candidateScores.push(...currentIterationScores);
     bestMove = iterationBestMove;
 
     if (iterationBestScore >= TERMINAL_WIN - BOT_ENGINE_CONFIG.searchParameters.terminalNearWinCutoff) {
@@ -582,7 +587,7 @@ export function searchMoveCandidates(
     }
 
     if (ctx.timedOut) {
-      if (candidateScores.length === 0) {
+      if (candidateScores.length === 0 && currentIterationScores.length === legalMoves.length) {
         candidateScores = currentIterationScores;
       }
       break;
@@ -596,7 +601,7 @@ export function searchMoveCandidates(
     }
   }
 
-  if (candidateScores.length === 0) {
+  if (candidateScores.length < legalMoves.length) {
     candidateScores = legalMoves.map((m) => {
       board.makeMove(m);
       const score = -evaluateBoard(board, board.currentTurn, tier, 1);

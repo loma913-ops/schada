@@ -113,4 +113,26 @@ describe('Analysis Engine', () => {
     expect(report.nextMove?.notation).toBeDefined();
     expect(report.nextMove?.candidateMoves.length).toBeGreaterThan(0);
   });
+
+  it('reliably analyzes games at deep search (depth >= 7) with strictly finite evaluations and valid accuracy', () => {
+    const shortGame = '1. Pd2-b4 Pe7-g5 2. Fa1-a3 Fb8-b6 3. Pa2-c4 Pf7-e6';
+    const report = analyzeGame(shortGame, {
+      depth: 8,
+      timeLimitMs: 50,
+    });
+
+    expect(report.totalPlies).toBe(6);
+    expect(Number.isFinite(report.blueAccuracy)).toBe(true);
+    expect(Number.isFinite(report.greenAccuracy)).toBe(true);
+    expect(report.blueAccuracy).not.toBeNaN();
+    expect(report.greenAccuracy).not.toBeNaN();
+
+    for (const move of report.moves) {
+      expect(Number.isFinite(move.evalBefore)).toBe(true);
+      expect(Number.isFinite(move.evalAfter)).toBe(true);
+      expect(Number.isFinite(move.evalDelta)).toBe(true);
+      expect(move.evalDelta).toBeGreaterThanOrEqual(0);
+      expect(move.evalDelta).not.toBeNaN();
+    }
+  });
 });

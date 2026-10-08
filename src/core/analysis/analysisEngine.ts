@@ -211,7 +211,11 @@ export function analyzeGame(
       playedScore = -Infinity;
     }
 
-    const evalDelta = isBook ? 0 : Math.max(0, bestScore - playedScore);
+    const evalDelta = isBook
+      ? 0
+      : Number.isFinite(bestScore) && Number.isFinite(playedScore)
+        ? Math.max(0, bestScore - playedScore)
+        : 0;
 
     // 4. Sacrifice Detection for Brilliant Moves
     let isSacrifice = false;
@@ -228,8 +232,10 @@ export function analyzeGame(
     const quality = classifyMoveQuality(evalDelta, bestScore, candidateScores, isSacrifice, isBook, config);
 
     // Normalize eval score to point of view (positive = Blue advantage)
-    const normalizedBefore = turn === 'blue' ? bestScore : -bestScore;
-    const normalizedAfter = turn === 'blue' ? playedScore : -playedScore;
+    const safeBestScore = Number.isFinite(bestScore) ? bestScore : 0;
+    const safePlayedScore = Number.isFinite(playedScore) ? playedScore : safeBestScore;
+    const normalizedBefore = turn === 'blue' ? safeBestScore : -safeBestScore;
+    const normalizedAfter = turn === 'blue' ? safePlayedScore : -safePlayedScore;
 
     evaluatedMoves.push({
       ply: ply + 1,

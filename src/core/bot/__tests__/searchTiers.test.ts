@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { createInitialGameState } from '../../schada/engine';
 import { selectBotMove, getBotThinkingDelayMs } from '../schadaBot';
 import { botWorkerClient } from '../botWorkerClient';
+import { FastBoard } from '../fastBoard';
+import { getBotTier } from '../botTiers';
+import { searchMoveCandidates } from '../search';
 
 describe('8-Tier Search Engine Validation', () => {
   it('successfully calculates legal moves for all 8 tiers from initial board', () => {
@@ -44,5 +47,26 @@ describe('8-Tier Search Engine Validation', () => {
 
     expect(move).not.toBeNull();
     expect(move?.piece.color).toBe('blue');
+  });
+
+  it('produces finite, non-NaN candidate evaluations during deep searches (depths 7 through 20)', () => {
+    const state = createInitialGameState();
+    const fastBoard = FastBoard.fromBoardMatrix(state.board, 'blue');
+    const tier = getBotTier(8);
+
+    for (const testDepth of [7, 8, 10, 16, 20]) {
+      const candidates = searchMoveCandidates(fastBoard, tier, testDepth, 150);
+      expect(candidates.length).toBeGreaterThan(0);
+      for (const cand of candidates) {
+        expect(Number.isFinite(cand.score)).toBe(true);
+        expect(cand.score).not.toBeNaN();
+        expect(cand.score).not.toBe(-Infinity);
+        expect(cand.score).not.toBe(Infinity);
+      }
+      // Candidates must be sorted descending
+      for (let i = 1; i < candidates.length; i++) {
+        expect(candidates[i - 1].score).toBeGreaterThanOrEqual(candidates[i].score);
+      }
+    }
   });
 });
