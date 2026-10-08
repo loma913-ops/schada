@@ -31,7 +31,9 @@ describe('AnalysisModal Component', () => {
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="true"');
     expect(html).toContain('modal-overlay');
+    expect(html).toContain('analysis-modal-overlay');
     expect(html).toContain('modal-content');
+    expect(html).toContain('analysis-modal-content');
 
     // Title and copy
     expect(html).toContain(CANONICAL_ANALYSIS_MODAL_CONFIG.copy.title);

@@ -103,13 +103,13 @@ export const AnalysisModal: React.FC<AnalysisModalProps> = ({
 
   return (
     <div
-      className="modal-overlay"
+      className="modal-overlay analysis-modal-overlay"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="analysis-modal-title"
     >
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content analysis-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Sparkles size={20} color="var(--accent-gold)" />
