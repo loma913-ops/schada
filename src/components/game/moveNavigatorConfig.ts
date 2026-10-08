@@ -23,6 +23,8 @@ export interface MoveNavigatorButtonCopy {
 export interface MoveNavigatorHistoryCopy {
   readonly headerTitle: string;
   readonly emptyHistoryMessage: string;
+  readonly analyzeButtonText: string;
+  readonly analyzeButtonAriaLabel: string;
 }
 
 export interface MoveNavigatorConfig {
@@ -80,6 +82,24 @@ export function validateMoveNavigatorConfig(config: MoveNavigatorConfig): void {
   ) {
     throw new MoveNavigatorConfigError(
       'Invalid historyCopy.emptyHistoryMessage: expected non-empty string.'
+    );
+  }
+
+  if (
+    typeof config.historyCopy.analyzeButtonText !== 'string' ||
+    config.historyCopy.analyzeButtonText.trim().length === 0
+  ) {
+    throw new MoveNavigatorConfigError(
+      'Invalid historyCopy.analyzeButtonText: expected non-empty string.'
+    );
+  }
+
+  if (
+    typeof config.historyCopy.analyzeButtonAriaLabel !== 'string' ||
+    config.historyCopy.analyzeButtonAriaLabel.trim().length === 0
+  ) {
+    throw new MoveNavigatorConfigError(
+      'Invalid historyCopy.analyzeButtonAriaLabel: expected non-empty string.'
     );
   }
 
@@ -153,6 +173,8 @@ export const CANONICAL_MOVE_NAVIGATOR_CONFIG: MoveNavigatorConfig = Object.freez
   historyCopy: Object.freeze({
     headerTitle: 'Moves Notation',
     emptyHistoryMessage: 'No moves made yet',
+    analyzeButtonText: 'Analyze',
+    analyzeButtonAriaLabel: 'Analyze game moves',
   }),
   ariaLabels: Object.freeze({
     toolbar: 'Game moves navigation',

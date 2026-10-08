@@ -13,6 +13,9 @@ import { MoveHistory } from './MoveHistory';
 import { MoveNavigator } from './MoveNavigator';
 import { GameControls } from './GameControls';
 import { GameOverModal, type PlayerEloUpdate } from './GameOverModal';
+import { AnalysisModal } from './AnalysisModal';
+import { analysisWorkerClient } from '@/core/analysis/analysisWorkerClient';
+import type { MoveQuality } from '@/core/analysis/analysisConfig';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
@@ -67,10 +70,17 @@ interface ArenaProps {
   onResign?: () => void;
   onTimeout?: (timedOutColor: PieceColor) => void;
   onGameComplete?: (finalState: BoardState) => void;
+  onAnalyze?: () => void;
+  onStartAnalysis?: (params: {
+    readonly depth: number;
+    readonly timeLimitSeconds: number;
+    readonly timeLimitMs: number;
+  }) => void;
   onExit: () => void;
   blueDisconnected?: boolean;
   greenDisconnected?: boolean;
   abandonCountdownSeconds?: number | null;
+  initialReviewMode?: boolean;
 }
 
 export const Arena: React.FC<ArenaProps> = ({
@@ -94,10 +104,13 @@ export const Arena: React.FC<ArenaProps> = ({
   onResign: customResign,
   onTimeout: customTimeout,
   onGameComplete,
+  onAnalyze,
+  onStartAnalysis,
   onExit,
   blueDisconnected,
   greenDisconnected,
   abandonCountdownSeconds,
+  initialReviewMode = false,
 }) => {
   const [gameState, setGameState] = useState<BoardState>(syncedGameState || initialState);
   const [viewMoveIndex, setViewMoveIndex] = useState<number>(() => {
@@ -121,11 +134,85 @@ export const Arena: React.FC<ArenaProps> = ({
     }
   }, [userColor, isSpectator, gameState.currentTurn]);
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
-  const [showGameOverModal, setShowGameOverModal] = useState(true);
-  const [gameOverEffectsPlayed, setGameOverEffectsPlayed] = useState(false);
+  const [showGameOverModal, setShowGameOverModal] = useState(() => !initialReviewMode);
+  const [gameOverEffectsPlayed, setGameOverEffectsPlayed] = useState(() => Boolean(initialReviewMode));
+  const [isReviewMode, setIsReviewMode] = useState(() => Boolean(initialReviewMode));
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [analyzedQualities, setAnalyzedQualities] = useState<Record<number, MoveQuality>>({});
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<{ current: number; total: number } | null>(null);
+
   const handleGameOverEffectsPlayed = useCallback(() => {
     setGameOverEffectsPlayed(true);
   }, []);
+
+  const handleCancelAnalysis = useCallback(() => {
+    analysisWorkerClient.cancelAnalysis();
+    setIsAnalyzing(false);
+    setAnalysisProgress(null);
+  }, []);
+
+  const handleStartAnalysis = useCallback(
+    (params: {
+      readonly depth: number;
+      readonly timeLimitSeconds: number;
+      readonly timeLimitMs: number;
+    }) => {
+      setAnalyzedQualities({});
+      setIsAnalyzing(true);
+      setAnalysisProgress({ current: 0, total: gameState.moveHistory.length });
+
+      analysisWorkerClient.startAnalysis(
+        gameState.moveHistory,
+        params.depth,
+        params.timeLimitMs,
+        {
+          onPlyEvaluated: (plyIndex, evaluatedMove, progress) => {
+            setAnalyzedQualities((prev) => ({
+              ...prev,
+              [plyIndex]: evaluatedMove.quality,
+            }));
+            setAnalysisProgress(progress);
+          },
+          onComplete: () => {
+            setIsAnalyzing(false);
+            setAnalysisProgress(null);
+          },
+          onError: (err) => {
+            console.error('Game analysis failed:', err);
+            setIsAnalyzing(false);
+            setAnalysisProgress(null);
+          },
+        }
+      );
+
+      onStartAnalysis?.(params);
+    },
+    [gameState.moveHistory, onStartAnalysis]
+  );
+
+  useEffect(() => {
+    if (!gameState.isGameOver) {
+      setIsReviewMode(false);
+      analysisWorkerClient.cancelAnalysis();
+      setIsAnalyzing(false);
+      setAnalysisProgress(null);
+      setAnalyzedQualities({});
+    }
+  }, [gameState.isGameOver]);
+
+  useEffect(() => {
+    return () => {
+      analysisWorkerClient.cancelAnalysis();
+    };
+  }, []);
+
+  const isReview = Boolean(gameState.isGameOver && (isReviewMode || !showGameOverModal));
+
+  const handleAnalyze = useCallback(() => {
+    setShowAnalysisModal(true);
+    onAnalyze?.();
+  }, [onAnalyze]);
 
   const prevIsGameOverRef = useRef(gameState.isGameOver);
   useEffect(() => {
@@ -695,6 +782,12 @@ export const Arena: React.FC<ArenaProps> = ({
           history={gameState.moveHistory}
           currentMoveIndex={viewMoveIndex}
           onNavigateMove={setViewMoveIndex}
+          isReview={isReview}
+          onAnalyze={handleAnalyze}
+          isAnalyzing={isAnalyzing}
+          analysisProgress={analysisProgress}
+          analyzedQualities={analyzedQualities}
+          onCancelAnalysis={handleCancelAnalysis}
         />
 
         {/* Action Controls */}
@@ -747,6 +840,12 @@ export const Arena: React.FC<ArenaProps> = ({
                 history={gameState.moveHistory}
                 currentMoveIndex={viewMoveIndex}
                 onNavigateMove={setViewMoveIndex}
+                isReview={isReview}
+                onAnalyze={handleAnalyze}
+                isAnalyzing={isAnalyzing}
+                analysisProgress={analysisProgress}
+                analyzedQualities={analyzedQualities}
+                onCancelAnalysis={handleCancelAnalysis}
               />
             </div>
           </div>
@@ -769,9 +868,21 @@ export const Arena: React.FC<ArenaProps> = ({
           onClose={() => {
             setShowGameOverModal(false);
             setGameOverEffectsPlayed(true);
+            setIsReviewMode(true);
           }}
         />
       )}
+
+      {/* Analysis Settings Modal */}
+      <AnalysisModal
+        isOpen={showAnalysisModal}
+        totalMoves={gameState.moveHistory.length}
+        onClose={() => setShowAnalysisModal(false)}
+        onStartAnalysis={(params) => {
+          setShowAnalysisModal(false);
+          handleStartAnalysis(params);
+        }}
+      />
     </div>
   );
 };

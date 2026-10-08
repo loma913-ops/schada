@@ -112,7 +112,7 @@ export const CANONICAL_ANALYSIS_CONFIG: AnalysisConfig = Object.freeze({
     maxDepth: 20,
     defaultTimeLimitMs: 250,
     minTimeLimitMs: 10,
-    maxTimeLimitMs: 5000,
+    maxTimeLimitMs: 15000,
     masterTierLevel: 8,
     topCandidateMovesLimit: 5,
   }),

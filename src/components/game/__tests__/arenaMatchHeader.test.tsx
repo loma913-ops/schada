@@ -133,4 +133,37 @@ describe('Arena Match Header Time Limit Display', () => {
     );
     expect(htmlUnlimited).toContain('∞ •');
   });
+
+  it('renders Analyze button when game is over and in review mode', () => {
+    const finishedGameState = {
+      ...initialBoard,
+      isGameOver: true,
+      result: {
+        winner: 'blue' as const,
+        winReason: 'goal_reached' as const,
+        blueScore: { goalScore: 2, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 2 },
+        greenScore: { goalScore: 0, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 0 },
+      },
+    };
+
+    const onAnalyze = vi.fn();
+    const htmlFinished = renderToStaticMarkup(
+      <GamePreferencesProvider>
+        <Arena
+          initialState={finishedGameState}
+          bluePlayer={mockBluePlayer}
+          greenPlayer={mockGreenPlayer}
+          timeControlMinutes={5}
+          incrementSeconds={0}
+          isRanked={false}
+          initialReviewMode={true}
+          onAnalyze={onAnalyze}
+          onExit={vi.fn()}
+        />
+      </GamePreferencesProvider>
+    );
+
+    expect(htmlFinished).toContain('move-history-analyze-btn');
+    expect(htmlFinished).toContain('Analyze');
+  });
 });
