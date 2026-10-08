@@ -8,6 +8,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteField,
   runTransaction,
   serverTimestamp,
   onSnapshot,
@@ -24,6 +25,7 @@ import { LOCAL_CONFIG } from './localConfig';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { safeSetItem } from '../storage/storageCleanup';
 import { AUTH_CONFIG } from './authConfig';
+import { SECURITY_CONFIG } from '@/core/security/securityConfig';
 
 export function validateUsernameFormat(username: string): { valid: boolean; error?: string } {
   const trimmed = username.trim();
@@ -254,7 +256,9 @@ export async function reloadUserProfile(): Promise<UserProfile | null> {
       if (snap.exists()) {
         const active = isCurrentClientActive();
         const status = active ? 'online' : 'offline';
-        const profile: UserProfile = { ...(snap.data() as UserProfile), status };
+        const data = snap.data() as UserProfile;
+        const authEmail = auth.currentUser?.email ?? data.email ?? SECURITY_CONFIG.emptyEmailFallback;
+        const profile: UserProfile = { ...data, email: authEmail, status };
         persistCachedProfile(profile);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
@@ -379,11 +383,13 @@ export async function registerUser(
       createdAt: new Date().toISOString(),
     };
 
-    // 3. Atomically write profile and reserve username
+    const { email: _omitEmail, ...firestoreProfile } = userProfile;
+
+    // 3. Atomically write profile and reserve username (email omitted from public Firestore document)
     await runTransaction(firestore, async (tx) => {
       tx.set(usernameDocRef, { uid, createdAt: serverTimestamp() });
       tx.set(doc(firestore, MULTIPLAYER_SCALE_CONFIG.collections.users, uid), {
-        ...userProfile,
+        ...firestoreProfile,
         createdAt: serverTimestamp(),
         lastSeen: serverTimestamp(),
       });
@@ -415,7 +421,8 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
     const active = isCurrentClientActive();
     const status = active ? 'online' : 'offline';
     const data = userDoc.data() as UserProfile;
-    const profileWithStatus: UserProfile = { ...data, status };
+    const authEmail = auth.currentUser?.email ?? email;
+    const profileWithStatus: UserProfile = { ...data, email: authEmail, status };
     persistCachedProfile(profileWithStatus);
     syncPresenceHeartbeat();
     return profileWithStatus;
@@ -468,7 +475,7 @@ export async function changeUsername(
       if (!userSnap.exists()) throw new Error('User does not exist.');
 
       const current = userSnap.data() as UserProfile;
-      if (current.usernameChangeCount >= 1) {
+      if (current.usernameChangeCount >= SECURITY_CONFIG.maxUsernameChanges) {
         throw new Error('You have already changed your username once. No further changes are allowed.');
       }
 
@@ -490,13 +497,13 @@ export async function changeUsername(
         ...current,
         username: newUsername.trim(),
         usernameLower: newLower,
-        usernameChangeCount: 1,
+        usernameChangeCount: SECURITY_CONFIG.maxUsernameChanges,
       };
 
       tx.update(userDocRef, {
         username: newUsername.trim(),
         usernameLower: newLower,
-        usernameChangeCount: 1,
+        usernameChangeCount: SECURITY_CONFIG.maxUsernameChanges,
         updatedAt: serverTimestamp(),
       });
 
@@ -541,6 +548,9 @@ function hasMeaningfulProfileChanged(
   );
 }
 
+// In-memory set tracking user accounts whose PII email field has already been scheduled for deletion
+const migratedEmailUids = new Set<string>();
+
 export function subscribeToAuthState(callback: (user: UserProfile | null) => void): () => void {
   if (isFirebaseConfigured() && auth && db) {
     let unsubscribeDoc: (() => void) | null = null;
@@ -571,8 +581,21 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
                 const currentActive = isCurrentClientActive();
                 const currentStatus = currentActive ? 'online' : 'offline';
                 const data = userSnap.data() as UserProfile;
+                const authEmail = firebaseUser.email ?? data.email ?? SECURITY_CONFIG.emptyEmailFallback;
+
+                // Migration: if Firestore user doc still contains email, delete it to protect PII.
+                // Deduplicated via migratedEmailUids to guarantee strictly <= 1 write operation.
+                if ('email' in data && data.email !== undefined && !migratedEmailUids.has(firebaseUser.uid)) {
+                  migratedEmailUids.add(firebaseUser.uid);
+                  updateDoc(userDocRef, { email: deleteField() }).catch((err) => {
+                    migratedEmailUids.delete(firebaseUser.uid);
+                    console.warn('Could not remove email from Firestore user doc:', err);
+                  });
+                }
+
                 const profile: UserProfile = {
                   ...data,
+                  email: authEmail,
                   status: currentStatus,
                 };
                 // Only dispatch callback when meaningful profile fields change (avoids lastSeen ping-pong loops)

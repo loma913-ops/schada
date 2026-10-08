@@ -310,19 +310,23 @@ function pvs(
 
   // Null-Move Pruning (Levels 7-8)
   const searchParams = BOT_ENGINE_CONFIG.searchParameters;
-  if (ctx.tier.useNullMovePruning && allowNull && depth >= searchParams.nullMoveMinDepth && ply > 0) {
+  const isBetaFinite = Number.isFinite(beta) && Math.abs(beta) < TERMINAL_WIN - searchParams.terminalNearWinCutoff;
+  if (ctx.tier.useNullMovePruning && allowNull && depth >= searchParams.nullMoveMinDepth && ply > 0 && isBetaFinite) {
     const isBlue = board.currentTurn === 'blue';
     const highRemain = isBlue
       ? board.blueHighTotal - board.blueHighInGoal
       : board.greenHighTotal - board.greenHighInGoal;
 
     if (highRemain > 1) {
-      board.currentTurn = isBlue ? 'green' : 'blue';
-      const nullScore = -pvs(board, depth - 1 - searchParams.nullMoveReduction, -beta, -beta + 1, ply + 1, ctx, false);
-      board.currentTurn = isBlue ? 'blue' : 'green';
+      const staticEval = evaluateBoard(board, board.currentTurn, ctx.tier, ply);
+      if (staticEval >= beta) {
+        board.currentTurn = isBlue ? 'green' : 'blue';
+        const nullScore = -pvs(board, depth - 1 - searchParams.nullMoveReduction, -beta, -beta + 1, ply + 1, ctx, false);
+        board.currentTurn = isBlue ? 'blue' : 'green';
 
-      if (ctx.timedOut) return alpha;
-      if (nullScore >= beta) return beta;
+        if (ctx.timedOut) return alpha;
+        if (nullScore >= beta) return beta;
+      }
     }
   }
 
@@ -472,7 +476,7 @@ export function searchBestMove(
   const candidateScores: Array<{ move: FastMove; score: number }> = [];
 
   for (let d = 1; d <= maxDepth; d++) {
-    candidateScores.length = 0;
+    const currentIterationScores: Array<{ move: FastMove; score: number }> = [];
     let iterationBestScore = -Infinity;
     let iterationBestMove = bestMove;
 
@@ -487,7 +491,7 @@ export function searchBestMove(
 
       if (ctx.timedOut) break;
 
-      candidateScores.push({ move, score });
+      currentIterationScores.push({ move, score });
       if (score > iterationBestScore) {
         iterationBestScore = score;
         iterationBestMove = move;
@@ -495,9 +499,14 @@ export function searchBestMove(
     }
 
     if (ctx.timedOut) {
+      if (candidateScores.length === 0 && currentIterationScores.length > 0) {
+        candidateScores.push(...currentIterationScores);
+      }
       break;
     }
 
+    candidateScores.length = 0;
+    candidateScores.push(...currentIterationScores);
     bestMove = iterationBestMove;
 
     if (iterationBestScore >= TERMINAL_WIN - BOT_ENGINE_CONFIG.searchParameters.terminalNearWinCutoff) {
@@ -520,4 +529,87 @@ export function searchBestMove(
   }
 
   return bestMove;
+}
+
+export interface CandidateMoveEvaluation {
+  readonly move: FastMove;
+  readonly score: number;
+}
+
+/**
+ * Evaluates all legal moves from the current position using iterative deepening
+ * with alpha-beta/PVS search, returning candidate moves ranked by engine score.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: Bounded by timeLimitMs; worst case O(b^d), average case O(b^(d/2)).
+ * - Auxiliary Space Complexity: O(d + TT_SIZE) fixed allocation.
+ *
+ * Growth Rate:
+ * - Controlled polynomial-depth traversal pruned via alpha-beta cutoffs, transposition
+ *   table hits, and killer move heuristic, ensuring scalability as tree depth d increases.
+ */
+export function searchMoveCandidates(
+  board: FastBoard,
+  tier: BotTierConfig,
+  targetDepth: number,
+  timeLimitMs: number
+): CandidateMoveEvaluation[] {
+  const legalMoves = board.generateLegalMoves(board.currentTurn);
+  if (legalMoves.length === 0) return [];
+
+  const ctx = createSearchContext(tier, timeLimitMs);
+  let bestMove: FastMove = legalMoves[0];
+  const maxDepth = Math.max(1, Math.min(targetDepth, tier.maxDepth));
+
+  let candidateScores: Array<{ move: FastMove; score: number }> = [];
+
+  for (let d = 1; d <= maxDepth; d++) {
+    const currentIterationScores: Array<{ move: FastMove; score: number }> = [];
+    let iterationBestScore = -Infinity;
+    let iterationBestMove = bestMove;
+
+    if (tier.useMoveOrdering) {
+      sortMoves(legalMoves, bestMove.from, bestMove.to, 0, ctx);
+    }
+
+    for (const move of legalMoves) {
+      board.makeMove(move);
+      const score = -pvs(board, d - 1, -Infinity, Infinity, 1, ctx, true);
+      board.unmakeMove();
+
+      if (ctx.timedOut) break;
+
+      currentIterationScores.push({ move, score });
+      if (score > iterationBestScore) {
+        iterationBestScore = score;
+        iterationBestMove = move;
+      }
+    }
+
+    if (ctx.timedOut) {
+      if (candidateScores.length === 0 && currentIterationScores.length === legalMoves.length) {
+        candidateScores = currentIterationScores;
+      }
+      break;
+    }
+
+    candidateScores = currentIterationScores;
+    bestMove = iterationBestMove;
+
+    if (iterationBestScore >= TERMINAL_WIN - BOT_ENGINE_CONFIG.searchParameters.terminalNearWinCutoff) {
+      break;
+    }
+  }
+
+  if (candidateScores.length < legalMoves.length) {
+    candidateScores = legalMoves.map((m) => {
+      board.makeMove(m);
+      const score = -evaluateBoard(board, board.currentTurn, tier, 1);
+      board.unmakeMove();
+      return { move: m, score };
+    });
+  }
+
+  candidateScores.sort((a, b) => b.score - a.score);
+  return candidateScores;
 }

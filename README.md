@@ -16,6 +16,8 @@ Schada combines a fast, minimalist, Lichess-inspired user experience with a math
 6. [Updating & Deploying to Production](#6-updating--deploying-to-production)
 7. [Project Architecture & Structure](#7-project-architecture--structure)
 8. [Editing `src/core/schada/vectors.ts`](#8-editing-srccoreschadavectorsts)
+9. [Security & Threat Modeling](#9-security--threat-modeling)
+10. [Knowledge Graph (graphify)](#10-knowledge-graph-graphify)
 
 ---
 
@@ -63,6 +65,9 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
 - **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.
 - **Partitioned Lobby Sections**: Dedicated "My Games" section pinned at the top for player's active and waiting games, alongside filtered "Available Games".
+- **Defense-in-Depth Security Hardening**: Granular Firestore authorization rules, sensitive PII segregation, and comprehensive HTTP security headers with strict cache invalidation.
+- **Standalone Bot Championship Simulator**: Local CLI tool pitting all 8 AI tiers against each other in multi-tournament brackets with Elo calibration, game notation, and cross-table export.
+- **Standalone Game Analysis Engine**: Post-game 10-tier move quality classifier, player accuracy calculator, and continuation predictor powered by Tier 8 Master search.
 
 ---
 
@@ -90,8 +95,62 @@ The Schada AI engine (`src/core/bot`) is implemented from scratch in TypeScript 
 - **Zobrist Transposition Table**: 262,144-entry (2¹⁸) hash table storing exact scores, upper bounds, and lower bounds with depth-preferred replacement.
 - **Move Ordering**: Prioritizes PV moves > MVV-LVA Captures > Goal Entry > Killer Moves > History Heuristic > Shortest-Path Distance Gains.
 - **Quiescence Search**: Resolves volatile capture chains and goal-line entries beyond the horizon to prevent tactical blunders.
-- **Opening Book**: Pre-compiled database of historical opening variations (e.g., *Twin Pillars Defense*, *Wing Outpost Variation*, *Eastern/Western Sentinels*).
+- **Opening Book**: Universal engine-calibrated database of 294 positions covering all 14 legal Blue opening moves (e.g., *Flank Flow*, *Center Flow*, *Pawn Strikes*, *Wing Outposts*) with tactical vector safety and Boltzmann-distributed selection weights.
 - **Distance Tables**: Precomputed breadth-first search (BFS) shortest-path tables (`DISTANCE_TABLES`) quantifying exact minimum moves to the goal rank for every square.
+
+### Standalone Championship Simulator (CLI)
+
+Schada includes a standalone, command-line championship simulator (`scripts/simulateTournaments.ts`) designed to pit all 8 AI tiers against each other in single-elimination tournament brackets. This utility allows developers to calibrate bot Elo ratings, discover engine balance anomalies, and generate complete game notations.
+
+> **100% Local & Offline**: The tournament simulator executes entirely in-memory using Node.js CPU workers and writes results directly to local disk. It **never connects to Firebase, requires zero network access, and never touches any database.**
+
+#### How It Works
+- **Championship Bracket**: Each tournament seeds all 8 bots in a single-elimination knockout bracket (4 Quarterfinals → 2 Semifinals → 1 Championship Final = 7 matches per tournament).
+- **Random Seeding & Colors**: Shuffles seeds every tournament to ensure a diverse spread of matchups across all tiers, and assigns Blue/Green colors randomly (50/50) per match to eliminate first-move bias.
+- **Draw Resolution**: In the rare event of a true draw (equal goal scores, surviving pieces, and rank distances), an immediate rematch is played with swapped colors until a decisive winner advances.
+- **Elo Rating Calibration**: All 8 bots start at **1200 Elo**. Ratings update immediately after every match using the canonical `eloService` ($K=40$ for the first 15 games, $K=20$ thereafter). Ratings persist across all tournaments within a run and cleanly reset to 1200 whenever a new simulation is launched.
+
+#### How to Run
+
+```bash
+# 1. Run with default settings (1,000 tournaments, 50ms per-move budget)
+npm run simulate
+
+# 2. Quick test run (10 tournaments, 10ms budget)
+npm run simulate -- -n 10 -t 10
+
+# 3. Custom calibration run with specific output path
+npm run simulate -- --tournaments 500 --time-limit 50 --output-dir ./tournament_output
+
+# 4. View all available CLI flags and usage
+npm run simulate -- --help
+# or via tsx directly:
+npx tsx scripts/simulateTournaments.ts --help
+```
+
+#### CLI Options & Flags
+
+| Flag | Short | Default | Description |
+|:---|:---:|:---:|:---|
+| `--tournaments <count>` | `-n` | `1000` | Number of championship tournaments to simulate |
+| `--time-limit <ms>` | `-t` | `50` | Search budget per move in milliseconds |
+| `--max-moves <count>` | `-m` | `300` | Maximum half-moves safety limit before terminal score adjudication |
+| `--output-dir <path>` | `-o` | `./tournament_output` | Destination directory for all generated reports and notation files |
+| `--help` | `-h` | — | Display usage banner and option descriptions |
+
+#### Generated Output Artifacts
+
+Upon completion (or during live execution), the simulator writes the following files to your specified `--output-dir`:
+
+- **`<output-dir>/games/`**: Individual `.txt` notation files for every match played (`t0001_m1_quarterfinals_novice_vs_casual.txt`), formatted with event metadata, player Elo deltas, final scores, and numbered turn notation.
+- **`<output-dir>/tournaments/`**: Individual `.json` result files for each tournament (`tournament_0001.json`), containing bracket progression, match pairings, winners, and a concluding `finalRankings` array sorted #1 (Champion) down to #8 (Quarterfinalist) with bot names, final Elo, match wins, and match losses.
+- **`<output-dir>/bot_summary.json`**: Machine-readable JSON summary containing overall championship rankings across all tournaments, final Elo standings, peak/lowest ratings, win/loss records, Blue vs. Green win splits, victory condition distributions, and full 8×8 head-to-head match matrices.
+- **`<output-dir>/bot_summary.md`**: Publication-ready Markdown report featuring:
+  - Final tournament championship standings across all tournament games (ranked #1 to #8 by championships won, match win rate, and final Elo).
+  - Elo ratings leaderboard with gains/losses, peak ratings, and side splits.
+  - Complete 8×8 head-to-head cross-table (Row vs. Column records).
+  - Win reason distribution table (Goal Reached, Elimination, Blockade, Repetition, Mutual Shuffle).
+  - Engine balance and calibration observations.
 
 ---
 
@@ -153,6 +212,44 @@ npm run lint
 # Compile TypeScript and build production bundle
 npm run build
 ```
+
+### Running Bot Tournament Simulations (Local CLI)
+
+You can run automated bot championship simulations locally from the terminal without running the web server:
+
+```bash
+# Run default 1,000-tournament simulation (50ms per move)
+npm run simulate
+
+# Quick test simulation (10 tournaments, 10ms move budget)
+npm run simulate -- -n 10 -t 10
+
+# Custom simulation with specific output directory
+npm run simulate -- --tournaments 500 --time-limit 50 --output-dir ./tournament_output
+```
+
+> **Note:** The tournament simulation runs 100% locally and offline in CPU memory, writing game notation and results directly to disk. It never connects to Firebase or touches any database.
+
+### Running Game Analysis (Local CLI)
+
+You can analyze played matches turn-by-turn with 10-tier move classifications (Brilliant, Great, Best, Excellent, Good, Book, Inaccuracy, Mistake, Miss, Blunder), Lichess-calibrated player accuracy % (volatility-weighted and harmonic mean), and next continuation move predictions:
+
+```bash
+# Analyze a tournament game file
+npm run analyze -- tournament_output/games/t0001_m1_quarterfinals_advanced_vs_intermediate.txt
+
+# Analyze raw notation directly from the command line
+npm run analyze -- "1. Fe1-e3 Pc7-e5 2. Fc1-c3 Fb8-b6 3. Fa1-a3 Fh8-h6"
+
+# Deep analysis with custom search depth and time budget
+npm run analyze -- -d 7 -t 200 tournament_output/games/t0001_m1_quarterfinals_advanced_vs_intermediate.txt
+
+# Output machine-readable JSON to stdout or save to file
+npm run analyze -- --json path/to/game.txt
+npm run analyze -- --output ./analysis_report.json path/to/game.txt
+```
+
+> **Note:** The analysis engine executes 100% locally and offline in Node.js, replaying moves through the rules engine and evaluating positions using the Tier 8 Master search.
 
 ### Connecting to GCP / Firebase & Stripe
 
@@ -417,7 +514,16 @@ Always update **both** squares simultaneously to preserve board balance and engi
 
 ---
 
-## Knowledge Graph (graphify)
+## 9. Security & Threat Modeling
+
+Schada employs an authoritative defense-in-depth security model:
+- **Zero-Trust Client Mindset**: Authoritative game state immutability, bounded Elo deltas, monotonic match counters, and granular room lifecycle rules enforced authoritatively at the database boundary via `firestore.rules`.
+- **Sensitive PII Segregation**: Registered user email addresses are omitted from public Firestore documents, eliminating database enumeration while hydrating seamlessly in memory via Firebase Auth tokens.
+- **HTTP Security Headers**: Strict hosting security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and CSP) deployed with zero-reload cache-control preservation.
+
+---
+
+## 10. Knowledge Graph (graphify)
 
 This project is graphified — a queryable knowledge graph of the full codebase can be built and explored using [graphify](https://github.com/safishamsi/graphifyy).
 

@@ -10,15 +10,40 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // User profiles
+    function isGameImmutablePreserved() {
+      return request.resource.data.id == resource.data.id &&
+             request.resource.data.createdAt == resource.data.createdAt &&
+             request.resource.data.isRanked == resource.data.isRanked &&
+             request.resource.data.timeControlMinutes == resource.data.timeControlMinutes &&
+             request.resource.data.incrementSeconds == resource.data.incrementSeconds &&
+             request.resource.data.creatorColorPref == resource.data.creatorColorPref;
+    }
+
+    // User profiles (public read for leaderboards and friend search, locked writes)
     match /users/{userId} {
       allow read: if true;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && (
-        // Allow general profile updates, but constrain username changes to at most 1
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['username']) ||
-        (resource.data.usernameChangeCount == 0 && request.resource.data.usernameChangeCount == 1)
-      );
+      allow create: if isOwner(userId) &&
+        request.resource.data.eloRating == 1200 &&
+        request.resource.data.usernameChangeCount == 0 &&
+        request.resource.data.gamesPlayed == 0 &&
+        request.resource.data.gamesWon == 0 &&
+        request.resource.data.gamesLost == 0 &&
+        request.resource.data.gamesDrawn == 0;
+      allow update: if isOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'lastSeen', 'eloRating', 'gamesPlayed', 'gamesWon', 'gamesLost', 'gamesDrawn',
+          'username', 'usernameLower', 'usernameChangeCount', 'updatedAt', 'email'
+        ]) &&
+        // Constrain username changes to at most 1
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['username']) ||
+          (resource.data.usernameChangeCount == 0 && request.resource.data.usernameChangeCount == 1)) &&
+        // Monotonic gamesPlayed increment when stats are updated
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['gamesPlayed']) ||
+          request.resource.data.gamesPlayed == resource.data.gamesPlayed + 1) &&
+        // Bounded Elo rating update (capped per game)
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['eloRating']) ||
+          (request.resource.data.eloRating >= resource.data.eloRating - 64 &&
+           request.resource.data.eloRating <= resource.data.eloRating + 64));
       allow delete: if false;
 
       // User friends subcollection
@@ -31,7 +56,10 @@ service cloud.firestore {
     // Unique username lookup table
     match /usernames/{usernameLower} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.keys().hasOnly(['uid', 'createdAt']) &&
+        usernameLower.size() >= 3 && usernameLower.size() <= 20;
       allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
       allow update: if false;
     }
@@ -53,24 +81,65 @@ service cloud.firestore {
       );
     }
 
-    // Active & archived games (ranked games strictly require authentication)
+    // Active & archived games (granular lifecycle matrix protecting ranked and casual play)
     match /games/{gameId} {
       allow read: if true;
-      allow create: if !request.resource.data.isRanked || isAuthenticated();
-      allow update: if true;
+      allow create: if (
+        (!request.resource.data.isRanked) ||
+        (isAuthenticated() && (
+          (request.resource.data.bluePlayer != null && request.resource.data.bluePlayer.id == request.auth.uid) ||
+          (request.resource.data.greenPlayer != null && request.resource.data.greenPlayer.id == request.auth.uid)
+        ))
+      ) && request.resource.data.status == 'waiting';
+
+      allow update: if isGameImmutablePreserved() && (
+        // 1. Waiting -> abandoned (host cancel or lobby cleanup watcher)
+        (resource.data.status == 'waiting' && request.resource.data.status == 'abandoned') ||
+        // 2. Waiting -> in_progress (join open seat)
+        (resource.data.status == 'waiting' && request.resource.data.status == 'in_progress' && (
+          !resource.data.isRanked ||
+          (isAuthenticated() && (
+            (resource.data.bluePlayer == null && request.resource.data.bluePlayer.id == request.auth.uid) ||
+            (resource.data.greenPlayer == null && request.resource.data.greenPlayer.id == request.auth.uid)
+          ))
+        )) ||
+        // 3. In_progress -> in_progress / completed (moves, resignations, disconnect flags, timeouts)
+        (resource.data.status == 'in_progress' && (
+          !resource.data.isRanked ||
+          // Actions by seated players
+          (isAuthenticated() && (
+            request.auth.uid == resource.data.bluePlayer.id ||
+            request.auth.uid == resource.data.greenPlayer.id
+          )) ||
+          // Clock timeout auto-resolution by any authenticated participant/watcher
+          (isAuthenticated() && request.resource.data.status == 'completed' &&
+            request.resource.data.winReason in ['timeout', 'abandonment'])
+        )) ||
+        // 4. Completed -> completed (markGameEloProcessed array append)
+        (resource.data.status == 'completed' && request.resource.data.status == 'completed' && (
+          !resource.data.isRanked ||
+          (isAuthenticated() && (
+            request.auth.uid == resource.data.bluePlayer.id ||
+            request.auth.uid == resource.data.greenPlayer.id
+          ))
+        ))
+      );
+
       allow delete: if resource.data.status == 'abandoned';
     }
 
-    // Real-time guest presence sessions
+    // Real-time guest presence sessions (bounded schema for unauthenticated presence heartbeats)
     match /guest_sessions/{sessionId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['lastSeen', 'updatedAt']) &&
+        sessionId.size() <= 64;
+      allow delete: if true;
     }
 
-    // Platform-wide aggregate stats (O(1) lobby stats for tens of thousands of users)
+    // Platform-wide aggregate stats (read-only for clients, locked against client overwrite)
     match /stats/{statId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if false;
     }
 
     // Matchmaking queue tickets

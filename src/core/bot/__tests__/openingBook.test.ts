@@ -18,7 +18,10 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
 
     expect(bookMove).not.toBeNull();
     expect(bookMove?.piece.color).toBe('blue');
-    expect(['c1', 'e1', 'c2', 'e2', 'a1', 'g1']).toContain(bookMove?.from);
+    expect([
+      'a1', 'c1', 'e1', 'g1',
+      'a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2'
+    ]).toContain(bookMove?.from);
   });
 
   it('provides legal responses for Green on ply 1', () => {
@@ -54,18 +57,27 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
 
   it('returns null on uncatalogued / off-book positions for seamless engine search fallback', () => {
     const state = createInitialGameState();
-    // Simulate an unusual opening move that is not in the theoretical book
-    const offBookKey = buildMoveSequenceKey([
+    const offBookMoves = [
       {
-        from: 'h2',
-        to: 'h4',
-        piece: state.board['h2']!,
-        intermediateSquares: ['h3'],
-        notation: 'h2-h4',
+        from: 'a1' as Square,
+        to: 'a3' as Square,
+        piece: state.board['a1']!,
+        intermediateSquares: ['a2' as Square],
+        notation: 'Fa1-a3',
       },
-    ]);
-
+      {
+        from: 'a7' as Square,
+        to: 'c5' as Square,
+        piece: state.board['a7']!,
+        intermediateSquares: [],
+        notation: 'Pa7-c5',
+      },
+    ];
+    const offBookKey = buildMoveSequenceKey(offBookMoves);
     expect(OPENING_BOOK[offBookKey]).toBeUndefined();
+
+    const bookMove = getOpeningBookMove(state.board, 'blue', 3, offBookMoves);
+    expect(bookMove).toBeNull();
   });
 
   it('yields instantaneous 0ms thinking delay when an opening book move is available', () => {
@@ -153,5 +165,46 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
     const move = getOpeningBookMove(state.board, 'blue');
     // Level 1 is defaultLevel and bypasses book, returning null
     expect(move).toBeNull();
+  });
+
+  it('verifies that candidate weights sum to 100 for all positions in OPENING_BOOK', () => {
+    for (const [key, candidates] of Object.entries(OPENING_BOOK)) {
+      const sum = candidates.reduce((acc, c) => acc + c.weight, 0);
+      expect(sum, `Weights in position "${key}" must sum to 100`).toBe(100);
+      for (const c of candidates) {
+        expect(c.weight, `Weight for candidate ${c.from}-${c.to} in "${key}" must be >= 1`).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+
+  it('verifies that no candidate move falls into vector hanging traps', () => {
+    // Specifically verify known vector traps are eliminated:
+    // 1. After 1. a1-a3 (which attacks d6 via [3,3] beam), Green must not play d8-d6
+    const a1a3Candidates = OPENING_BOOK['a1-a3'];
+    expect(a1a3Candidates.some((c) => c.from === 'd8' && c.to === 'd6')).toBe(false);
+
+    // 2. After 1. ... h8-h6 (which attacks e3 via [-3,-3] beam), Blue must not play e1-e3
+    const h8h6Responses = Object.entries(OPENING_BOOK).filter(([k]) => k.includes('h8-h6'));
+    for (const [key, cands] of h8h6Responses) {
+      if (key.endsWith('h8-h6')) {
+        expect(cands.some((c) => c.from === 'e1' && c.to === 'e3')).toBe(false);
+      }
+    }
+  });
+
+  it('verifies that all 14 legal Blue opening moves are included in OPENING_BOOK[""]', () => {
+    const rootCandidates = OPENING_BOOK[''];
+    expect(rootCandidates).toBeDefined();
+    expect(rootCandidates.length).toBe(14);
+
+    const rootMoves = rootCandidates.map((c) => `${c.from}-${c.to}`);
+    const expected14Moves = [
+      'a1-a3', 'a2-c4', 'b2-c3', 'c1-c3', 'c2-d3', 'c2-a4', 'd2-b4',
+      'e1-e3', 'e2-d3', 'e2-g4', 'f2-d4', 'g1-g3', 'g2-e4', 'h2-h4',
+    ];
+
+    for (const expected of expected14Moves) {
+      expect(rootMoves, `Expected opening move "${expected}" to be in root book`).toContain(expected);
+    }
   });
 });
