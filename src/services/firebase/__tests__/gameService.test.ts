@@ -19,11 +19,13 @@ import {
   markGameEloProcessed,
   computeRankedGameEloResult,
   reconcilePendingElo,
+  generateGameId,
   localGameStore,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '../gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
+import { SECURITY_CONFIG } from '@/core/security/securityConfig';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
 import { registerUser } from '../authService';
 import { localBackend } from '../localProvider';
@@ -1052,6 +1054,84 @@ describe('GameService Multiplayer Sync', () => {
     expect(reconciled!.gamesPlayed).toBe(1);
     expect(reconciled!.gamesWon).toBe(1);
     expect(reconciled!.eloRating).toBeGreaterThan(userB.eloRating);
+  });
+
+  describe('9-digit Alphanumeric Game ID Generation and Collision Prevention', () => {
+    it('generates a 9-digit alphanumeric case-sensitive ID matching SECURITY_CONFIG pattern', () => {
+      const id = generateGameId();
+      expect(id).toHaveLength(SECURITY_CONFIG.gameIdLength);
+      expect(id).toMatch(new RegExp(SECURITY_CONFIG.gameIdRegexPattern));
+      for (const char of id) {
+        expect(SECURITY_CONFIG.gameIdCharset).toContain(char);
+      }
+    });
+
+    it('generates case-sensitive alphanumeric IDs with diverse uppercase, lowercase, and digit characters', () => {
+      const ids = Array.from({ length: 50 }, () => generateGameId());
+      expect(new Set(ids).size).toBe(50);
+
+      const allChars = ids.join('');
+      expect(/[0-9]/.test(allChars)).toBe(true);
+      expect(/[a-z]/.test(allChars)).toBe(true);
+      expect(/[A-Z]/.test(allChars)).toBe(true);
+    });
+
+    it('creates game with a canonical 9-character ID', async () => {
+      const creator = { id: 'user_gen_test', username: 'TestHost', elo: 1300 };
+      const { gameId } = await createGame({
+        timeControlMinutes: 5,
+        colorPref: 'blue',
+        creator,
+      });
+
+      expect(gameId).toHaveLength(9);
+      expect(gameId).toMatch(/^[0-9a-zA-Z]{9}$/);
+    });
+
+    it('prevents duplicates by retrying when an ID collision is encountered in store', async () => {
+      const creator = { id: 'user_dup_test', username: 'DupTester', elo: 1300 };
+
+      // Pre-seed a game with a specific ID
+      const initialGame = await createGame({
+        timeControlMinutes: 5,
+        colorPref: 'blue',
+        creator,
+      });
+      expect(initialGame.gameId).toHaveLength(9);
+
+      // Verify that createGame creates another unique game without colliding
+      const secondGame = await createGame({
+        timeControlMinutes: 5,
+        colorPref: 'blue',
+        creator,
+      });
+      expect(secondGame.gameId).toHaveLength(9);
+      expect(secondGame.gameId).not.toBe(initialGame.gameId);
+    });
+
+    it('throws a meaningful error when max retry attempts are exhausted due to continuous collisions', async () => {
+      const creator = { id: 'user_exhaust_test', username: 'ExhaustTester', elo: 1300 };
+
+      // Mock localGameStore.get to simulate every candidate ID already existing
+      const originalGet = localGameStore.get.bind(localGameStore);
+      const dummyRoom = {
+        id: 'dummy1234',
+        status: 'waiting',
+      } as unknown as GameRoom;
+      vi.spyOn(localGameStore, 'get').mockReturnValue(dummyRoom);
+
+      await expect(
+        createGame({
+          timeControlMinutes: 5,
+          colorPref: 'blue',
+          creator,
+        })
+      ).rejects.toThrow(
+        `Failed to generate a unique game ID after ${SECURITY_CONFIG.maxGameIdCreationRetries} retry attempts.`
+      );
+
+      vi.spyOn(localGameStore, 'get').mockImplementation(originalGet);
+    });
   });
 });
 

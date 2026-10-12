@@ -1,7 +1,6 @@
 import {
   doc,
   getDoc,
-  setDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
@@ -17,6 +16,7 @@ import { safeSetItem } from '../storage/storageCleanup';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { isPatronUser } from '@/components/common/PatronBadge';
 import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
+import { SECURITY_CONFIG } from '@/core/security/securityConfig';
 import type { ArenaPlayer } from './gameTypes';
 
 // Re-exported modular domain services
@@ -68,12 +68,45 @@ export function setLocalSessionToken(gameId: string, token: string): void {
   safeSetItem(SESSION_STORAGE_PREFIX + gameId, token);
 }
 
-function generateGameId(): string {
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-  let result = '';
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+/**
+ * Generates an authoritative 9-digit case-sensitive alphanumeric game identifier (Base62).
+ * Utilizes cryptographically secure pseudo-random values (crypto.getRandomValues)
+ * and rejection sampling to achieve an exact uniform distribution without modulo bias.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(L) expected time where L = SECURITY_CONFIG.gameIdLength (L = 9).
+ *   With rejection threshold 248 on byte domain [0..255], rejection probability is 8 / 256 = 3.125%.
+ *   The expected iterations to collect 9 unbiased characters is 9 / (1 - 0.03125) ≈ 9.29 steps, strictly O(L).
+ * - Auxiliary Space Complexity: O(L) auxiliary space for typed byte buffer (size 2 * L).
+ *
+ * Growth Rate:
+ * - O(L) linear with identifier length. As platform data scales to millions of matches,
+ *   generation overhead is O(1) constant with respect to total database volume.
+ */
+export function generateGameId(): string {
+  const charset = SECURITY_CONFIG.gameIdCharset;
+  const length = SECURITY_CONFIG.gameIdLength;
+  const charsetLength = charset.length;
+  // Discard bytes beyond the largest multiple of charsetLength to eliminate modulo bias
+  const maxValidByte = 256 - (256 % charsetLength);
+
+  const cryptoObj = typeof crypto !== 'undefined' ? crypto : undefined;
+  if (!cryptoObj || typeof cryptoObj.getRandomValues !== 'function') {
+    throw new Error('Cryptographically secure PRNG (crypto.getRandomValues) is required for game ID generation.');
   }
+
+  let result = '';
+  const randomBytes = new Uint8Array(length * 2);
+  while (result.length < length) {
+    cryptoObj.getRandomValues(randomBytes);
+    for (let i = 0; i < randomBytes.length && result.length < length; i++) {
+      const byte = randomBytes[i];
+      if (byte < maxValidByte) {
+        result += charset[byte % charsetLength];
+      }
+    }
+  }
+
   return result;
 }
 
@@ -81,8 +114,23 @@ function generateToken(): string {
   return 'tok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
 
+/**
+ * Creates a new multiplayer game room with an authoritative 9-digit alphanumeric ID.
+ * Employs atomic Firestore transactions with an existence check to authoritatively
+ * prevent duplicate game IDs and room collisions.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(R * (T_tx + T_gen)) where R <= SECURITY_CONFIG.maxGameIdCreationRetries.
+ *   Given an address space of 62^9 ≈ 1.35 * 10^16, the collision probability is asymptotically zero,
+ *   so R = 1 with probability > 99.9999999999%. The transaction executes exactly 1 document read
+ *   and 1 document write.
+ * - Auxiliary Space Complexity: O(1) auxiliary space, writing the sanitized GameRoom payload.
+ *
+ * Growth Rate:
+ * - O(1) constant amortized transaction and space complexity, scaling sustainably as game volume
+ *   scales to millions of matches without unindexed scans or table locks.
+ */
 export async function createGame(params: CreateGameParams): Promise<{ gameId: string; sessionToken: string; color: PieceColor }> {
-  const gameId = generateGameId();
   const sessionToken = generateToken();
   const initialTimeMs = params.timeControlMinutes > 0 ? params.timeControlMinutes * 60 * 1000 : 0;
 
@@ -115,35 +163,61 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
   const isRanked = isGuest ? false : Boolean(params.isRanked);
 
   const initialBoard = createInitialGameState();
+  const maxRetries = SECURITY_CONFIG.maxGameIdCreationRetries;
+  let finalGameId: string | null = null;
 
-  const newGame: GameRoom = {
-    id: gameId,
-    isPrivate: Boolean(params.isPrivate),
-    status: 'waiting',
-    createdAt: Date.now(),
-    timeControlMinutes: params.timeControlMinutes,
-    incrementSeconds: params.incrementSeconds || 0,
-    isRanked,
-    creatorColorPref: colorPref,
-    bluePlayer: creatorColor === 'blue' ? creatorPlayer : null,
-    greenPlayer: creatorColor === 'green' ? creatorPlayer : null,
-    boardState: initialBoard,
-    currentTurn: 'blue',
-    blueTimeMs: initialTimeMs,
-    greenTimeMs: initialTimeMs,
-    lastTurnStartTimeMs: null,
-  };
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const candidateId = generateGameId();
 
-  setLocalSessionToken(gameId, sessionToken);
+    const newGame: GameRoom = {
+      id: candidateId,
+      isPrivate: Boolean(params.isPrivate),
+      status: 'waiting',
+      createdAt: Date.now(),
+      timeControlMinutes: params.timeControlMinutes,
+      incrementSeconds: params.incrementSeconds || 0,
+      isRanked,
+      creatorColorPref: colorPref,
+      bluePlayer: creatorColor === 'blue' ? creatorPlayer : null,
+      greenPlayer: creatorColor === 'green' ? creatorPlayer : null,
+      boardState: initialBoard,
+      currentTurn: 'blue',
+      blueTimeMs: initialTimeMs,
+      greenTimeMs: initialTimeMs,
+      lastTurnStartTimeMs: null,
+    };
 
-  if (isFirebaseConfigured() && db) {
-    const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
-    await setDoc(docRef, sanitize(newGame));
-  } else {
-    localGameStore.set(newGame);
+    if (isFirebaseConfigured() && db) {
+      const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, candidateId);
+      const isCommitted = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(docRef);
+        if (snap.exists()) {
+          return false;
+        }
+        tx.set(docRef, sanitize(newGame));
+        return true;
+      });
+
+      if (isCommitted) {
+        finalGameId = candidateId;
+        break;
+      }
+    } else {
+      if (!localGameStore.get(candidateId)) {
+        localGameStore.set(newGame);
+        finalGameId = candidateId;
+        break;
+      }
+    }
   }
 
-  return { gameId, sessionToken, color: creatorColor };
+  if (!finalGameId) {
+    throw new Error(`Failed to generate a unique game ID after ${maxRetries} retry attempts.`);
+  }
+
+  setLocalSessionToken(finalGameId, sessionToken);
+
+  return { gameId: finalGameId, sessionToken, color: creatorColor };
 }
 
 export async function joinGame(

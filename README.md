@@ -68,6 +68,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Defense-in-Depth Security Hardening**: Granular Firestore authorization rules, sensitive PII segregation, and comprehensive HTTP security headers with strict cache invalidation.
 - **Standalone Bot Championship Simulator**: Local CLI tool pitting all 8 AI tiers against each other in multi-tournament brackets with Elo calibration, game notation, and cross-table export.
 - **Interactive Game Analysis Engine**: Post-game Move Quality Distribution table (10 tiers with graphical symbol badges) and player accuracy metrics in the Game Over modal alongside on-demand Web Worker notation review.
+- **9-Digit Alphanumeric Game URLs & Collision Protection**: Canonical Base62 (case-sensitive) 9-character game identifiers with CSPRNG generation, transactional collision prevention, and strict format validation.
 
 ---
 
@@ -520,6 +521,7 @@ Schada employs an authoritative defense-in-depth security model:
 - **Zero-Trust Client Mindset**: Authoritative game state immutability, bounded Elo deltas, monotonic match counters, and granular room lifecycle rules enforced authoritatively at the database boundary via `firestore.rules`.
 - **Sensitive PII Segregation**: Registered user email addresses are omitted from public Firestore documents, eliminating database enumeration while hydrating seamlessly in memory via Firebase Auth tokens.
 - **HTTP Security Headers**: Strict hosting security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and CSP) deployed with zero-reload cache-control preservation.
+- **Canonical Game Identifier Hardening**: 9-character alphanumeric (case-sensitive, Base62) game identifiers generated via cryptographically secure pseudo-random values (`crypto.getRandomValues`), atomic collision-prevention transactions in Firestore, and strict regex schema enforcement in `firestore.rules`.
 
 ---
 

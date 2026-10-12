@@ -48,6 +48,7 @@ import {
   reconcilePendingElo,
 } from './services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
+import { SECURITY_CONFIG } from './core/security/securityConfig';
 import { safeSetItem } from './services/storage/storageCleanup';
 import { getBotTier } from './core/bot/botTiers';
 import type { BoardState, PieceColor } from './core/schada/types';
@@ -107,10 +108,11 @@ const MainApp: React.FC = () => {
     userColor?: 'random' | 'blue' | 'green';
   }>({});
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
+  const [toastNotification, setToastNotification] = useState<string | null>(null);
 
-  // Check if routed with request to open Computer Modal
+  // Check if routed with notification or request to open Computer Modal
   useEffect(() => {
-    const state = location.state as ComputerModalNavState | null;
+    const state = location.state as (ComputerModalNavState & { notification?: string }) | null;
     if (state && state.openComputerModal) {
       setComputerModalSettings({
         timeControlMinutes: state.timeControlMinutes,
@@ -119,8 +121,19 @@ const MainApp: React.FC = () => {
       });
       setComputerModalOpen(true);
       navigate(location.pathname, { replace: true, state: {} });
+    } else if (state?.notification) {
+      setToastNotification(state.notification);
+      navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
+
+  useEffect(() => {
+    if (!toastNotification) return;
+    const timer = setTimeout(() => {
+      setToastNotification(null);
+    }, SECURITY_CONFIG.toastNotificationDurationMs);
+    return () => clearTimeout(timer);
+  }, [toastNotification]);
 
   // Reconcile any unapplied completed ranked games for the authenticated user
   const userId = user?.id;
@@ -437,6 +450,20 @@ const MainApp: React.FC = () => {
     <div className={`app-container ${isMatchActive ? 'in-match' : ''}`}>
       <UpdateNotificationBanner isMatchActive={isMatchActive} />
       <OfflineBanner />
+
+      {toastNotification && (
+        <div className="toast-notification" role="alert" aria-live="polite">
+          <span>{toastNotification}</span>
+          <button
+            type="button"
+            className="toast-close-btn"
+            onClick={() => setToastNotification(null)}
+            aria-label="Dismiss notification"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Top Navbar */}
       <Navbar
