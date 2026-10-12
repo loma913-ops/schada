@@ -60,7 +60,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Threat Detection Indicators**: Real-time visual attack badges on vulnerable pieces with toggleable player preferences.
 - **Goal Invulnerability Shield Badges**: Golden shield badges displayed on goal-line high pieces denoting capture immunity.
 - **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.
-- **Correspondence Game Mode & Precision Custom Pairing**: Multi-day turn-based matches (1–14 days per player) and real-time custom time control sliders (0.5–180 min) with dedicated lobby filtering and adaptive clock formatting.
+- **Correspondence Game Mode & Precision Custom Pairing**: Multi-day turn-based matches (1–14 days per move) and real-time custom time control sliders (0.5–180 min) with dedicated lobby filtering and adaptive clock formatting.
 - **Real-Time Abandonment & Disconnect Protection**: 60-second abandonment countdown for disconnected players on turn in real-time matches with automatic victory resolution and clock-timeout precedence.
 - **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
 - **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.

@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { isGuestUser } from '@/services/firebase/gameTypes';
+import { CANONICAL_DIGITAL_CLOCK_CONFIG } from '@/components/game/digitalClockConfig';
 
 export type CustomGameTab = 'realtime' | 'correspondence';
 
@@ -84,9 +85,13 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
   };
 
   const formatMinutesLabel = (mins: number): string => {
-    if (mins < 1) return `${mins} min (30s)`;
-    if (mins >= 60) {
-      const hrs = mins / 60;
+    const minutesPerHour = CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.minutesPerHour;
+    if (mins < 1) {
+      const seconds = Math.round(mins * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.secondsPerMinute);
+      return `${mins} min (${seconds}s)`;
+    }
+    if (mins >= minutesPerHour) {
+      const hrs = mins / minutesPerHour;
       return `${mins} min (${Number.isInteger(hrs) ? hrs : hrs.toFixed(1)} hrs)`;
     }
     return `${mins} min`;
@@ -178,7 +183,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
           <div className="form-group modal-slider-wrap">
             <div className="modal-slider-header">
               <label className="form-label" htmlFor="days-slider" style={{ marginBottom: 0 }}>
-                Days per player
+                Days per move
               </label>
               <span className="modal-slider-val">
                 {selectedDays} {selectedDays === 1 ? 'day' : 'days'}
@@ -193,7 +198,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
               step={1}
               value={daysIndex}
               onChange={(e) => setDaysIndex(Number(e.target.value))}
-              aria-label="Days per player"
+              aria-label="Days per move"
             />
           </div>
         )}

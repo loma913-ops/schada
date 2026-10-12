@@ -24,6 +24,7 @@ import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 import { isPatronUser, type PatronTier, type PatronSubscriptionStatus } from '@/components/common/PatronBadge';
 import { LOBBY_CONFIG, formatTimeControlDisplay } from '@/components/lobby/lobbyConfig';
+import { CANONICAL_DIGITAL_CLOCK_CONFIG } from './digitalClockConfig';
 
 /** Pure helper - defined at module scope so it is never re-created on render. */
 function getMaterialValue(pieces: Piece[]): number {
@@ -93,7 +94,9 @@ export const Arena: React.FC<ArenaProps> = ({
   blueElo,
   greenElo,
   timeControlMinutes = BOT_ENGINE_CONFIG.timeManagement.defaultMatchMinutes,
-  incrementSeconds = BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs / 1000,
+  incrementSeconds =
+    BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs /
+    CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond,
   isRanked = false,
   userColor,
   isComputer = false,
@@ -358,8 +361,21 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const computerColor: PieceColor | undefined =
     isComputer && userColor ? (userColor === 'blue' ? 'green' : 'blue') : undefined;
+ 
+  if (!LOBBY_CONFIG || typeof LOBBY_CONFIG.correspondenceCutoffMinutes !== 'number' || typeof LOBBY_CONFIG.secondsPerMinute !== 'number') {
+    throw new Error('Arena: Lobby configuration is missing or invalid.');
+  }
+  if (!CANONICAL_DIGITAL_CLOCK_CONFIG || typeof CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits?.msPerSecond !== 'number') {
+    throw new Error('Arena: Digital clock configuration is missing or invalid.');
+  }
 
-  const initialMs = timeControlMinutes > 0 ? timeControlMinutes * 60 * 1000 : 0;
+  const msPerMinute =
+    LOBBY_CONFIG.secondsPerMinute * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond;
+  const initialMs = timeControlMinutes > 0 ? timeControlMinutes * msPerMinute : 0;
+  const isCorrespondence =
+    typeof timeControlMinutes === 'number' &&
+    timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
+
   const [blueTime, setBlueTime] = useState<number>(syncedBlueTimeMs ?? initialMs);
   const [greenTime, setGreenTime] = useState<number>(syncedGreenTimeMs ?? initialMs);
 
@@ -450,42 +466,33 @@ export const Arena: React.FC<ArenaProps> = ({
     handleTimeout,
   ]);
 
+  /**
+   * Handles move execution from user interaction or bot automation.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) constant time board move execution and clock arithmetic.
+   * - Auxiliary Space Complexity: O(1) constant state allocation.
+   *
+   * Growth Rate:
+   * - O(1) flat growth rate, invariant to move history length or match volume.
+   */
   const handleMakeMove = useCallback((move: Move) => {
     const currentState = gameStateRef.current;
     if (currentState.isGameOver) return;
-
-    if (customMakeMove) {
-      if (move.captured) {
-        soundService.playCapture();
-      } else {
-        soundService.playMove();
-      }
-
-      if (move.piece.type !== 'pawn') {
-        const destRow = parseInt(move.to[1], 10) - 1;
-        const goalRow = move.piece.color === 'blue' ? 7 : 0;
-        if (destRow === goalRow) {
-          soundService.playGoal();
-        }
-      }
-
-      const nextState = executeMove(currentState, move);
-      gameStateRef.current = nextState;
-      const newMoveIndex = nextState.moveHistory.length - 1;
-      lastAudibleMoveIndexRef.current = newMoveIndex;
-      prevMoveCountRef.current = nextState.moveHistory.length;
-      prevHistoryLenRef.current = nextState.moveHistory.length;
-      setViewMoveIndex(newMoveIndex);
-      setGameState(nextState);
-      customMakeMove(move);
-      return;
-    }
 
     // Play appropriate sound effect
     if (move.captured) {
       soundService.playCapture();
     } else {
       soundService.playMove();
+    }
+
+    if (move.piece.type !== 'pawn') {
+      const destRow = parseInt(move.to[1], 10) - 1;
+      const goalRow = move.piece.color === 'blue' ? 7 : 0;
+      if (destRow === goalRow) {
+        soundService.playGoal();
+      }
     }
 
     const nextState = executeMove(currentState, move);
@@ -496,18 +503,11 @@ export const Arena: React.FC<ArenaProps> = ({
     prevHistoryLenRef.current = nextState.moveHistory.length;
     setViewMoveIndex(newMoveIndex);
 
-    // If a high piece reached goal, chime!
-    if (move.piece.type !== 'pawn') {
-      const destRow = parseInt(move.to[1], 10) - 1;
-      const goalRow = move.piece.color === 'blue' ? 7 : 0;
-      if (destRow === goalRow) {
-        soundService.playGoal();
-      }
-    }
-
-    // Apply Fischer increment to player who just moved
-    if (incrementSeconds > 0 && timeControlMinutes > 0) {
-      const addMs = incrementSeconds * 1000;
+    if (isCorrespondence) {
+      setBlueTime(initialMs);
+      setGreenTime(initialMs);
+    } else if (!customMakeMove && incrementSeconds > 0 && timeControlMinutes > 0) {
+      const addMs = incrementSeconds * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond;
       if (currentState.currentTurn === 'blue') {
         setBlueTime((prev) => prev + addMs);
       } else {
@@ -517,10 +517,12 @@ export const Arena: React.FC<ArenaProps> = ({
 
     setGameState(nextState);
 
-    if (nextState.isGameOver && onGameComplete) {
+    if (customMakeMove) {
+      customMakeMove(move);
+    } else if (nextState.isGameOver && onGameComplete) {
       onGameComplete(nextState);
     }
-  }, [customMakeMove, incrementSeconds, timeControlMinutes, onGameComplete]);
+  }, [customMakeMove, incrementSeconds, timeControlMinutes, initialMs, isCorrespondence, onGameComplete]);
 
   // Bot Turn Automation (via Web Worker with sync fallback)
   useEffect(() => {
@@ -538,7 +540,7 @@ export const Arena: React.FC<ArenaProps> = ({
         botLevel,
         gameStateRef.current.moveHistory,
         remainingTimeMs,
-        incrementSeconds * 1000
+        incrementSeconds * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond
       );
       if (!isSubscribed) return;
       setIsBotThinking(false);
@@ -642,9 +644,6 @@ export const Arena: React.FC<ArenaProps> = ({
   // Algorithmic Complexity: O(1) constant time, verifying whether game has unlimited time controls.
   // Growth Rate: O(1) flat.
   const isUnlimited = timeControlMinutes <= 0;
-  const isCorrespondence =
-    typeof timeControlMinutes === 'number' &&
-    timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
 
   const formattedTimeControl = useMemo(
     () =>

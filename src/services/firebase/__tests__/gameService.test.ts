@@ -27,6 +27,8 @@ import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
 import { registerUser } from '../authService';
 import { localBackend } from '../localProvider';
+import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
+import { CANONICAL_DIGITAL_CLOCK_CONFIG } from '@/components/game/digitalClockConfig';
 
 vi.mock('../config', () => ({
   isFirebaseConfigured: () => false,
@@ -170,6 +172,47 @@ describe('GameService Multiplayer Sync', () => {
     const updatedGame = localGameStore.get(gameId);
     expect(updatedGame?.boardState.moveHistory.length).toBe(1);
     expect(updatedGame?.boardState.currentTurn).toBe('green');
+  });
+
+  it('resets player clock on move completion in correspondence matches', async () => {
+    const creator = { id: 'p_corr_1', username: 'CorrBlue', elo: 1300 };
+    const daysPerMove = 2;
+    const msPerMinute =
+      LOBBY_CONFIG.secondsPerMinute * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond;
+    const twoDaysMinutes = daysPerMove * LOBBY_CONFIG.correspondenceCutoffMinutes;
+    const twoDaysMs = twoDaysMinutes * msPerMinute;
+    const { gameId } = await createGame({
+      timeControlMinutes: twoDaysMinutes,
+      colorPref: 'blue',
+      isPrivate: true,
+      creator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: 'p_corr_2', username: 'CorrGreen', elo: 1200 });
+
+    const currentRoom = localGameStore.get(gameId)!;
+    expect(currentRoom.blueTimeMs).toBe(twoDaysMs);
+    expect(currentRoom.greenTimeMs).toBe(twoDaysMs);
+
+    // Simulate 12 hours elapsed on blue's turn
+    const elapsedHours = 12;
+    const elapsedMs =
+      elapsedHours *
+      CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.minutesPerHour *
+      msPerMinute;
+    currentRoom.lastTurnStartTimeMs = Date.now() - elapsedMs;
+    localGameStore.set(currentRoom);
+
+    const p1Move = getLegalMovesForSquare(currentRoom.boardState.board, 'a1')[0];
+    await makeGameMove(gameId, p1Move, 'blue');
+
+    const updatedGame = localGameStore.get(gameId);
+    expect(updatedGame?.boardState.currentTurn).toBe('green');
+    // Blue's clock should be reset to 2 days (Days per move)
+    expect(updatedGame?.blueTimeMs).toBe(twoDaysMs);
+    // Green's clock should also be allocated full 2 days for their upcoming move
+    expect(updatedGame?.greenTimeMs).toBe(twoDaysMs);
   });
 
   it('handles resignation cleanly', async () => {
