@@ -225,6 +225,12 @@ export function subscribeToOpenRooms(
  * High-performance matchmaking lookup:
  * Direct targeted query for an available open room with matching time control.
  * Avoids full-database scans, returning O(1) document reads.
+ *
+ * @param timeControlMinutes Match duration in minutes.
+ * @param incrementSeconds Time increment per move in seconds.
+ * @param excludeUserId Seeker identifier (authenticated user ID or CSPRNG guest ID) to prevent self-pairing.
+ * @param candidateLimit Maximum candidate rooms to inspect.
+ * @param isRanked Whether the game is ranked.
  */
 export async function findOpenWaitingGame(
   timeControlMinutes: number,
@@ -233,6 +239,10 @@ export async function findOpenWaitingGame(
   candidateLimit: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.targetedMatchCandidateLimit,
   isRanked?: boolean
 ): Promise<GameRoom | null> {
+  if (excludeUserId !== undefined && typeof excludeUserId !== 'string') {
+    throw new TypeError('findOpenWaitingGame: excludeUserId must be a string or undefined.');
+  }
+
   const isGuestSeeker = isGuestUser({ id: excludeUserId });
 
   // Guests are strictly forbidden from participating in ranked games

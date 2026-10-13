@@ -1,23 +1,18 @@
 apply plugin: 'com.android.application'
-import groovy.json.JsonSlurper
 
 def packageJsonFile = rootProject.file('../package.json')
-def appVersionName = "1.4.0"
-def appVersionCode = 10400
+def appVersionName = "2.0.0"
+def appVersionCode = 20000
 
 if (packageJsonFile.exists()) {
-    try {
-        def packageJson = new JsonSlurper().parseText(packageJsonFile.text)
-        if (packageJson.version) {
-            appVersionName = packageJson.version.toString()
-            def parts = appVersionName.tokenize('.')
-            def major = parts.size() > 0 ? parts[0].toInteger() : 1
-            def minor = parts.size() > 1 ? parts[1].toInteger() : 0
-            def patch = parts.size() > 2 ? parts[2].tokenize('-')[0].toInteger() : 0
-            appVersionCode = (major * 10000) + (minor * 100) + patch
-        }
-    } catch (Exception ignored) {
-        // Fall back to default version
+    def versionMatch = (packageJsonFile.text =~ /"version"\s*:\s*"([^"]+)"/)
+    if (versionMatch.find()) {
+        appVersionName = versionMatch.group(1)
+        def parts = appVersionName.tokenize('.')
+        def major = parts.size() > 0 ? parts[0].toInteger() : 1
+        def minor = parts.size() > 1 ? parts[1].toInteger() : 0
+        def patch = parts.size() > 2 ? parts[2].tokenize('-')[0].toInteger() : 0
+        appVersionCode = (major * 10000) + (minor * 100) + patch
     }
 }
 

@@ -26,7 +26,7 @@ import type { PlayerEloUpdate } from './GameOverModal';
 import type { BoardState, Move, PieceColor } from '@/core/schada/types';
 import { Copy, Check, ArrowLeft, Loader2, Cpu, ShieldAlert, LogIn, Users } from 'lucide-react';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
-import { updateUserStats } from '@/services/firebase/authService';
+import { updateUserStats, getOrCreateGuestId } from '@/services/firebase/authService';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
@@ -174,8 +174,7 @@ export const GameRoomView: React.FC = () => {
     if (!gameId || !game || hasJoined || authLoading) return;
 
     const existingToken = getLocalSessionToken(gameId);
-    const guestIdKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId;
-    const guestId = typeof localStorage !== 'undefined' ? localStorage.getItem(guestIdKey) : null;
+    const guestId = getOrCreateGuestId();
 
     const isAlreadySeated = Boolean(
       (user &&
@@ -223,7 +222,7 @@ export const GameRoomView: React.FC = () => {
         patronSubscriptionStatus: user.patronSubscriptionStatus,
       }
       : {
-        id: 'guest_' + (guestId || Math.random().toString(36).substring(2, 8)),
+        id: guestId,
         username: guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
         elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
         gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
@@ -244,17 +243,13 @@ export const GameRoomView: React.FC = () => {
     if (!gameId) return;
 
     const trimmed = guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
-    const { guestName: guestNameKey, guestConfirmed: guestConfirmedKey, guestId: guestIdKey } =
+    const { guestName: guestNameKey, guestConfirmed: guestConfirmedKey } =
       MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
     safeSetItem(guestNameKey, trimmed);
     safeSetItem(guestConfirmedKey, 'true');
     setGuestPromptOpen(false);
 
-    let guestId = localStorage.getItem(guestIdKey);
-    if (!guestId) {
-      guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      safeSetItem(guestIdKey, guestId);
-    }
+    const guestId = getOrCreateGuestId();
 
     joinGame(gameId, {
       id: guestId,

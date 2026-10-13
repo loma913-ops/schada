@@ -20,6 +20,7 @@ import { LOCAL_CONFIG } from './localConfig';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { isGameTimedOut, type GameRoom } from './gameService';
 import { safeSetItem } from '../storage/storageCleanup';
+import { generateClientSessionId } from '@/core/security/cryptoUtils';
 
 export interface LobbyStats {
   playersOnline: number; // Strictly players who registered, signed in, and are active
@@ -57,14 +58,19 @@ let hiddenGraceTimerId: ReturnType<typeof setTimeout> | null = null;
 let isListenersAttached = false;
 const statsSubscribers = new Set<(stats: LobbyStats) => void>();
 
+let inMemorySessionId: string | null = null;
+
 // Generate or retrieve a unique tab/session ID for the current client
 export function getClientSessionId(): string {
   if (typeof sessionStorage === 'undefined') {
-    return 'session_node_test';
+    if (!inMemorySessionId) {
+      inMemorySessionId = generateClientSessionId();
+    }
+    return inMemorySessionId;
   }
   let id = sessionStorage.getItem(SESSION_STORAGE_ID_KEY);
   if (!id) {
-    id = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    id = generateClientSessionId();
     sessionStorage.setItem(SESSION_STORAGE_ID_KEY, id);
   }
   return id;
@@ -178,6 +184,7 @@ export function resetPresenceStateForTesting(): void {
   lastNotifiedStats = null;
   hiddenSince = null;
   currentActivityContext = 'online';
+  inMemorySessionId = null;
   firestoreRegisteredCount = null;
   firestoreGuestsCount = null;
   firestoreGamesCount = null;

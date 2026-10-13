@@ -3,7 +3,7 @@ import { X, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createGame } from '@/services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
-import { safeSetItem } from '@/services/storage/storageCleanup';
+import { getOrCreateGuestId } from '@/services/firebase/authService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
 import { useNavigate } from 'react-router-dom';
@@ -34,13 +34,9 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
   const handleCreate = async () => {
     setLoading(true);
     try {
-      const { guestId: guestIdKey, guestName: guestNameKey } =
+      const guestId = getOrCreateGuestId();
+      const { guestName: guestNameKey } =
         MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
-      let guestId = localStorage.getItem(guestIdKey);
-      if (!guestId) {
-        guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-        safeSetItem(guestIdKey, guestId);
-      }
       const storedGuestName = localStorage.getItem(guestNameKey);
       const guestName =
         storedGuestName && storedGuestName.trim().length > 0

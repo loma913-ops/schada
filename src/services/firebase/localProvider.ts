@@ -17,6 +17,7 @@ import {
   computeCancellationExpiration,
   isPatronActive,
 } from '@/core/donate/patronService';
+import { generateLocalUserId, generateFriendRequestId } from '@/core/security/cryptoUtils';
 
 export interface UserProfile {
   id: string;
@@ -290,7 +291,7 @@ class LocalBackend {
       throw new Error(`Username "${username}" is already taken.`);
     }
 
-    const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const uid = generateLocalUserId();
     const newUser: UserProfile = {
       id: uid,
       email: email.trim(),
@@ -632,7 +633,7 @@ class LocalBackend {
     }
 
     const newReq: LocalFriendRequest = {
-      id: `freq_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      id: generateFriendRequestId(),
       fromUserId: fromUser.id,
       fromUsername: fromUser.username,
       fromUserIsPatron: isPatronActive(fromUser),

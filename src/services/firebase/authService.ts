@@ -30,6 +30,7 @@ import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { safeSetItem } from '../storage/storageCleanup';
 import { AUTH_CONFIG } from './authConfig';
 import { SECURITY_CONFIG } from '@/core/security/securityConfig';
+import { generateGuestId } from '@/core/security/cryptoUtils';
 
 export function validateUsernameFormat(username: string): { valid: boolean; error?: string } {
   const trimmed = username.trim();
@@ -709,5 +710,29 @@ export async function deleteUserAccount(password: string): Promise<void> {
     }
     persistCachedProfile(null);
   }
+}
+
+/**
+ * Retrieves the persisted guest identifier from browser storage, or generates and
+ * persists an authoritative cryptographically secure guest identifier (CSPRNG).
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant time storage access and CSPRNG generation.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * @returns Cryptographically secure guest identifier starting with SECURITY_CONFIG.guestIdPrefix.
+ */
+export function getOrCreateGuestId(): string {
+  const guestIdKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId;
+  if (typeof localStorage !== 'undefined') {
+    const existing = localStorage.getItem(guestIdKey);
+    if (existing && existing.startsWith(SECURITY_CONFIG.guestIdPrefix)) {
+      return existing;
+    }
+    const newGuestId = generateGuestId();
+    safeSetItem(guestIdKey, newGuestId);
+    return newGuestId;
+  }
+  return generateGuestId();
 }
 
