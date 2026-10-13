@@ -76,14 +76,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.5rem;
-  height: 56px;
+  padding: env(safe-area-inset-top, 0px) 1.5rem 0;
+  min-height: calc(56px + env(safe-area-inset-top, 0px));
+  box-sizing: border-box;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
   position: sticky;
   top: 0;
   z-index: 60;
-  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .install-btn,
@@ -93,8 +93,9 @@ body {
 
 @media (max-width: 768px) {
   .navbar {
-    padding: 0 0.75rem;
-    height: 52px;
+    padding: env(safe-area-inset-top, 0px) 0.75rem 0;
+    min-height: calc(52px + env(safe-area-inset-top, 0px));
+    height: auto;
   }
 
   .nav-brand span {

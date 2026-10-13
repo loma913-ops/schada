@@ -126,8 +126,10 @@ export async function applyNativeSystemBarStyle(
   validateNativeConfig(config);
   if (!isNativePlatform()) return;
   try {
+    const configuredStyle =
+      theme === 'dark' ? config.systemBars.dark : config.systemBars.light;
     const targetStyle =
-      theme === 'dark' ? SystemBarsStyle.Dark : SystemBarsStyle.Light;
+      configuredStyle === 'DARK' ? SystemBarsStyle.Dark : SystemBarsStyle.Light;
     await SystemBars.setStyle({
       style: targetStyle,
     });

@@ -195,7 +195,7 @@ cd schada
 # 2. Install dependencies
 npm install
 
-# 3. Run unit test suite (72 test files, 655+ tests)
+# 3. Run unit test suite (74 test files, 690+ tests)
 npm test
 
 # 4. Start local development server with HMR
@@ -203,6 +203,8 @@ npm run dev
 ```
 
 Open `http://localhost:5173` in your browser. The app runs out of the box using a local mock service provider if Firebase environment variables are not configured.
+
+> **Tip for Mobile View Testing**: Open browser DevTools (`F12`), press `Ctrl+Shift+M` (or `Cmd+Shift+M` on macOS) to toggle the **Device Toolbar**, and select a mobile viewport (e.g., Pixel 7 or iPhone 14) to test responsive layouts, touch gestures, notation drawers, and portrait orientation lock handling.
 
 ### Running Quality Checks
 
@@ -609,12 +611,49 @@ Schada provides first-class native mobile editions for **Android** and **iOS** p
 
 ### Local Development Commands
 
-| Command | Purpose |
-| :--- | :--- |
-| `npm run build` | Compiles production web bundle to `dist/` |
-| `npm run cap:sync` | Synchronizes web assets and native plugins to `android/` and `ios/` |
-| `npm run cap:android` | Opens the Android project in Android Studio |
-| `npm run cap:ios` | Opens the iOS project in Xcode (macOS only) |
+| Command                   | Purpose                                                                |
+| :------------------------ | :--------------------------------------------------------------------- |
+| `npm run build`           | Compiles production web bundle to `dist/`                              |
+| `npm run cap:sync`        | Synchronizes web assets and native plugins to `android/` and `ios/`    |
+| `npm run cap:android`     | Opens the Android project in Android Studio                            |
+| `npm run cap:ios`         | Opens the iOS project in Xcode (macOS only)                            |
+| `npx cap run android`     | Runs app directly on connected Android device or emulator              |
+| `./gradlew assembleDebug` | Generates unsigned debug APK at `android/app/build/outputs/apk/debug/` |
+| `./gradlew bundleRelease` | Generates signed release bundle at `android/app/build/outputs/bundle/` |
+
+### Local Mobile Testing Workflow
+
+Before testing on an emulator or physical device, build web assets and sync plugins:
+
+```bash
+npm run build
+npm run cap:sync
+```
+
+#### Option A: Android Studio (Recommended)
+```bash
+npm run cap:android
+```
+1. Android Studio will open the native `android/` project.
+2. Select your target device (an **Android Virtual Device (AVD)** emulator or physical phone with USB debugging enabled).
+3. Click the green **Run ▶️** button (or press `Shift + F10`).
+4. The app installs and launches with native hardware haptics and hardware back button handling.
+
+#### Option B: Terminal / Capacitor CLI
+```bash
+npx cap run android
+```
+Select a detected target device/emulator from the terminal prompt to compile and deploy immediately.
+
+#### Option C: Standalone Debug APK (Direct Sideloading)
+To generate an installable `.apk` file for testing on any Android phone without release keystore credentials:
+```bash
+cd android
+./gradlew assembleDebug
+```
+The resulting package is generated at `android/app/build/outputs/apk/debug/app-debug.apk`. Transfer and install it directly onto any Android device.
+
+> **Note on Android SDK**: If running Gradle commands directly from the terminal, ensure `android/local.properties` specifies your Android SDK location (e.g., `sdk.dir=C\:\\Users\\<User>\\AppData\\Local\\Android\\Sdk`), or configure the `ANDROID_HOME` environment variable.
 
 ---
 
@@ -642,10 +681,13 @@ Before packaging mobile builds for Google Play or the Apple App Store, complete 
 
 5. **Generate Production App Icons and Splash Screens**:
    Capacitor generates placeholder icons upon initial setup. Before publishing to app stores, generate official icon and splash assets:
-   - Place `icon.png` (1024x1024) and `splash.png` (2732x2732) in an `assets/` folder.
-   - Run the asset generator:
+   - Generate official Schada vector branding assets into `assets/` (or place custom `icon.png` 1024x1024 and `splash.png` 2732x2732):
      ```bash
-     npx @capacitor/assets generate
+     python scripts/createSourceAssets.py
+     ```
+   - Run the asset generator to update Android and iOS native targets:
+     ```bash
+     npx @capacitor/assets generate --android --ios
      ```
 
 ---
@@ -721,5 +763,3 @@ npm run cap:ios
   - **Automated Tag Trigger**: Pushing a version tag (`v*`) automatically builds and archives release artifacts for both Android and iOS targets.
 - **CodeQL Security Analysis (`.github/workflows/codeql.yml`)**:
   - Automated SAST scanning for JavaScript & TypeScript code on `ubuntu-latest` without building native mobile boilerplate.
-
-
