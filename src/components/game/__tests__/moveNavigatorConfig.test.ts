@@ -104,6 +104,20 @@ describe('MoveNavigatorConfig validation and state calculation', () => {
       'MoveNavigatorConfigError: Invalid ariaLabels.buttons.startOfGame: expected non-empty string.'
     );
 
+    const invalidUnreadLabel = {
+      ...CANONICAL_MOVE_NAVIGATOR_CONFIG,
+      ariaLabels: {
+        ...CANONICAL_MOVE_NAVIGATOR_CONFIG.ariaLabels,
+        buttons: {
+          ...CANONICAL_MOVE_NAVIGATOR_CONFIG.ariaLabels.buttons,
+          unreadLiveMove: '',
+        },
+      },
+    };
+    expect(() => validateMoveNavigatorConfig(invalidUnreadLabel)).toThrowError(
+      'MoveNavigatorConfigError: Invalid ariaLabels.buttons.unreadLiveMove: expected non-empty string.'
+    );
+
     const invalidTooltip = {
       ...CANONICAL_MOVE_NAVIGATOR_CONFIG,
       tooltips: {
@@ -113,6 +127,17 @@ describe('MoveNavigatorConfig validation and state calculation', () => {
     };
     expect(() => validateMoveNavigatorConfig(invalidTooltip)).toThrowError(
       'MoveNavigatorConfigError: Invalid tooltips.nextMove: expected non-empty string.'
+    );
+
+    const invalidUnreadTooltip = {
+      ...CANONICAL_MOVE_NAVIGATOR_CONFIG,
+      tooltips: {
+        ...CANONICAL_MOVE_NAVIGATOR_CONFIG.tooltips,
+        unreadLiveMove: '   ',
+      },
+    };
+    expect(() => validateMoveNavigatorConfig(invalidUnreadTooltip)).toThrowError(
+      'MoveNavigatorConfigError: Invalid tooltips.unreadLiveMove: expected non-empty string.'
     );
   });
 

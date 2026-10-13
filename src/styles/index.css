@@ -710,6 +710,51 @@ body {
   display: block;
 }
 
+.move-navigator-btn-content {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.move-navigator-btn.has-unread-live-move {
+  color: var(--accent-gold);
+  background-color: rgba(212, 175, 55, 0.14);
+}
+
+[data-theme='light'] .move-navigator-btn.has-unread-live-move {
+  color: var(--piece-blue);
+  background-color: rgba(30, 58, 138, 0.12);
+}
+
+.move-navigator-unread-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--accent-gold);
+  box-shadow: 0 0 6px var(--accent-gold);
+  animation: pulse-unread-dot 1.8s infinite ease-in-out;
+}
+
+[data-theme='light'] .move-navigator-unread-dot {
+  background-color: var(--piece-blue);
+  box-shadow: 0 0 6px rgba(30, 58, 138, 0.6);
+}
+
+@keyframes pulse-unread-dot {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
 .move-history-header {
   display: flex;
   align-items: center;

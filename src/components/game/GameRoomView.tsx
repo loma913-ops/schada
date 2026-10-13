@@ -18,6 +18,7 @@ import {
   markGameEloProcessed,
   computeRankedGameEloResult,
   ABANDONED_GAME_EXPIRY_MS,
+  localGameStore,
   type GameRoom,
 } from '@/services/firebase/gameService';
 import { Arena, type ArenaPlayer } from './Arena';
@@ -394,6 +395,45 @@ export const GameRoomView: React.FC = () => {
     };
   }, [gameId]);
 
+  // Tab visibility synchronization: resync immediately when switching back to tab
+  /**
+   * Resynchronizes local game state on tab visibility change or window focus without making Firestore queries.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) in-memory store hash lookup and state comparison.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   * - Database CRUD Complexity: 0 document reads (incurring $0 billing cost).
+   *
+   * Growth Rate:
+   * - O(1) flat growth rate, completely invariant to collection scale or match history length.
+   */
+  useEffect(() => {
+    if (!gameId) return;
+
+    const handleVisibilitySync = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        const localGame = localGameStore.get(gameId);
+        if (
+          localGame &&
+          (!gameRef.current ||
+            localGame.boardState.moveHistory.length > gameRef.current.boardState.moveHistory.length ||
+            localGame.status !== gameRef.current.status ||
+            localGame.boardState.isGameOver !== gameRef.current.boardState.isGameOver)
+        ) {
+          setGame(localGame);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilitySync);
+    window.addEventListener('focus', handleVisibilitySync);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilitySync);
+      window.removeEventListener('focus', handleVisibilitySync);
+    };
+  }, [gameId]);
+
   // Handle game completion & ranked rating updates
   const applyUserEloUpdates = useCallback(
     async (completedGameState?: BoardState): Promise<void> => {
@@ -600,9 +640,10 @@ export const GameRoomView: React.FC = () => {
         syncedBlueTimeMs={currentBlueTime}
         syncedGreenTimeMs={currentGreenTime}
         onMakeMove={async (move: Move) => {
-          if (!userColor || game.status === 'waiting') return;
+          const currentGame = gameRef.current || game;
+          if (!userColor || currentGame.status === 'waiting') return;
           try {
-            await makeGameMove(gameId!, move, userColor, game);
+            await makeGameMove(gameId!, move, userColor, currentGame);
           } catch (err) {
             console.error('Failed to make move:', err);
           }

@@ -25,6 +25,7 @@ export interface MoveHistoryProps {
   readonly analysisProgress?: { readonly current: number; readonly total: number } | null;
   readonly analyzedQualities?: Readonly<Record<number, MoveQuality>>;
   readonly onCancelAnalysis?: () => void;
+  readonly hasUnreadLiveMove?: boolean;
   readonly config?: MoveNavigatorConfig;
   readonly displayConfig?: AnalysisDisplayConfig;
 }
@@ -51,6 +52,7 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
   analysisProgress = null,
   analyzedQualities,
   onCancelAnalysis,
+  hasUnreadLiveMove = false,
   config = CANONICAL_MOVE_NAVIGATOR_CONFIG,
   displayConfig = CANONICAL_ANALYSIS_DISPLAY_CONFIG,
 }) {
@@ -106,6 +108,7 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
           currentIndex={currentMoveIndex}
           totalMoves={history.length}
           onNavigate={onNavigateMove}
+          hasUnreadLiveMove={hasUnreadLiveMove}
           config={config}
         />
         <div className="move-history-header">

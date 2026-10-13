@@ -10,13 +10,25 @@ export interface MoveNavigatorProps {
   readonly currentIndex: number;
   readonly totalMoves: number;
   readonly onNavigate?: (index: number) => void;
+  readonly hasUnreadLiveMove?: boolean;
   readonly config?: MoveNavigatorConfig;
 }
 
+/**
+ * Interactive Move Navigation Toolbar.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time target evaluation and rendering.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) invariant to totalMoves length.
+ */
 export const MoveNavigator: React.FC<MoveNavigatorProps> = memo(function MoveNavigator({
   currentIndex,
   totalMoves,
   onNavigate,
+  hasUnreadLiveMove = false,
   config = CANONICAL_MOVE_NAVIGATOR_CONFIG,
 }) {
   validateMoveNavigatorConfig(config);
@@ -114,22 +126,25 @@ export const MoveNavigator: React.FC<MoveNavigatorProps> = memo(function MoveNav
 
       <button
         type="button"
-        className="move-navigator-btn"
+        className={`move-navigator-btn ${hasUnreadLiveMove ? 'has-unread-live-move' : ''}`}
         disabled={!canGoForward}
         onClick={handleEnd}
-        title={tooltips.endOfGame}
-        aria-label={ariaLabels.buttons.endOfGame}
+        title={hasUnreadLiveMove ? tooltips.unreadLiveMove : tooltips.endOfGame}
+        aria-label={hasUnreadLiveMove ? ariaLabels.buttons.unreadLiveMove : ariaLabels.buttons.endOfGame}
       >
-        <svg
-          className="move-navigator-icon"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path d="M4 5.5 L11 12 L4 18.5 Z" />
-          <path d="M11.5 5.5 L18.5 12 L11.5 18.5 Z" />
-          <rect x="18.5" y="4.5" width="2.2" height="15" rx="0.5" />
-        </svg>
+        <span className="move-navigator-btn-content">
+          <svg
+            className="move-navigator-icon"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M4 5.5 L11 12 L4 18.5 Z" />
+            <path d="M11.5 5.5 L18.5 12 L11.5 18.5 Z" />
+            <rect x="18.5" y="4.5" width="2.2" height="15" rx="0.5" />
+          </svg>
+          {hasUnreadLiveMove && <span className="move-navigator-unread-dot" aria-hidden="true" />}
+        </span>
       </button>
     </div>
   );

@@ -124,6 +124,7 @@ export const Arena: React.FC<ArenaProps> = ({
     return historyLen > 0 ? historyLen - 1 : CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex;
   });
   const [isBotThinking, setIsBotThinking] = useState(false);
+  const [hasUnreadLiveMove, setHasUnreadLiveMove] = useState(false);
 
   const [orientation, setOrientation] = useState<'blue' | 'green'>(() => {
     if (userColor) return userColor;
@@ -264,7 +265,11 @@ export const Arena: React.FC<ArenaProps> = ({
   const gameStateRef = useRef<BoardState>(gameState);
   gameStateRef.current = gameState;
 
+  const viewMoveIndexRef = useRef<number>(viewMoveIndex);
+  viewMoveIndexRef.current = viewMoveIndex;
+
   const prevMoveCountRef = useRef<number>(gameState.moveHistory.length);
+  const prevHistoryLenRef = useRef<number>(gameState.moveHistory.length);
   const lastAudibleMoveIndexRef = useRef<number>(
     (syncedGameState || initialState).moveHistory.length - 1
   );
@@ -300,6 +305,13 @@ export const Arena: React.FC<ArenaProps> = ({
       lastAudibleMoveIndexRef.current = Math.max(lastAudibleMoveIndexRef.current, incomingLen - 1);
       prevMoveCountRef.current = incomingLen;
 
+      // Determine if the user was actively following the live game before this incoming state
+      const currentViewIndex = viewMoveIndexRef.current;
+      const wasAtLivePosition =
+        currentLocalLen === 0
+          ? currentViewIndex === CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex
+          : currentViewIndex >= currentLocalLen - 1;
+
       // If incoming synced state matches our local optimistic state move count and game over status,
       // it is a server echo of our own move - skip redundant re-rendering
       if (
@@ -311,15 +323,57 @@ export const Arena: React.FC<ArenaProps> = ({
 
       gameStateRef.current = syncedGameState;
       setGameState(syncedGameState);
+
+      if (incomingLen > currentLocalLen) {
+        if (wasAtLivePosition) {
+          setViewMoveIndex(incomingLen - 1);
+          setHasUnreadLiveMove(false);
+        } else {
+          setHasUnreadLiveMove(true);
+        }
+      }
+      prevHistoryLenRef.current = incomingLen;
     }
   }, [syncedGameState]);
 
-  const prevHistoryLenRef = useRef<number>(gameState.moveHistory.length);
+  // Clear unread live move indicator once user navigates back to latest move
+  /**
+   * Clears the unread live move indicator when viewMoveIndex reaches or exceeds the latest move.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) constant time integer comparison.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   *
+   * Growth Rate:
+   * - O(1) flat growth rate.
+   */
+  useEffect(() => {
+    if (viewMoveIndex >= gameState.moveHistory.length - 1) {
+      setHasUnreadLiveMove(false);
+    }
+  }, [viewMoveIndex, gameState.moveHistory.length]);
+
+  /**
+   * Synchronizes viewMoveIndex when local gameState.moveHistory length changes externally.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) constant time integer boundary comparison.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   *
+   * Growth Rate:
+   * - O(1) flat growth rate, invariant to match history length.
+   */
   useEffect(() => {
     const currentLen = gameState.moveHistory.length;
     const prevLen = prevHistoryLenRef.current;
     if (currentLen > prevLen) {
-      setViewMoveIndex((prev) => (prev === prevLen - 1 ? currentLen - 1 : prev));
+      const wasAtLive =
+        prevLen === 0
+          ? viewMoveIndexRef.current === CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex
+          : viewMoveIndexRef.current >= prevLen - 1;
+      if (wasAtLive) {
+        setViewMoveIndex(currentLen - 1);
+      }
     } else if (currentLen < prevLen) {
       setViewMoveIndex(
         currentLen > 0 ? currentLen - 1 : CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex
@@ -502,6 +556,7 @@ export const Arena: React.FC<ArenaProps> = ({
     prevMoveCountRef.current = nextState.moveHistory.length;
     prevHistoryLenRef.current = nextState.moveHistory.length;
     setViewMoveIndex(newMoveIndex);
+    setHasUnreadLiveMove(false);
 
     if (isCorrespondence) {
       setBlueTime(initialMs);
@@ -776,6 +831,7 @@ export const Arena: React.FC<ArenaProps> = ({
               currentIndex={viewMoveIndex}
               totalMoves={gameState.moveHistory.length}
               onNavigate={setViewMoveIndex}
+              hasUnreadLiveMove={hasUnreadLiveMove}
             />
           </div>
 
@@ -821,6 +877,7 @@ export const Arena: React.FC<ArenaProps> = ({
           analysisProgress={analysisProgress}
           analyzedQualities={analyzedQualities}
           onCancelAnalysis={handleCancelAnalysis}
+          hasUnreadLiveMove={hasUnreadLiveMove}
         />
 
         {/* Action Controls */}
@@ -879,6 +936,7 @@ export const Arena: React.FC<ArenaProps> = ({
                 analysisProgress={analysisProgress}
                 analyzedQualities={analyzedQualities}
                 onCancelAnalysis={handleCancelAnalysis}
+                hasUnreadLiveMove={hasUnreadLiveMove}
               />
             </div>
           </div>

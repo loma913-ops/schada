@@ -164,4 +164,48 @@ describe('MoveHistory Component', () => {
 
     expect(html).toContain('Re-analyze');
   });
+
+  it('renders unread live move indicator on End button when hasUnreadLiveMove is true', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(MoveHistory, {
+        history: [
+          {
+            from: 'b2',
+            to: 'b3',
+            piece: { id: 'b_p1', type: 'pawn', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+            intermediateSquares: [],
+            notation: 'b2',
+          },
+        ],
+        currentMoveIndex: -1,
+        hasUnreadLiveMove: true,
+      })
+    );
+
+    expect(html).toContain('has-unread-live-move');
+    expect(html).toContain('move-navigator-unread-dot');
+    expect(html).toContain('Live move played — Jump to latest position');
+  });
+
+  it('does not render unread live move indicator when hasUnreadLiveMove is false or undefined', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(MoveHistory, {
+        history: [
+          {
+            from: 'b2',
+            to: 'b3',
+            piece: { id: 'b_p1', type: 'pawn', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+            intermediateSquares: [],
+            notation: 'b2',
+          },
+        ],
+        currentMoveIndex: -1,
+        hasUnreadLiveMove: false,
+      })
+    );
+
+    expect(html).not.toContain('has-unread-live-move');
+    expect(html).not.toContain('move-navigator-unread-dot');
+    expect(html).not.toContain('Live move played — Jump to latest position');
+  });
 });

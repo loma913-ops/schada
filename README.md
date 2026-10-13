@@ -49,7 +49,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Comprehensive Match Stats & Post-Game Elo Summary**: Game-over modal with synchronized rating point deltas and match details.
 - **Competitive Integrity & Guest Ranked Restriction**: Guests are strictly prohibited from participating in ranked matches; rated play requires an authenticated account.
 - **Lichess-Inspired Minimalist UX**: Responsive arena with clocks, notation, controls, and dark/light mode.
-- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves with direct atomic updates bypassing redundant document reads and deduplicated server-echo reconciliation.
+- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves, atomic multi-tab broadcast sync, automatic live position advancement, and non-disruptive unread move notifications.
 - **Cross-Platform Hybrid Audio Engine**: Web Audio API with immediate transient attack playback, realistic synthesized fallbacks, and zero-latency desktop and mobile sound.
 - **Authoritative Symmetrical Elo Engine**: Immutable initial/final Elo ratings and deltas stored in match documents for symmetrical cross-client synchronization.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
@@ -170,6 +170,7 @@ Schada includes a non-destructive move navigation engine (`src/core/schada/repla
   - `Home`: Jump to starting position.
   - `End`: Jump to live position.
 - **Non-Destructive Inspection**: Navigating historical plies allows full inspection of captured pieces, board coordinates, and move annotations. Once a player is ready to make a move, navigating back to live mode immediately re-enables interactive piece movement.
+- **Real-Time Live Auto-Advance & Unread Move Notifications**: When an opponent makes a move, the board automatically updates and steps forward in real time if the player is following live moves. If the player is inspecting historical plies, their viewed position is preserved without interruption while move audio plays, the notation list and turn indicator update, and a pulsating unread dot appears on the 'Live' (`>>|`) button, automatically clearing once the player returns to the live position.
 - **Sticky Controls (Desktop & Mobile)**: Navigation controls and match status remain pinned and sticky at the top across desktop panels and mobile notation sheets, ensuring controls never scroll out of sight during move review.
 - **Post-Game Game Review & Real-Time Analysis**: Following match completion, the Game Over modal immediately presents the match outcome, win reason, scoring breakdown, Move Quality Distribution table (all 10 tiers with graphical vector symbols), and player accuracy percentages (Blue & Green) calculated via background analysis. The modal can be closed via the 'Review' action, 'X' button, backdrop click, or `Escape` key, permitting full board inspection, move navigation, and board flipping. In Review mode, an 'Analyze' action button is displayed in the Moves Notation header bar across desktop and mobile, opening an Analysis Settings modal with configurable Depth (1–20 plies) and Time Limit (1.0–15.0s per move) sliders alongside real-time estimated completion time. Triggering analysis launches a dedicated background Web Worker that evaluates moves off the main thread at 60 FPS, streaming graphical vector move quality symbols (Brilliant, Great Move, Inaccuracy, Mistake, Miss, Blunder) in real time directly to the right of each move notation with native tooltips and live ply progress feedback. Players can reopen match results at any time via the 'Results' button or exit to the lobby via 'Lobby'.
 
@@ -192,7 +193,7 @@ cd schada
 # 2. Install dependencies
 npm install
 
-# 3. Run unit test suite (47 test suites, 420+ tests)
+# 3. Run unit test suite (72 test files, 655+ tests)
 npm test
 
 # 4. Start local development server with HMR
