@@ -44,7 +44,7 @@ service cloud.firestore {
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['eloRating']) ||
           (request.resource.data.eloRating >= resource.data.eloRating - 64 &&
            request.resource.data.eloRating <= resource.data.eloRating + 64));
-      allow delete: if false;
+      allow delete: if isOwner(userId);
 
       // User friends subcollection
       match /userFriends/{friendId} {

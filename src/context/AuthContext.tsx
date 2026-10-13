@@ -9,6 +9,7 @@ import {
   setUserOnlineStatus,
   getInitialAuthState,
   reloadUserProfile,
+  deleteUserAccount,
 } from '@/services/firebase/authService';
 import { startPresenceTracking, syncPresenceHeartbeat } from '@/services/firebase/presenceService';
 import { LOCAL_CONFIG } from '@/services/firebase/localConfig';
@@ -20,6 +21,7 @@ interface AuthContextType {
   register: (email: string, pass: string, username: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUsername: (newUsername: string) => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
   refreshUser: (updatedProfile?: UserProfile | null) => Promise<UserProfile | null>;
   setUserStatus: (status: 'online' | 'in-game' | 'offline') => Promise<void>;
 }
@@ -108,6 +110,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const deleteAccount = React.useCallback(async (password: string) => {
+    await deleteUserAccount(password);
+    setUser(null);
+  }, []);
+
   const setUserStatus = React.useCallback(async (status: 'online' | 'in-game' | 'offline') => {
     await setUserOnlineStatus(status);
     setUser((current) => (current ? { ...current, status } : null));
@@ -135,10 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       register,
       logout,
       updateUsername,
+      deleteAccount,
       refreshUser,
       setUserStatus,
     }),
-    [user, isLoading, login, register, logout, updateUsername, refreshUser, setUserStatus]
+    [user, isLoading, login, register, logout, updateUsername, deleteAccount, refreshUser, setUserStatus]
   );
 
   return (

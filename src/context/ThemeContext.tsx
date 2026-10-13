@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { safeSetItem } from '@/services/storage/storageCleanup';
+import { applyNativeSystemBarStyle } from '@/services/native/mobileService';
 
 type Theme = 'dark' | 'light';
 
@@ -24,6 +25,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (metaThemeColor) {
       metaThemeColor.setAttribute('content', theme === 'dark' ? '#161512' : '#edebe8');
     }
+    void applyNativeSystemBarStyle(theme);
   }, [theme]);
 
   const toggleTheme = () => {

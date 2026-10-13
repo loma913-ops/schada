@@ -45,3 +45,20 @@ graphify-out/
 
 # Bot Championship simulation outputs
 tournament_output/
+
+# Capacitor Android & iOS build outputs
+android/app/build/
+android/.gradle/
+android/app/src/main/assets/public/
+android/capacitor-cordova-android-plugins/
+ios/App/build/
+ios/App/App/public/
+ios/DerivedData/
+
+# Mobile Signing Credentials & Keys (Strictly prohibited from source control)
+*.jks
+*.keystore
+key.properties
+*.p12
+*.mobileprovision
+*.p8

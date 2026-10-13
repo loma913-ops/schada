@@ -41,6 +41,7 @@ import {
   setUserOnlineStatus,
   updateUserStats,
   reloadUserProfile,
+  deleteUserAccount,
 } from '../authService';
 import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
 import { localBackend } from '../localProvider';
@@ -152,5 +153,23 @@ describe('authService caching and hydration', () => {
     expect(reloaded).not.toBeNull();
     expect(reloaded?.id).toBe(user.id);
     expect(reloaded?.eloRating).toBe(user.eloRating + 25);
+  });
+
+  it('rejects account deletion when password is empty or blank', async () => {
+    await expect(deleteUserAccount('')).rejects.toThrow(
+      'Account deletion requires your current password for security verification.'
+    );
+    await expect(deleteUserAccount('   ')).rejects.toThrow(
+      'Account deletion requires your current password for security verification.'
+    );
+  });
+
+  it('deletes user account and clears cached profile', async () => {
+    await registerUser('delete_target@example.com', 'password123', 'delete_user');
+    expect(getCachedAuthProfile()).not.toBeNull();
+
+    await deleteUserAccount('password123');
+    expect(getCachedAuthProfile()).toBeNull();
+    expect(getInitialAuthState().initialUser).toBeNull();
   });
 });

@@ -3,6 +3,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  deleteUser,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import {
   doc,
@@ -12,6 +15,7 @@ import {
   runTransaction,
   serverTimestamp,
   onSnapshot,
+  writeBatch,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { localBackend, type UserProfile } from './localProvider';
@@ -638,3 +642,64 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
   callback(mockUser);
   return () => {};
 }
+
+/**
+ * Deletes the authenticated user's account and profile data.
+ *
+ * Enforces Apple Guideline 5.1.1(v) & Google Play account deletion mandates:
+ * 1. Re-authenticates the current user using their password to prevent unauthorized session hijacking.
+ * 2. Executes an atomic batch deleting users/{uid} and usernames/{usernameLower} (2 operations).
+ * 3. Deletes the Firebase Auth account.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time point lookups on indexed primary keys and 2-document batch deletion.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ *
+ * Growth Rate:
+ * - O(1) constant, strictly scales without collection scans or data-volume dependency.
+ */
+export async function deleteUserAccount(password: string): Promise<void> {
+  if (!password || typeof password !== 'string' || password.trim().length === 0) {
+    throw new Error('Account deletion requires your current password for security verification.');
+  }
+
+  if (isFirebaseConfigured() && auth?.currentUser && db) {
+    const currentUser = auth.currentUser;
+    const uid = currentUser.uid;
+    const email = currentUser.email;
+
+    if (!email) {
+      throw new Error('Account deletion requires a verified email address.');
+    }
+
+    // 1. Authoritative password verification
+    const credential = EmailAuthProvider.credential(email, password);
+    await reauthenticateWithCredential(currentUser, credential);
+
+    // 2. Resolve username for lookup table deletion
+    const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, uid);
+    const userSnap = await getDoc(userDocRef);
+    const userData = userSnap.data();
+    const usernameLower = userData?.usernameLower || (userData?.username ? String(userData.username).toLowerCase() : null);
+
+    // 3. Batched atomic Firestore deletion
+    const batch = writeBatch(db);
+    batch.delete(userDocRef);
+    if (usernameLower) {
+      batch.delete(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.usernames, usernameLower));
+    }
+    await batch.commit();
+
+    // 4. Delete Auth user credentials
+    await deleteUser(currentUser);
+    persistCachedProfile(null);
+  } else {
+    // Offline / Mock backend
+    const currentMock = localBackend.getCurrentUser();
+    if (currentMock) {
+      localBackend.deleteUser(currentMock.id);
+    }
+    persistCachedProfile(null);
+  }
+}
+

@@ -5,6 +5,8 @@ Database CRUD operations must be optimized without compromising performance or g
 
 When deploying the User must not have to empty cache or do a hard reload to see the changes.
 
+This project must be built for web, android and ios. The same codebase must be used for all platforms.
+
 All UI components must support dark and light mode. It is sufficient to verify this in the code as opposed to using the Browser tool.
 
 All UI components must be formatted well for desktop and mobile. It is sufficient to verify this in the code as opposed to using the Browser tool.

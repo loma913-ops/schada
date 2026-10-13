@@ -5,6 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { usePwa } from '@/context/PwaContext';
 import { SchadaStar } from '@/components/common/SchadaStar';
 import type { NavigationTab } from '@/components/layout/navigationTypes';
+import { isNativePlatform } from '@/services/native/mobileService';
 
 interface NavbarProps {
   currentTab: NavigationTab;
@@ -65,27 +66,31 @@ export const Navbar: React.FC<NavbarProps> = ({
           <History size={16} />
           <span>History</span>
         </button>
-        <button
-          className={`nav-tab nav-donate-tab ${currentTab === 'donate' ? 'active' : ''}`}
-          onClick={() => onSelectTab('donate')}
-          title="Support Schada • Donate"
-        >
-          <Heart size={16} />
-          <span>Donate</span>
-        </button>
+        {!isNativePlatform() && (
+          <button
+            className={`nav-tab nav-donate-tab ${currentTab === 'donate' ? 'active' : ''}`}
+            onClick={() => onSelectTab('donate')}
+            title="Support Schada • Donate"
+          >
+            <Heart size={16} />
+            <span>Donate</span>
+          </button>
+        )}
       </div>
 
       {/* Right Cluster */}
       <div className="nav-actions">
         {/* Mobile Donate Link */}
-        <button
-          className={`action-btn mobile-donate-btn ${currentTab === 'donate' ? 'active' : ''}`}
-          onClick={() => onSelectTab('donate')}
-          title="Support Schada • Donate"
-          aria-label="Support Schada • Donate"
-        >
-          <Heart size={16} />
-        </button>
+        {!isNativePlatform() && (
+          <button
+            className={`action-btn mobile-donate-btn ${currentTab === 'donate' ? 'active' : ''}`}
+            onClick={() => onSelectTab('donate')}
+            title="Support Schada • Donate"
+            aria-label="Support Schada • Donate"
+          >
+            <Heart size={16} />
+          </button>
+        )}
 
         {/* PWA Install Trigger (only visible on mobile devices, hidden on desktop browser and if already installed) */}
         {!isStandalone && isMobile && (

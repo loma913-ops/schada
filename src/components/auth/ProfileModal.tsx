@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { X, LogOut, Edit2, CheckCircle2, AlertTriangle, Sliders, AlertCircle } from 'lucide-react';
+import { X, LogOut, Edit2, CheckCircle2, AlertTriangle, Sliders, AlertCircle, Trash2 } from 'lucide-react';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { SchadaStar } from '@/components/common/SchadaStar';
 import { getPatronStatusDescription } from '@/core/donate/patronService';
 import { useGamePreferences } from '@/context/GamePreferencesContext';
+import { AUTH_CONFIG } from '@/services/firebase/authConfig';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -12,13 +13,20 @@ interface ProfileModalProps {
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
-  const { user, updateUsername, logout } = useAuth();
+  const { user, updateUsername, logout, deleteAccount } = useAuth();
   const { showThreatIndicators, setShowThreatIndicators } = useGamePreferences();
   const [newUsername, setNewUsername] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Account Deletion State (Store compliance: Apple 5.1.1(v))
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmPhrase, setDeleteConfirmPhrase] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!isOpen || !user) return null;
 
@@ -47,6 +55,29 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
   };
 
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deleteConfirmPhrase !== AUTH_CONFIG.accountDeletionConfirmationPhrase) {
+      setDeleteError(`Please type "${AUTH_CONFIG.accountDeletionConfirmationPhrase}" to confirm.`);
+      return;
+    }
+    setDeleteError(null);
+    setDeleteLoading(true);
+
+    try {
+      await deleteAccount(deletePassword);
+      onClose();
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setDeleteError(err.message);
+      } else {
+        setDeleteError('Failed to delete account.');
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     onClose();
@@ -54,7 +85,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ width: 'min(92vw, 520px)' }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-content"
+        style={{ width: 'min(92vw, 520px)', maxHeight: '90vh', overflowY: 'auto' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2 className="modal-title">Player Profile</h2>
           <button className="modal-close-btn" onClick={onClose}>
@@ -336,6 +371,121 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 <PatronBadge size={12} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
               )}.
             </p>
+          )}
+        </div>
+
+        {/* Account Deletion Section (Store Compliance: Apple Guideline 5.1.1(v)) */}
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid rgba(224, 86, 36, 0.3)',
+            borderRadius: 'var(--radius-sm)',
+            marginBottom: '1.25rem',
+            backgroundColor: 'var(--bg-tertiary)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Trash2 size={16} />
+              <span>Delete Account</span>
+            </div>
+          </div>
+
+          {!isDeletingAccount ? (
+            <>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                Permanently delete your Schada account, profile data, rating, and username. This action cannot be undone.
+              </p>
+              <button
+                type="button"
+                className="action-btn danger"
+                style={{ width: '100%', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                onClick={() => {
+                  setIsDeletingAccount(true);
+                  setDeleteError(null);
+                  setDeletePassword('');
+                  setDeleteConfirmPhrase('');
+                }}
+              >
+                <Trash2 size={14} />
+                <span>Delete Account</span>
+              </button>
+            </>
+          ) : (
+            <form onSubmit={handleDeleteAccount} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: 'rgba(224, 86, 36, 0.1)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid rgba(224, 86, 36, 0.3)',
+                  color: 'var(--accent-red)',
+                  fontSize: '0.8rem',
+                  lineHeight: '1.4',
+                }}
+              >
+                <strong>Warning:</strong> Account deletion is immediate and permanent. Your rating ({user.eloRating}) and record will be erased, and the username "{user.username}" will become available to others.
+              </div>
+
+              {deleteError && (
+                <div style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>
+                  {deleteError}
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--text-secondary)' }}>
+                  Confirm your password
+                </label>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="Enter current password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--text-secondary)' }}>
+                  Type <strong>{AUTH_CONFIG.accountDeletionConfirmationPhrase}</strong> to confirm
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder={`Type ${AUTH_CONFIG.accountDeletionConfirmationPhrase}`}
+                  value={deleteConfirmPhrase}
+                  onChange={(e) => setDeleteConfirmPhrase(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <button
+                  type="submit"
+                  className="action-btn danger"
+                  disabled={deleteLoading || deleteConfirmPhrase !== AUTH_CONFIG.accountDeletionConfirmationPhrase || !deletePassword}
+                  style={{ flex: 1, padding: '0.5rem', opacity: (deleteConfirmPhrase !== AUTH_CONFIG.accountDeletionConfirmationPhrase || !deletePassword || deleteLoading) ? 0.6 : 1 }}
+                >
+                  {deleteLoading ? 'Deleting Account...' : 'Permanently Delete'}
+                </button>
+                <button
+                  type="button"
+                  className="action-btn"
+                  disabled={deleteLoading}
+                  onClick={() => {
+                    setIsDeletingAccount(false);
+                    setDeleteError(null);
+                    setDeletePassword('');
+                    setDeleteConfirmPhrase('');
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           )}
         </div>
 

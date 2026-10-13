@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { isMobileDevice } from '@/services/orientation/orientationService';
+import { isNativePlatform } from '@/services/native/mobileService';
 import {
   PWA_CONFIG,
   validatePwaConfig,
@@ -72,6 +73,7 @@ export const PwaProvider: React.FC<PwaProviderProps> = ({
 
     // Detect standalone mode (already installed & opened from home screen)
     const isStandaloneMode =
+      isNativePlatform() ||
       window.matchMedia(config.mediaQueries.standalone).matches ||
       (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
       document.referrer.includes(config.referrerProtocols.androidApp);

@@ -16,6 +16,7 @@ import { LobbyTable } from './components/lobby/LobbyTable';
 import type { ArenaPlayer } from './components/game/Arena';
 import type { NavigationTab } from './components/layout/navigationTypes';
 import { isPatronUser } from './components/common/PatronBadge';
+import { isNativePlatform, initNativeMobileServices } from './services/native/mobileService';
 
 // Lazy-loaded routes and modal components for minimal initial bundle size
 const GameRoomView = lazy(() => import('./components/game/GameRoomView').then((m) => ({ default: m.GameRoomView })));
@@ -126,6 +127,25 @@ const MainApp: React.FC = () => {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
+
+  // Register native Android & iOS lifecycle and hardware back button listeners
+  useEffect(() => {
+    const cleanupNative = initNativeMobileServices({
+      hasOpenModal: () => authOpen || profileOpen || friendsOpen || customGameOpen || computerModalOpen || createRoomOpen,
+      closeActiveModal: () => {
+        if (authOpen) setAuthOpen(false);
+        else if (profileOpen) setProfileOpen(false);
+        else if (friendsOpen) setFriendsOpen(false);
+        else if (customGameOpen) setCustomGameOpen(false);
+        else if (computerModalOpen) setComputerModalOpen(false);
+        else if (createRoomOpen) setCreateRoomOpen(false);
+      },
+      isInGameMatch: () => location.pathname.startsWith('/game/') || Boolean(activeMatch),
+      navigateBack: () => navigate(-1),
+      isAtRootPlayTab: () => location.pathname === '/' && currentTab === 'play',
+    });
+    return () => cleanupNative();
+  }, [authOpen, profileOpen, friendsOpen, customGameOpen, computerModalOpen, createRoomOpen, location.pathname, activeMatch, currentTab, navigate]);
 
   useEffect(() => {
     if (!toastNotification) return;
@@ -488,7 +508,7 @@ const MainApp: React.FC = () => {
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/donate" element={<DonatePage />} />
+          {!isNativePlatform() && <Route path="/donate" element={<DonatePage />} />}
           <Route
             path="*"
             element={
@@ -534,9 +554,9 @@ const MainApp: React.FC = () => {
                   <RulesGuide />
                 ) : currentTab === 'history' ? (
                   <HistoryGuide />
-                ) : (
+                ) : !isNativePlatform() ? (
                   <DonatePage />
-                )}
+                ) : null}
               </main>
             }
           />

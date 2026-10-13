@@ -13,6 +13,7 @@
 import { safeGetItem, safeSetItem } from '../storage/storageCleanup';
 import { SOUND_ASSET_PATHS } from './soundAssets';
 import { AUDIO_CONFIG } from './audioConfig';
+import { mobileHaptics } from '../native/mobileService';
 
 export class SoundService {
   private ctx: AudioContext | null = null;
@@ -407,6 +408,7 @@ export class SoundService {
 
   /** Authentic wooden piece placement on a board */
   public playMove(): void {
+    void mobileHaptics.move();
     if (this.isMuted) return;
 
     const now = Date.now();
@@ -441,6 +443,7 @@ export class SoundService {
 
   /** Authentic wooden piece capture hit */
   public playCapture(): void {
+    void mobileHaptics.capture();
     if (this.isMuted) return;
 
     const now = Date.now();
@@ -475,6 +478,7 @@ export class SoundService {
 
   /** Harmonious chime when a high piece enters the goal line */
   public playGoal(): void {
+    void mobileHaptics.goal();
     if (this.isMuted) return;
     const ctx = this.ensureContext();
     if (!ctx) return;
@@ -571,6 +575,7 @@ export class SoundService {
 
   /** Victory fanfare */
   public playVictory(): void {
+    void mobileHaptics.victory();
     if (this.isMuted) return;
 
     const now = Date.now();

@@ -35,6 +35,8 @@ import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { isGuestUser } from '@/services/firebase/gameTypes';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { SECURITY_CONFIG } from '@/core/security/securityConfig';
+import { getShareBaseUrl, copyToClipboard } from '@/services/native/mobileService';
+import { NATIVE_CONFIG } from '@/services/native/nativeConfig';
 
 const GAME_ID_REGEX = new RegExp(SECURITY_CONFIG.gameIdRegexPattern);
 
@@ -269,12 +271,17 @@ export const GameRoomView: React.FC = () => {
     });
   };
 
-  const shareableUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const shareableUrl = typeof window !== 'undefined'
+    ? `${getShareBaseUrl()}${window.location.pathname}`
+    : '';
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareableUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    void copyToClipboard(shareableUrl).then((success) => {
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), NATIVE_CONFIG.clipboardFeedbackDurationMs);
+      }
+    });
   };
 
   // Determine user's role and color with multi-tier identification:

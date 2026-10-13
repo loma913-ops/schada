@@ -345,6 +345,40 @@ class LocalBackend {
   }
 
   /**
+   * Deletes a local mock user and clears session if active.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) key deletion in local mock users map.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   *
+   * Growth Rate:
+   * - O(1) constant.
+   */
+  public deleteUser(userId: string): void {
+    if (!userId || typeof userId !== 'string') return;
+    if (typeof localStorage === 'undefined') return;
+    const users = this.getUsers();
+    if (users[userId]) {
+      delete users[userId];
+      this.saveUsers(users);
+    }
+    const currentId = localStorage.getItem(this.currentUserIdKey);
+    if (currentId === userId) {
+      localStorage.removeItem(this.currentUserIdKey);
+    }
+    try {
+      window.dispatchEvent(
+        new CustomEvent(LOCAL_CONFIG.events.userStatusChanged, { detail: { status: 'offline' } })
+      );
+      window.dispatchEvent(
+        new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: null })
+      );
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
    * Computes the number of unique registered users currently active.
    *
    * Algorithmic Complexity:
