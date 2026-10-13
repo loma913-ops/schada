@@ -292,8 +292,13 @@ export async function reloadUserProfile(): Promise<UserProfile | null> {
 function persistCachedProfile(profile: UserProfile | null): void {
   const { authCachedUid, authCachedProfile } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
   if (profile) {
-    safeSetItem(authCachedUid, profile.id);
-    safeSetItem(authCachedProfile, JSON.stringify(profile));
+    // Segregate PII: Avoid storing private user email in unencrypted browser storage
+    const safeProfile: UserProfile = {
+      ...profile,
+      email: SECURITY_CONFIG.emptyEmailFallback,
+    };
+    safeSetItem(authCachedUid, safeProfile.id);
+    safeSetItem(authCachedProfile, JSON.stringify(safeProfile));
   } else {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(authCachedUid);
@@ -313,6 +318,9 @@ export function getCachedAuthProfile(): UserProfile | null {
   try {
     const parsed = JSON.parse(raw) as UserProfile;
     if (parsed && typeof parsed.id === 'string' && typeof parsed.username === 'string') {
+      if (auth?.currentUser?.email) {
+        parsed.email = auth.currentUser.email;
+      }
       return parsed;
     }
   } catch (e) {

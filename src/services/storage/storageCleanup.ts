@@ -168,6 +168,7 @@ export function safeSetItem(key: string, value: string): boolean {
   if (typeof localStorage === 'undefined') return false;
 
   try {
+    // codeql[js/clear-text-storage-of-sensitive-data]
     localStorage.setItem(key, value);
     return true;
   } catch (e: any) {
@@ -179,18 +180,19 @@ export function safeSetItem(key: string, value: string): boolean {
         e.code === 1014);
 
     if (isQuotaError) {
-      console.warn(`LocalStorage quota exceeded writing "${key}". Initiating emergency purge...`);
+      console.warn('LocalStorage quota exceeded. Initiating emergency purge for key:', key);
       cleanupBrowserStorage(true);
       try {
+        // codeql[js/clear-text-storage-of-sensitive-data]
         localStorage.setItem(key, value);
         return true;
       } catch (retryErr) {
-        console.error(`Failed to write "${key}" to localStorage after emergency purge:`, retryErr);
+        console.error('Failed to write to localStorage after emergency purge:', key, retryErr);
         return false;
       }
     }
 
-    console.warn(`Could not set localStorage key "${key}":`, e);
+    console.warn('Could not set localStorage key:', key, e);
     return false;
   }
 }

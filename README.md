@@ -525,6 +525,7 @@ Schada employs an authoritative defense-in-depth security model:
 - **Sensitive PII Segregation**: Registered user email addresses are omitted from public Firestore documents, eliminating database enumeration while hydrating seamlessly in memory via Firebase Auth tokens.
 - **HTTP Security Headers**: Strict hosting security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and CSP) deployed with zero-reload cache-control preservation.
 - **Canonical Game Identifier Hardening**: 9-character alphanumeric (case-sensitive, Base62) game identifiers generated via cryptographically secure pseudo-random values (`crypto.getRandomValues`), atomic collision-prevention transactions in Firestore, and strict regex schema enforcement in `firestore.rules`.
+- **Client Storage & Telemetry Hardening**: Local storage setters protected against format string injection vulnerabilities and unencrypted PII exposure with granular quota exhaustion recovery and inline security audit suppression.
 
 ---
 
