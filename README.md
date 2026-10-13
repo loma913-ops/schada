@@ -716,7 +716,10 @@ npm run cap:ios
 
 ### Automated CI/CD (GitHub Actions)
 
-A dedicated multi-platform build workflow is available in `.github/workflows/build-mobile.yml`:
-- **Manual Trigger (`workflow_dispatch`)**: Choose between `debug` (generates test APK) and `release` (generates signed AAB).
-- **Automated Tag Trigger**: Pushing a version tag (`v*`) automatically builds and archives release artifacts for both Android and iOS targets.
+- **Mobile Application Builds (`.github/workflows/build-mobile.yml`)**:
+  - **Manual Trigger (`workflow_dispatch`)**: Choose between `debug` (generates test APK) and `release` (generates signed AAB).
+  - **Automated Tag Trigger**: Pushing a version tag (`v*`) automatically builds and archives release artifacts for both Android and iOS targets.
+- **CodeQL Security Analysis (`.github/workflows/codeql.yml`)**:
+  - Automated SAST scanning for JavaScript & TypeScript code on `ubuntu-latest` without building native mobile boilerplate.
+
 
