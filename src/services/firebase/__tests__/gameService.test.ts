@@ -19,14 +19,18 @@ import {
   markGameEloProcessed,
   computeRankedGameEloResult,
   reconcilePendingElo,
+  generateGameId,
   localGameStore,
   ABANDONED_GAME_EXPIRY_MS,
   type GameRoom,
 } from '../gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
+import { SECURITY_CONFIG } from '@/core/security/securityConfig';
 import { getLegalMovesForSquare } from '@/core/schada/engine';
 import { registerUser } from '../authService';
 import { localBackend } from '../localProvider';
+import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
+import { CANONICAL_DIGITAL_CLOCK_CONFIG } from '@/components/game/digitalClockConfig';
 
 vi.mock('../config', () => ({
   isFirebaseConfigured: () => false,
@@ -170,6 +174,47 @@ describe('GameService Multiplayer Sync', () => {
     const updatedGame = localGameStore.get(gameId);
     expect(updatedGame?.boardState.moveHistory.length).toBe(1);
     expect(updatedGame?.boardState.currentTurn).toBe('green');
+  });
+
+  it('resets player clock on move completion in correspondence matches', async () => {
+    const creator = { id: 'p_corr_1', username: 'CorrBlue', elo: 1300 };
+    const daysPerMove = 2;
+    const msPerMinute =
+      LOBBY_CONFIG.secondsPerMinute * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond;
+    const twoDaysMinutes = daysPerMove * LOBBY_CONFIG.correspondenceCutoffMinutes;
+    const twoDaysMs = twoDaysMinutes * msPerMinute;
+    const { gameId } = await createGame({
+      timeControlMinutes: twoDaysMinutes,
+      colorPref: 'blue',
+      isPrivate: true,
+      creator,
+    });
+
+    localStorage.removeItem('schada_player_token_' + gameId);
+    await joinGame(gameId, { id: 'p_corr_2', username: 'CorrGreen', elo: 1200 });
+
+    const currentRoom = localGameStore.get(gameId)!;
+    expect(currentRoom.blueTimeMs).toBe(twoDaysMs);
+    expect(currentRoom.greenTimeMs).toBe(twoDaysMs);
+
+    // Simulate 12 hours elapsed on blue's turn
+    const elapsedHours = 12;
+    const elapsedMs =
+      elapsedHours *
+      CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.minutesPerHour *
+      msPerMinute;
+    currentRoom.lastTurnStartTimeMs = Date.now() - elapsedMs;
+    localGameStore.set(currentRoom);
+
+    const p1Move = getLegalMovesForSquare(currentRoom.boardState.board, 'a1')[0];
+    await makeGameMove(gameId, p1Move, 'blue');
+
+    const updatedGame = localGameStore.get(gameId);
+    expect(updatedGame?.boardState.currentTurn).toBe('green');
+    // Blue's clock should be reset to 2 days (Days per move)
+    expect(updatedGame?.blueTimeMs).toBe(twoDaysMs);
+    // Green's clock should also be allocated full 2 days for their upcoming move
+    expect(updatedGame?.greenTimeMs).toBe(twoDaysMs);
   });
 
   it('handles resignation cleanly', async () => {
@@ -1009,6 +1054,84 @@ describe('GameService Multiplayer Sync', () => {
     expect(reconciled!.gamesPlayed).toBe(1);
     expect(reconciled!.gamesWon).toBe(1);
     expect(reconciled!.eloRating).toBeGreaterThan(userB.eloRating);
+  });
+
+  describe('9-digit Alphanumeric Game ID Generation and Collision Prevention', () => {
+    it('generates a 9-digit alphanumeric case-sensitive ID matching SECURITY_CONFIG pattern', () => {
+      const id = generateGameId();
+      expect(id).toHaveLength(SECURITY_CONFIG.gameIdLength);
+      expect(id).toMatch(new RegExp(SECURITY_CONFIG.gameIdRegexPattern));
+      for (const char of id) {
+        expect(SECURITY_CONFIG.gameIdCharset).toContain(char);
+      }
+    });
+
+    it('generates case-sensitive alphanumeric IDs with diverse uppercase, lowercase, and digit characters', () => {
+      const ids = Array.from({ length: 50 }, () => generateGameId());
+      expect(new Set(ids).size).toBe(50);
+
+      const allChars = ids.join('');
+      expect(/[0-9]/.test(allChars)).toBe(true);
+      expect(/[a-z]/.test(allChars)).toBe(true);
+      expect(/[A-Z]/.test(allChars)).toBe(true);
+    });
+
+    it('creates game with a canonical 9-character ID', async () => {
+      const creator = { id: 'user_gen_test', username: 'TestHost', elo: 1300 };
+      const { gameId } = await createGame({
+        timeControlMinutes: 5,
+        colorPref: 'blue',
+        creator,
+      });
+
+      expect(gameId).toHaveLength(9);
+      expect(gameId).toMatch(/^[0-9a-zA-Z]{9}$/);
+    });
+
+    it('prevents duplicates by retrying when an ID collision is encountered in store', async () => {
+      const creator = { id: 'user_dup_test', username: 'DupTester', elo: 1300 };
+
+      // Pre-seed a game with a specific ID
+      const initialGame = await createGame({
+        timeControlMinutes: 5,
+        colorPref: 'blue',
+        creator,
+      });
+      expect(initialGame.gameId).toHaveLength(9);
+
+      // Verify that createGame creates another unique game without colliding
+      const secondGame = await createGame({
+        timeControlMinutes: 5,
+        colorPref: 'blue',
+        creator,
+      });
+      expect(secondGame.gameId).toHaveLength(9);
+      expect(secondGame.gameId).not.toBe(initialGame.gameId);
+    });
+
+    it('throws a meaningful error when max retry attempts are exhausted due to continuous collisions', async () => {
+      const creator = { id: 'user_exhaust_test', username: 'ExhaustTester', elo: 1300 };
+
+      // Mock localGameStore.get to simulate every candidate ID already existing
+      const originalGet = localGameStore.get.bind(localGameStore);
+      const dummyRoom = {
+        id: 'dummy1234',
+        status: 'waiting',
+      } as unknown as GameRoom;
+      vi.spyOn(localGameStore, 'get').mockReturnValue(dummyRoom);
+
+      await expect(
+        createGame({
+          timeControlMinutes: 5,
+          colorPref: 'blue',
+          creator,
+        })
+      ).rejects.toThrow(
+        `Failed to generate a unique game ID after ${SECURITY_CONFIG.maxGameIdCreationRetries} retry attempts.`
+      );
+
+      vi.spyOn(localGameStore, 'get').mockImplementation(originalGet);
+    });
   });
 });
 

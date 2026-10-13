@@ -18,6 +18,7 @@ import {
   markGameEloProcessed,
   computeRankedGameEloResult,
   ABANDONED_GAME_EXPIRY_MS,
+  localGameStore,
   type GameRoom,
 } from '@/services/firebase/gameService';
 import { Arena, type ArenaPlayer } from './Arena';
@@ -33,12 +34,17 @@ import { safeSetItem } from '@/services/storage/storageCleanup';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { isGuestUser } from '@/services/firebase/gameTypes';
 import { AuthModal } from '@/components/auth/AuthModal';
+import { SECURITY_CONFIG } from '@/core/security/securityConfig';
+
+const GAME_ID_REGEX = new RegExp(SECURITY_CONFIG.gameIdRegexPattern);
 
 export const GameRoomView: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const { user, isLoading: authLoading, refreshUser } = useAuth();
   const isGuest = isGuestUser(user);
   const navigate = useNavigate();
+
+  const isValidGameId = Boolean(gameId && GAME_ID_REGEX.test(gameId));
 
   const [game, setGame] = useState<GameRoom | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,9 +68,19 @@ export const GameRoomView: React.FC = () => {
   const eloUpdatedRef = useRef(false);
   const eloUpdatePromiseRef = useRef<Promise<void> | null>(null);
 
+  // Redirect if game ID fails strict canonical validation
+  useEffect(() => {
+    if (!isValidGameId) {
+      navigate('/', {
+        replace: true,
+        state: { notification: SECURITY_CONFIG.invalidGameIdErrorMessage },
+      });
+    }
+  }, [isValidGameId, navigate]);
+
   // 1. Subscribe to real-time game updates
   useEffect(() => {
-    if (!gameId) return;
+    if (!isValidGameId || !gameId) return;
 
     setLoading(true);
     const unsubscribe = subscribeToGame(
@@ -85,7 +101,7 @@ export const GameRoomView: React.FC = () => {
     );
 
     return () => unsubscribe();
-  }, [gameId]);
+  }, [gameId, isValidGameId]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -379,6 +395,45 @@ export const GameRoomView: React.FC = () => {
     };
   }, [gameId]);
 
+  // Tab visibility synchronization: resync immediately when switching back to tab
+  /**
+   * Resynchronizes local game state on tab visibility change or window focus without making Firestore queries.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) in-memory store hash lookup and state comparison.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   * - Database CRUD Complexity: 0 document reads (incurring $0 billing cost).
+   *
+   * Growth Rate:
+   * - O(1) flat growth rate, completely invariant to collection scale or match history length.
+   */
+  useEffect(() => {
+    if (!gameId) return;
+
+    const handleVisibilitySync = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        const localGame = localGameStore.get(gameId);
+        if (
+          localGame &&
+          (!gameRef.current ||
+            localGame.boardState.moveHistory.length > gameRef.current.boardState.moveHistory.length ||
+            localGame.status !== gameRef.current.status ||
+            localGame.boardState.isGameOver !== gameRef.current.boardState.isGameOver)
+        ) {
+          setGame(localGame);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilitySync);
+    window.addEventListener('focus', handleVisibilitySync);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilitySync);
+      window.removeEventListener('focus', handleVisibilitySync);
+    };
+  }, [gameId]);
+
   // Handle game completion & ranked rating updates
   const applyUserEloUpdates = useCallback(
     async (completedGameState?: BoardState): Promise<void> => {
@@ -435,6 +490,10 @@ export const GameRoomView: React.FC = () => {
 
     applyUserEloUpdates();
   }, [game, user, applyUserEloUpdates]);
+
+  if (!isValidGameId) {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -581,9 +640,10 @@ export const GameRoomView: React.FC = () => {
         syncedBlueTimeMs={currentBlueTime}
         syncedGreenTimeMs={currentGreenTime}
         onMakeMove={async (move: Move) => {
-          if (!userColor || game.status === 'waiting') return;
+          const currentGame = gameRef.current || game;
+          if (!userColor || currentGame.status === 'waiting') return;
           try {
-            await makeGameMove(gameId!, move, userColor, game);
+            await makeGameMove(gameId!, move, userColor, currentGame);
           } catch (err) {
             console.error('Failed to make move:', err);
           }

@@ -49,7 +49,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Comprehensive Match Stats & Post-Game Elo Summary**: Game-over modal with synchronized rating point deltas and match details.
 - **Competitive Integrity & Guest Ranked Restriction**: Guests are strictly prohibited from participating in ranked matches; rated play requires an authenticated account.
 - **Lichess-Inspired Minimalist UX**: Responsive arena with clocks, notation, controls, and dark/light mode.
-- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves with direct atomic updates bypassing redundant document reads and deduplicated server-echo reconciliation.
+- **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves, atomic multi-tab broadcast sync, automatic live position advancement, and non-disruptive unread move notifications.
 - **Cross-Platform Hybrid Audio Engine**: Web Audio API with immediate transient attack playback, realistic synthesized fallbacks, and zero-latency desktop and mobile sound.
 - **Authoritative Symmetrical Elo Engine**: Immutable initial/final Elo ratings and deltas stored in match documents for symmetrical cross-client synchronization.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
@@ -60,14 +60,15 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Threat Detection Indicators**: Real-time visual attack badges on vulnerable pieces with toggleable player preferences.
 - **Goal Invulnerability Shield Badges**: Golden shield badges displayed on goal-line high pieces denoting capture immunity.
 - **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.
-- **Correspondence Game Mode & Precision Custom Pairing**: Multi-day turn-based matches (1–14 days per player) and real-time custom time control sliders (0.5–180 min) with dedicated lobby filtering and adaptive clock formatting.
+- **Correspondence Game Mode & Precision Custom Pairing**: Multi-day turn-based matches (1–14 days per move) and real-time custom time control sliders (0.5–180 min) with dedicated lobby filtering and adaptive clock formatting.
 - **Real-Time Abandonment & Disconnect Protection**: 60-second abandonment countdown for disconnected players on turn in real-time matches with automatic victory resolution and clock-timeout precedence.
 - **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
 - **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.
 - **Partitioned Lobby Sections**: Dedicated "My Games" section pinned at the top for player's active and waiting games, alongside filtered "Available Games".
 - **Defense-in-Depth Security Hardening**: Granular Firestore authorization rules, sensitive PII segregation, and comprehensive HTTP security headers with strict cache invalidation.
 - **Standalone Bot Championship Simulator**: Local CLI tool pitting all 8 AI tiers against each other in multi-tournament brackets with Elo calibration, game notation, and cross-table export.
-- **Standalone Game Analysis Engine**: Post-game 10-tier move quality classifier, player accuracy calculator, and continuation predictor powered by Tier 8 Master search.
+- **Interactive Game Analysis Engine**: Post-game Move Quality Distribution table (10 tiers with graphical symbol badges) and player accuracy metrics in the Game Over modal alongside on-demand Web Worker notation review.
+- **9-Digit Alphanumeric Game URLs & Collision Protection**: Canonical Base62 (case-sensitive) 9-character game identifiers with CSPRNG generation, transactional collision prevention, and strict format validation.
 
 ---
 
@@ -130,13 +131,13 @@ npx tsx scripts/simulateTournaments.ts --help
 
 #### CLI Options & Flags
 
-| Flag | Short | Default | Description |
-|:---|:---:|:---:|:---|
-| `--tournaments <count>` | `-n` | `1000` | Number of championship tournaments to simulate |
-| `--time-limit <ms>` | `-t` | `50` | Search budget per move in milliseconds |
-| `--max-moves <count>` | `-m` | `300` | Maximum half-moves safety limit before terminal score adjudication |
-| `--output-dir <path>` | `-o` | `./tournament_output` | Destination directory for all generated reports and notation files |
-| `--help` | `-h` | — | Display usage banner and option descriptions |
+| Flag                    | Short |        Default        | Description                                                        |
+| :---------------------- | :---: | :-------------------: | :----------------------------------------------------------------- |
+| `--tournaments <count>` | `-n`  |        `1000`         | Number of championship tournaments to simulate                     |
+| `--time-limit <ms>`     | `-t`  |         `50`          | Search budget per move in milliseconds                             |
+| `--max-moves <count>`   | `-m`  |         `300`         | Maximum half-moves safety limit before terminal score adjudication |
+| `--output-dir <path>`   | `-o`  | `./tournament_output` | Destination directory for all generated reports and notation files |
+| `--help`                | `-h`  |           —           | Display usage banner and option descriptions                       |
 
 #### Generated Output Artifacts
 
@@ -169,8 +170,9 @@ Schada includes a non-destructive move navigation engine (`src/core/schada/repla
   - `Home`: Jump to starting position.
   - `End`: Jump to live position.
 - **Non-Destructive Inspection**: Navigating historical plies allows full inspection of captured pieces, board coordinates, and move annotations. Once a player is ready to make a move, navigating back to live mode immediately re-enables interactive piece movement.
+- **Real-Time Live Auto-Advance & Unread Move Notifications**: When an opponent makes a move, the board automatically updates and steps forward in real time if the player is following live moves. If the player is inspecting historical plies, their viewed position is preserved without interruption while move audio plays, the notation list and turn indicator update, and a pulsating unread dot appears on the 'Live' (`>>|`) button, automatically clearing once the player returns to the live position.
 - **Sticky Controls (Desktop & Mobile)**: Navigation controls and match status remain pinned and sticky at the top across desktop panels and mobile notation sheets, ensuring controls never scroll out of sight during move review.
-- **Post-Game Game Review**: Following match completion, the Game Over modal can be closed via the 'Review' action, 'X' button, backdrop click, or `Escape` key, permitting full board inspection, move navigation, and board flipping. Players can reopen match results at any time via the 'Results' button or exit to the lobby via 'Lobby'.
+- **Post-Game Game Review & Real-Time Analysis**: Following match completion, the Game Over modal immediately presents the match outcome, win reason, scoring breakdown, Move Quality Distribution table (all 10 tiers with graphical vector symbols), and player accuracy percentages (Blue & Green) calculated via background analysis. The modal can be closed via the 'Review' action, 'X' button, backdrop click, or `Escape` key, permitting full board inspection, move navigation, and board flipping. In Review mode, an 'Analyze' action button is displayed in the Moves Notation header bar across desktop and mobile, opening an Analysis Settings modal with configurable Depth (1–20 plies) and Time Limit (1.0–15.0s per move) sliders alongside real-time estimated completion time. Triggering analysis launches a dedicated background Web Worker that evaluates moves off the main thread at 60 FPS, streaming graphical vector move quality symbols (Brilliant, Great Move, Inaccuracy, Mistake, Miss, Blunder) in real time directly to the right of each move notation with native tooltips and live ply progress feedback. Players can reopen match results at any time via the 'Results' button or exit to the lobby via 'Lobby'.
 
 ---
 
@@ -191,7 +193,7 @@ cd schada
 # 2. Install dependencies
 npm install
 
-# 3. Run unit test suite (47 test suites, 420+ tests)
+# 3. Run unit test suite (72 test files, 655+ tests)
 npm test
 
 # 4. Start local development server with HMR
@@ -520,6 +522,7 @@ Schada employs an authoritative defense-in-depth security model:
 - **Zero-Trust Client Mindset**: Authoritative game state immutability, bounded Elo deltas, monotonic match counters, and granular room lifecycle rules enforced authoritatively at the database boundary via `firestore.rules`.
 - **Sensitive PII Segregation**: Registered user email addresses are omitted from public Firestore documents, eliminating database enumeration while hydrating seamlessly in memory via Firebase Auth tokens.
 - **HTTP Security Headers**: Strict hosting security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and CSP) deployed with zero-reload cache-control preservation.
+- **Canonical Game Identifier Hardening**: 9-character alphanumeric (case-sensitive, Base62) game identifiers generated via cryptographically secure pseudo-random values (`crypto.getRandomValues`), atomic collision-prevention transactions in Firestore, and strict regex schema enforcement in `firestore.rules`.
 
 ---
 

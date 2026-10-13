@@ -1,4 +1,4 @@
-import type { Move, PieceColor } from '../schada/types';
+import type { BoardState, Move, PieceColor } from '../schada/types';
 import { createInitialGameState, executeMove } from '../schada/engine';
 import { FastBoard, type FastMove, BLUE_PAWN, GREEN_PAWN } from '../bot/fastBoard';
 import { getBotTier } from '../bot/botTiers';
@@ -128,6 +128,127 @@ export function classifyMoveQuality(
  * - Linear in plies N; polynomial in tree depth bounded by timeLimitMs and alpha-beta cutoffs.
  *   Scales predictably on games exceeding hundreds of plies.
  */
+export interface SinglePlyEvaluationResult {
+  readonly evaluatedMove: EvaluatedMove;
+  readonly nextState: BoardState;
+}
+
+/**
+ * Evaluates a single played move ply against the engine candidates and opening book.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: Bounded by the search depth / timeLimitMs.
+ * - Auxiliary Space Complexity: O(1) heap allocations.
+ */
+export function evaluateSinglePly(
+  currentState: BoardState,
+  moveHistory: readonly Move[],
+  playedMove: Move,
+  ply: number,
+  depth: number,
+  timeLimitMs: number,
+  config: AnalysisConfig = CANONICAL_ANALYSIS_CONFIG
+): SinglePlyEvaluationResult {
+  validateAnalysisConfig(config);
+  const tier = getBotTier(config.search.masterTierLevel);
+  const turn = currentState.currentTurn;
+  const moveNumber = Math.floor(ply / 2) + 1;
+  const fastBoard = FastBoard.fromBoardMatrix(currentState.board, turn);
+
+  // 1. Check Opening Book
+  const bookKey = buildMoveSequenceKey(moveHistory);
+  const bookCandidates = OPENING_BOOK[bookKey];
+  let isBook = false;
+  let bookLineName: string | undefined = undefined;
+
+  if (bookCandidates && bookCandidates.length > 0) {
+    const matchBook = bookCandidates.find((c) => c.from === playedMove.from && c.to === playedMove.to);
+    if (matchBook) {
+      isBook = true;
+      bookLineName = matchBook.lineName;
+    }
+  }
+
+  // 2. Engine Candidate Search
+  const candidateScores = searchMoveCandidates(fastBoard, tier, depth, timeLimitMs);
+  const legalFastMoves = fastBoard.generateLegalMoves(turn);
+
+  if (candidateScores.length === 0) {
+    throw new AnalysisConfigError(`No legal candidate moves found at ply ${ply + 1}.`);
+  }
+
+  const bestCandidate = candidateScores[0];
+  const bestScore = bestCandidate.score;
+  const bestMove = fastBoard.toStandardMove(bestCandidate.move);
+
+  // 3. Score the played move
+  const playedFastMove = findMatchingFastMove(fastBoard, legalFastMoves, playedMove);
+  let playedScore = -Infinity;
+
+  if (playedFastMove) {
+    const candidateMatch = candidateScores.find(
+      (c) => c.move.from === playedFastMove.from && c.move.to === playedFastMove.to
+    );
+    if (candidateMatch) {
+      playedScore = candidateMatch.score;
+    } else {
+      fastBoard.makeMove(playedFastMove);
+      playedScore = -evaluateBoard(fastBoard, fastBoard.currentTurn, tier, 1);
+      fastBoard.unmakeMove();
+    }
+  } else {
+    playedScore = -Infinity;
+  }
+
+  const evalDelta = isBook
+    ? 0
+    : Number.isFinite(bestScore) && Number.isFinite(playedScore)
+      ? Math.max(0, bestScore - playedScore)
+      : 0;
+
+  // 4. Sacrifice Detection for Brilliant Moves
+  let isSacrifice = false;
+  if (playedFastMove) {
+    const opponentColor: PieceColor = turn === 'blue' ? 'green' : 'blue';
+    const isAttacked = fastBoard.isSquareAttacked(playedFastMove.to, opponentColor);
+    const isHighPiece = playedFastMove.piece !== BLUE_PAWN && playedFastMove.piece !== GREEN_PAWN;
+    if (isAttacked && (isHighPiece || playedFastMove.captured === 0)) {
+      isSacrifice = true;
+    }
+  }
+
+  // 5. Classify Move Quality
+  const quality = classifyMoveQuality(evalDelta, bestScore, candidateScores, isSacrifice, isBook, config);
+
+  // Normalize eval score to point of view (positive = Blue advantage)
+  const safeBestScore = Number.isFinite(bestScore) ? bestScore : 0;
+  const safePlayedScore = Number.isFinite(playedScore) ? playedScore : safeBestScore;
+  const normalizedBefore = turn === 'blue' ? safeBestScore : -safeBestScore;
+  const normalizedAfter = turn === 'blue' ? safePlayedScore : -safePlayedScore;
+
+  const evaluatedMove: EvaluatedMove = {
+    ply: ply + 1,
+    turn,
+    moveNumber,
+    playedMove,
+    playedNotation: playedMove.notation,
+    bestMove,
+    bestNotation: bestMove.notation,
+    evalBefore: normalizedBefore,
+    evalAfter: normalizedAfter,
+    evalDelta,
+    quality,
+    bookLineName,
+  };
+
+  const nextState = executeMove(currentState, playedMove);
+
+  return {
+    evaluatedMove,
+    nextState,
+  };
+}
+
 export function analyzeGame(
   gameInput: string | object | ParsedGameData,
   options: AnalysisOptions = {}
@@ -162,98 +283,18 @@ export function analyzeGame(
 
   for (let ply = 0; ply < parsedData.moves.length; ply++) {
     const playedMove = parsedData.moves[ply];
-    const turn = currentState.currentTurn;
-    const moveNumber = Math.floor(ply / 2) + 1;
-    const fastBoard = FastBoard.fromBoardMatrix(currentState.board, turn);
-
-    // 1. Check Opening Book
-    const bookKey = buildMoveSequenceKey(moveHistory);
-    const bookCandidates = OPENING_BOOK[bookKey];
-    let isBook = false;
-    let bookLineName: string | undefined = undefined;
-
-    if (bookCandidates && bookCandidates.length > 0) {
-      const matchBook = bookCandidates.find((c) => c.from === playedMove.from && c.to === playedMove.to);
-      if (matchBook) {
-        isBook = true;
-        bookLineName = matchBook.lineName;
-      }
-    }
-
-    // 2. Engine Candidate Search
-    const candidateScores = searchMoveCandidates(fastBoard, tier, depth, timeLimitMs);
-    const legalFastMoves = fastBoard.generateLegalMoves(turn);
-
-    if (candidateScores.length === 0) {
-      throw new AnalysisConfigError(`No legal candidate moves found at ply ${ply + 1}.`);
-    }
-
-    const bestCandidate = candidateScores[0];
-    const bestScore = bestCandidate.score;
-    const bestMove = fastBoard.toStandardMove(bestCandidate.move);
-
-    // 3. Score the played move
-    const playedFastMove = findMatchingFastMove(fastBoard, legalFastMoves, playedMove);
-    let playedScore = -Infinity;
-
-    if (playedFastMove) {
-      const candidateMatch = candidateScores.find(
-        (c) => c.move.from === playedFastMove.from && c.move.to === playedFastMove.to
-      );
-      if (candidateMatch) {
-        playedScore = candidateMatch.score;
-      } else {
-        fastBoard.makeMove(playedFastMove);
-        playedScore = -evaluateBoard(fastBoard, fastBoard.currentTurn, tier, 1);
-        fastBoard.unmakeMove();
-      }
-    } else {
-      playedScore = -Infinity;
-    }
-
-    const evalDelta = isBook
-      ? 0
-      : Number.isFinite(bestScore) && Number.isFinite(playedScore)
-        ? Math.max(0, bestScore - playedScore)
-        : 0;
-
-    // 4. Sacrifice Detection for Brilliant Moves
-    let isSacrifice = false;
-    if (playedFastMove) {
-      const opponentColor: PieceColor = turn === 'blue' ? 'green' : 'blue';
-      const isAttacked = fastBoard.isSquareAttacked(playedFastMove.to, opponentColor);
-      const isHighPiece = playedFastMove.piece !== BLUE_PAWN && playedFastMove.piece !== GREEN_PAWN;
-      if (isAttacked && (isHighPiece || playedFastMove.captured === 0)) {
-        isSacrifice = true;
-      }
-    }
-
-    // 5. Classify Move Quality
-    const quality = classifyMoveQuality(evalDelta, bestScore, candidateScores, isSacrifice, isBook, config);
-
-    // Normalize eval score to point of view (positive = Blue advantage)
-    const safeBestScore = Number.isFinite(bestScore) ? bestScore : 0;
-    const safePlayedScore = Number.isFinite(playedScore) ? playedScore : safeBestScore;
-    const normalizedBefore = turn === 'blue' ? safeBestScore : -safeBestScore;
-    const normalizedAfter = turn === 'blue' ? safePlayedScore : -safePlayedScore;
-
-    evaluatedMoves.push({
-      ply: ply + 1,
-      turn,
-      moveNumber,
+    const { evaluatedMove, nextState } = evaluateSinglePly(
+      currentState,
+      moveHistory,
       playedMove,
-      playedNotation: playedMove.notation,
-      bestMove,
-      bestNotation: bestMove.notation,
-      evalBefore: normalizedBefore,
-      evalAfter: normalizedAfter,
-      evalDelta,
-      quality,
-      bookLineName,
-    });
+      ply,
+      depth,
+      timeLimitMs,
+      config
+    );
 
-    // Advance board state
-    currentState = executeMove(currentState, playedMove);
+    evaluatedMoves.push(evaluatedMove);
+    currentState = nextState;
     moveHistory.push(playedMove);
   }
 

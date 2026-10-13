@@ -48,9 +48,11 @@ export interface MoveQualityThresholdsConfig {
 
 export interface AnalysisSearchConfig {
   readonly defaultDepth: number;
+  readonly postGameDepth: number;
   readonly minDepth: number;
   readonly maxDepth: number;
   readonly defaultTimeLimitMs: number;
+  readonly postGameTimeLimitMs: number;
   readonly minTimeLimitMs: number;
   readonly maxTimeLimitMs: number;
   readonly masterTierLevel: number;
@@ -108,11 +110,13 @@ export interface AnalysisConfig {
 export const CANONICAL_ANALYSIS_CONFIG: AnalysisConfig = Object.freeze({
   search: Object.freeze({
     defaultDepth: 6,
+    postGameDepth: 2,
     minDepth: 1,
     maxDepth: 20,
     defaultTimeLimitMs: 250,
+    postGameTimeLimitMs: 100,
     minTimeLimitMs: 10,
-    maxTimeLimitMs: 5000,
+    maxTimeLimitMs: 15000,
     masterTierLevel: 8,
     topCandidateMovesLimit: 5,
   }),
@@ -266,6 +270,11 @@ export function validateAnalysisConfig(config: AnalysisConfig): void {
       `Invalid defaultDepth ${s.defaultDepth}: must be an integer between ${s.minDepth} and ${s.maxDepth}.`
     );
   }
+  if (!Number.isInteger(s.postGameDepth) || s.postGameDepth < s.minDepth || s.postGameDepth > s.maxDepth) {
+    throw new AnalysisConfigError(
+      `Invalid postGameDepth ${s.postGameDepth}: must be an integer between ${s.minDepth} and ${s.maxDepth}.`
+    );
+  }
   if (
     typeof s.defaultTimeLimitMs !== 'number' ||
     s.defaultTimeLimitMs < s.minTimeLimitMs ||
@@ -273,6 +282,15 @@ export function validateAnalysisConfig(config: AnalysisConfig): void {
   ) {
     throw new AnalysisConfigError(
       `Invalid defaultTimeLimitMs ${s.defaultTimeLimitMs}: must be between ${s.minTimeLimitMs} and ${s.maxTimeLimitMs}.`
+    );
+  }
+  if (
+    typeof s.postGameTimeLimitMs !== 'number' ||
+    s.postGameTimeLimitMs < s.minTimeLimitMs ||
+    s.postGameTimeLimitMs > s.maxTimeLimitMs
+  ) {
+    throw new AnalysisConfigError(
+      `Invalid postGameTimeLimitMs ${s.postGameTimeLimitMs}: must be between ${s.minTimeLimitMs} and ${s.maxTimeLimitMs}.`
     );
   }
   if (!Number.isInteger(s.masterTierLevel) || s.masterTierLevel <= 0) {

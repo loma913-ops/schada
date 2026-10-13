@@ -18,11 +18,14 @@ export interface MoveNavigatorButtonCopy {
   readonly previousMove: string;
   readonly nextMove: string;
   readonly endOfGame: string;
+  readonly unreadLiveMove: string;
 }
 
 export interface MoveNavigatorHistoryCopy {
   readonly headerTitle: string;
   readonly emptyHistoryMessage: string;
+  readonly analyzeButtonText: string;
+  readonly analyzeButtonAriaLabel: string;
 }
 
 export interface MoveNavigatorConfig {
@@ -83,6 +86,24 @@ export function validateMoveNavigatorConfig(config: MoveNavigatorConfig): void {
     );
   }
 
+  if (
+    typeof config.historyCopy.analyzeButtonText !== 'string' ||
+    config.historyCopy.analyzeButtonText.trim().length === 0
+  ) {
+    throw new MoveNavigatorConfigError(
+      'Invalid historyCopy.analyzeButtonText: expected non-empty string.'
+    );
+  }
+
+  if (
+    typeof config.historyCopy.analyzeButtonAriaLabel !== 'string' ||
+    config.historyCopy.analyzeButtonAriaLabel.trim().length === 0
+  ) {
+    throw new MoveNavigatorConfigError(
+      'Invalid historyCopy.analyzeButtonAriaLabel: expected non-empty string.'
+    );
+  }
+
   if (!config.ariaLabels || typeof config.ariaLabels !== 'object') {
     throw new MoveNavigatorConfigError('Invalid ariaLabels: expected object.');
   }
@@ -96,6 +117,7 @@ export function validateMoveNavigatorConfig(config: MoveNavigatorConfig): void {
     'previousMove',
     'nextMove',
     'endOfGame',
+    'unreadLiveMove',
   ];
 
   for (const key of requiredButtonKeys) {
@@ -153,6 +175,8 @@ export const CANONICAL_MOVE_NAVIGATOR_CONFIG: MoveNavigatorConfig = Object.freez
   historyCopy: Object.freeze({
     headerTitle: 'Moves Notation',
     emptyHistoryMessage: 'No moves made yet',
+    analyzeButtonText: 'Analyze',
+    analyzeButtonAriaLabel: 'Analyze game moves',
   }),
   ariaLabels: Object.freeze({
     toolbar: 'Game moves navigation',
@@ -161,6 +185,7 @@ export const CANONICAL_MOVE_NAVIGATOR_CONFIG: MoveNavigatorConfig = Object.freez
       previousMove: 'Previous move',
       nextMove: 'Next move',
       endOfGame: 'End of game',
+      unreadLiveMove: 'Live move played — Jump to latest position',
     }),
   }),
   tooltips: Object.freeze({
@@ -168,6 +193,7 @@ export const CANONICAL_MOVE_NAVIGATOR_CONFIG: MoveNavigatorConfig = Object.freez
     previousMove: 'Previous move',
     nextMove: 'Next move',
     endOfGame: 'End of game',
+    unreadLiveMove: 'Live move played — Jump to latest position',
   }),
   keyboardShortcuts: Object.freeze({
     previous: Object.freeze(['ArrowLeft']),

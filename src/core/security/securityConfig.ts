@@ -36,6 +36,18 @@ export interface SecurityConfig {
   readonly immutableGameKeys: readonly string[];
   /** Standard empty string fallback for email hydration when unauthenticated */
   readonly emptyEmailFallback: string;
+  /** Exact character length of canonical game identifiers */
+  readonly gameIdLength: number;
+  /** Allowed characters for game identifier generation (Base62 alphanumeric case-sensitive) */
+  readonly gameIdCharset: string;
+  /** Regular expression pattern for strict game identifier validation */
+  readonly gameIdRegexPattern: string;
+  /** Maximum transaction retry attempts for duplicate game ID collision resolution */
+  readonly maxGameIdCreationRetries: number;
+  /** Canonical notification message displayed when navigating to an invalid game identifier */
+  readonly invalidGameIdErrorMessage: string;
+  /** Duration in milliseconds that application toast notifications remain visible */
+  readonly toastNotificationDurationMs: number;
 }
 
 /**
@@ -141,6 +153,71 @@ export function validateSecurityConfig(config: SecurityConfig): void {
   if (typeof config.emptyEmailFallback !== 'string') {
     throw new SecurityConfigError('Invalid emptyEmailFallback: expected string value.');
   }
+
+  if (
+    typeof config.gameIdLength !== 'number' ||
+    !Number.isFinite(config.gameIdLength) ||
+    config.gameIdLength <= 0 ||
+    !Number.isInteger(config.gameIdLength)
+  ) {
+    throw new SecurityConfigError(
+      `Invalid gameIdLength: expected positive integer, received ${String(config.gameIdLength)}.`
+    );
+  }
+
+  if (
+    typeof config.gameIdCharset !== 'string' ||
+    config.gameIdCharset.length === 0 ||
+    new Set(config.gameIdCharset).size !== config.gameIdCharset.length
+  ) {
+    throw new SecurityConfigError('Invalid gameIdCharset: expected non-empty string with unique characters.');
+  }
+
+  if (
+    typeof config.gameIdRegexPattern !== 'string' ||
+    config.gameIdRegexPattern.length === 0
+  ) {
+    throw new SecurityConfigError('Invalid gameIdRegexPattern: expected non-empty string.');
+  }
+
+  try {
+    new RegExp(config.gameIdRegexPattern);
+  } catch {
+    throw new SecurityConfigError('Invalid gameIdRegexPattern: pattern is not a valid regular expression.');
+  }
+
+  if (
+    typeof config.maxGameIdCreationRetries !== 'number' ||
+    !Number.isFinite(config.maxGameIdCreationRetries) ||
+    config.maxGameIdCreationRetries < 1 ||
+    !Number.isInteger(config.maxGameIdCreationRetries)
+  ) {
+    throw new SecurityConfigError(
+      `Invalid maxGameIdCreationRetries: expected positive integer >= 1, received ${String(
+        config.maxGameIdCreationRetries
+      )}.`
+    );
+  }
+
+  if (
+    typeof config.invalidGameIdErrorMessage !== 'string' ||
+    config.invalidGameIdErrorMessage.trim().length === 0
+  ) {
+    throw new SecurityConfigError('Invalid invalidGameIdErrorMessage: expected non-empty string.');
+  }
+
+  if (
+    typeof config.toastNotificationDurationMs !== 'number' ||
+    !Number.isFinite(config.toastNotificationDurationMs) ||
+    config.toastNotificationDurationMs <= 0 ||
+    !Number.isInteger(config.toastNotificationDurationMs)
+  ) {
+    throw new SecurityConfigError(
+      `Invalid toastNotificationDurationMs: expected positive integer, received ${String(
+        config.toastNotificationDurationMs
+      )}.`
+    );
+  }
 }
 
 export const SECURITY_CONFIG: SecurityConfig = Object.freeze({
@@ -174,6 +251,12 @@ export const SECURITY_CONFIG: SecurityConfig = Object.freeze({
     'creatorColorPref',
   ]),
   emptyEmailFallback: '',
+  gameIdLength: 9,
+  gameIdCharset: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  gameIdRegexPattern: '^[0-9a-zA-Z]{9}$',
+  maxGameIdCreationRetries: 3,
+  invalidGameIdErrorMessage: 'Invalid game ID',
+  toastNotificationDurationMs: 4000,
 });
 
 // Self-validate security configuration upon module initialization

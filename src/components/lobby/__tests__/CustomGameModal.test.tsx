@@ -31,7 +31,7 @@ describe('CustomGameModal Component', () => {
     expect(html).toContain('Correspondence');
     expect(html).toContain('Minutes per player');
     expect(html).toContain('Increment in seconds');
-    expect(html).not.toContain('Days per player');
+    expect(html).not.toContain('Days per move');
   });
 
   it('renders Correspondence tab with days slider when initialTab is correspondence', () => {
@@ -43,7 +43,7 @@ describe('CustomGameModal Component', () => {
         initialTab="correspondence"
       />
     );
-    expect(html).toContain('Days per player');
+    expect(html).toContain('Days per move');
     expect(html).toContain('2 days');
     expect(html).not.toContain('Minutes per player');
     expect(html).not.toContain('Increment in seconds');

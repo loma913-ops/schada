@@ -23,17 +23,31 @@ export class LocalGameStore {
   private resolvingTimeout = new Set<string>();
   private timeoutHandler: TimeoutHandler | null = null;
 
+  /**
+   * Initializes BroadcastChannel and storage listeners for multi-tab synchronization.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(S) where S is the number of active subscribers for the updated game ID.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   *
+   * Growth Rate:
+   * - O(1) in typical operation as subscriber sets contain at most 1–2 component callbacks.
+   */
   constructor() {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       this.channel = new BroadcastChannel(LOCAL_CONFIG.events.gameSyncChannel);
       this.channel.onmessage = (event) => {
         const { type, gameId, game } = event.data || {};
         if (type === 'GAME_UPDATED' && gameId) {
+          if (game) {
+            this.memoryStore[gameId] = game;
+          }
           const subs = this.listeners.get(gameId);
           if (subs) {
             subs.forEach((cb) => cb(game));
           }
         } else if (type === 'GAME_DELETED' && gameId) {
+          delete this.memoryStore[gameId];
           const subs = this.listeners.get(gameId);
           if (subs) {
             subs.forEach((cb) => cb(null));

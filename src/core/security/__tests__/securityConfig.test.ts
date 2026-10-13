@@ -73,4 +73,58 @@ describe('Security Configuration and Validator', () => {
     const invalidGame = { ...SECURITY_CONFIG, immutableGameKeys: [] };
     expect(() => validateSecurityConfig(invalidGame)).toThrow(SecurityConfigError);
   });
+
+  it('throws SecurityConfigError for invalid gameIdLength', () => {
+    const invalidZero = { ...SECURITY_CONFIG, gameIdLength: 0 };
+    expect(() => validateSecurityConfig(invalidZero)).toThrow(SecurityConfigError);
+
+    const invalidNegative = { ...SECURITY_CONFIG, gameIdLength: -5 };
+    expect(() => validateSecurityConfig(invalidNegative)).toThrow(SecurityConfigError);
+
+    const invalidFloat = { ...SECURITY_CONFIG, gameIdLength: 9.5 };
+    expect(() => validateSecurityConfig(invalidFloat)).toThrow(SecurityConfigError);
+  });
+
+  it('throws SecurityConfigError for invalid gameIdCharset', () => {
+    const invalidEmpty = { ...SECURITY_CONFIG, gameIdCharset: '' };
+    expect(() => validateSecurityConfig(invalidEmpty)).toThrow(SecurityConfigError);
+
+    const invalidDuplicateChars = { ...SECURITY_CONFIG, gameIdCharset: 'aab' };
+    expect(() => validateSecurityConfig(invalidDuplicateChars)).toThrow(SecurityConfigError);
+  });
+
+  it('throws SecurityConfigError for invalid gameIdRegexPattern', () => {
+    const invalidEmpty = { ...SECURITY_CONFIG, gameIdRegexPattern: '' };
+    expect(() => validateSecurityConfig(invalidEmpty)).toThrow(SecurityConfigError);
+
+    const invalidRegex = { ...SECURITY_CONFIG, gameIdRegexPattern: '[a-z' };
+    expect(() => validateSecurityConfig(invalidRegex)).toThrow(SecurityConfigError);
+  });
+
+  it('throws SecurityConfigError for invalid maxGameIdCreationRetries', () => {
+    const invalidZero = { ...SECURITY_CONFIG, maxGameIdCreationRetries: 0 };
+    expect(() => validateSecurityConfig(invalidZero)).toThrow(SecurityConfigError);
+
+    const invalidNegative = { ...SECURITY_CONFIG, maxGameIdCreationRetries: -1 };
+    expect(() => validateSecurityConfig(invalidNegative)).toThrow(SecurityConfigError);
+  });
+
+  it('throws SecurityConfigError for invalid invalidGameIdErrorMessage', () => {
+    const invalidEmpty = { ...SECURITY_CONFIG, invalidGameIdErrorMessage: '' };
+    expect(() => validateSecurityConfig(invalidEmpty)).toThrow(SecurityConfigError);
+
+    const invalidWhitespace = { ...SECURITY_CONFIG, invalidGameIdErrorMessage: '   ' };
+    expect(() => validateSecurityConfig(invalidWhitespace)).toThrow(SecurityConfigError);
+  });
+
+  it('throws SecurityConfigError for invalid toastNotificationDurationMs', () => {
+    const invalidZero = { ...SECURITY_CONFIG, toastNotificationDurationMs: 0 };
+    expect(() => validateSecurityConfig(invalidZero)).toThrow(SecurityConfigError);
+
+    const invalidNegative = { ...SECURITY_CONFIG, toastNotificationDurationMs: -100 };
+    expect(() => validateSecurityConfig(invalidNegative)).toThrow(SecurityConfigError);
+
+    const invalidFloat = { ...SECURITY_CONFIG, toastNotificationDurationMs: 4000.5 };
+    expect(() => validateSecurityConfig(invalidFloat)).toThrow(SecurityConfigError);
+  });
 });

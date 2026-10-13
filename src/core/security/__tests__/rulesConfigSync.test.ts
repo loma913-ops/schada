@@ -50,4 +50,10 @@ describe('Firestore Rules ↔ TypeScript Configuration Synchronization', () => {
       expect(rulesContent).toContain(`'${key}'`);
     });
   });
+
+  it('enforces canonical game ID length, regex, and immutable ID binding matching SECURITY_CONFIG', () => {
+    expect(rulesContent).toContain(`gameId.size() == ${SECURITY_CONFIG.gameIdLength}`);
+    expect(rulesContent).toContain(`gameId.matches('${SECURITY_CONFIG.gameIdRegexPattern}')`);
+    expect(rulesContent).toContain('request.resource.data.id == gameId');
+  });
 });

@@ -3,7 +3,11 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GameOverModal } from '../GameOverModal';
 import { formatEloWithDelta } from '@/core/elo/eloService';
-import { GameOverModalConfigError, type GameOverModalConfig } from '../gameOverConfig';
+import {
+  GAME_OVER_MODAL_CONFIG,
+  GameOverModalConfigError,
+  type GameOverModalConfig,
+} from '../gameOverConfig';
 import type { GameResult } from '@/core/schada/types';
 
 // Mock dependencies that rely on browser/DOM audio or canvas
@@ -238,6 +242,179 @@ describe('GameOverModal - Rated Games Elo Display', () => {
           })
         );
       }).toThrowError(GameOverModalConfigError);
+    });
+
+    it('renders Move Quality Distribution and Accuracy sections with provided analysisReport', () => {
+      const mockReport = {
+        metadata: {},
+        moves: [],
+        blueAccuracy: 77.7,
+        greenAccuracy: 85.8,
+        blueBreakdown: {
+          brilliant: 0,
+          great: 0,
+          best: 7,
+          excellent: 2,
+          good: 1,
+          book: 2,
+          inaccuracy: 1,
+          mistake: 0,
+          miss: 2,
+          blunder: 0,
+        },
+        greenBreakdown: {
+          brilliant: 0,
+          great: 0,
+          best: 5,
+          excellent: 2,
+          good: 1,
+          book: 2,
+          inaccuracy: 1,
+          mistake: 3,
+          miss: 0,
+          blunder: 0,
+        },
+        isComplete: true,
+        totalPlies: 29,
+        analyzedAt: new Date().toISOString(),
+        durationMs: 350,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          result: mockResult,
+          bluePlayer: { elo: 1200, username: 'SchadaBot' },
+          greenPlayer: { elo: 1200, username: 'Guest' },
+          analysisReport: mockReport,
+          onHome: vi.fn(),
+          onClose: vi.fn(),
+        })
+      );
+
+      // Verify sections are present
+      expect(html).toContain('data-testid="move-quality-distribution-section"');
+      expect(html).toContain('data-testid="accuracy-section"');
+
+      // Verify headers
+      expect(html).toContain('Classification');
+      expect(html).toContain('Accuracy');
+      expect(html).toContain('SchadaBot');
+      expect(html).toContain('Guest');
+
+      // Verify all 10 tiers are rendered with labels
+      expect(html).toContain('Brilliant');
+      expect(html).toContain('Great Move');
+      expect(html).toContain('Best Move');
+      expect(html).toContain('Excellent');
+      expect(html).toContain('Good');
+      expect(html).toContain('Book');
+      expect(html).toContain('Inaccuracy');
+      expect(html).toContain('Mistake');
+      expect(html).toContain('Miss');
+      expect(html).toContain('Blunder');
+
+      // Verify counts from mock report
+      expect(html).toContain('7'); // Blue best moves
+      expect(html).toContain('5'); // Green best moves
+      expect(html).toContain('3'); // Green mistakes
+
+      // Verify accuracy values
+      expect(html).toContain('77.7%');
+      expect(html).toContain('85.8%');
+
+      // Verify positioned above review and lobby buttons
+      const distIndex = html.indexOf('data-testid="move-quality-distribution-section"');
+      const accIndex = html.indexOf('data-testid="accuracy-section"');
+      const reviewIndex = html.indexOf('Review');
+      const lobbyIndex = html.indexOf('Lobby');
+
+      expect(distIndex).toBeLessThan(accIndex);
+      expect(accIndex).toBeLessThan(reviewIndex);
+      expect(reviewIndex).toBeLessThan(lobbyIndex);
+    });
+
+    it('renders skeleton loading placeholders when isAnalyzing is true', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          result: mockResult,
+          isAnalyzing: true,
+          onHome: vi.fn(),
+          onClose: vi.fn(),
+        })
+      );
+
+      expect(html).toContain('data-testid="analysis-loading-skeleton"');
+      expect(html).toContain('modal-skeleton');
+    });
+
+    it('maintains frozen header, scrollable body, and frozen footer layout in modal DOM structure', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          result: mockResult,
+          onHome: vi.fn(),
+          onClose: vi.fn(),
+          onRematch: vi.fn(),
+        })
+      );
+
+      // Verify structural containers exist
+      expect(html).toContain('game-over-modal-content');
+      expect(html).toContain('game-over-modal-header');
+      expect(html).toContain('game-over-modal-body');
+      expect(html).toContain('game-over-modal-footer');
+
+      // Verify DOM ordering: header -> body -> footer
+      const headerIdx = html.indexOf('game-over-modal-header');
+      const bodyIdx = html.indexOf('game-over-modal-body');
+      const footerIdx = html.indexOf('game-over-modal-footer');
+
+      expect(headerIdx).toBeGreaterThan(-1);
+      expect(bodyIdx).toBeGreaterThan(headerIdx);
+      expect(footerIdx).toBeGreaterThan(bodyIdx);
+
+      // Verify header contains title & close button
+      const closeBtnIdx = html.indexOf('modal-close-btn');
+      const titleIdx = html.indexOf('id="game-over-title"');
+      expect(closeBtnIdx).toBeGreaterThan(headerIdx);
+      expect(closeBtnIdx).toBeLessThan(bodyIdx);
+      expect(titleIdx).toBeGreaterThan(headerIdx);
+      expect(titleIdx).toBeLessThan(bodyIdx);
+
+      // Verify footer contains action buttons
+      const rematchIdx = html.indexOf('Rematch');
+      const reviewIdx = html.indexOf('Review');
+      const lobbyIdx = html.indexOf('Lobby');
+      expect(rematchIdx).toBeGreaterThan(footerIdx);
+      expect(reviewIdx).toBeGreaterThan(footerIdx);
+      expect(lobbyIdx).toBeGreaterThan(footerIdx);
+    });
+
+    it('uses configured copy labels for score breakdown and winner title', () => {
+      const customConfig: GameOverModalConfig = {
+        ...GAME_OVER_MODAL_CONFIG,
+        copy: {
+          ...GAME_OVER_MODAL_CONFIG.copy,
+          categoryHeader: 'Custom Category',
+          goalScoreLabel: 'Custom Goal Points',
+          outsideHighPiecesLabel: 'Custom High Pieces',
+          rankDistanceLabel: 'Custom Rank Distance',
+          winnerTitleSuffix: 'Victorious!',
+        },
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          result: mockResult,
+          config: customConfig,
+          onHome: vi.fn(),
+        })
+      );
+
+      expect(html).toContain('Custom Category');
+      expect(html).toContain('Custom Goal Points');
+      expect(html).toContain('Custom High Pieces');
+      expect(html).toContain('Custom Rank Distance');
+      expect(html).toContain('Victorious!');
     });
   });
 });

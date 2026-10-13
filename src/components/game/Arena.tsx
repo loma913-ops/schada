@@ -13,11 +13,18 @@ import { MoveHistory } from './MoveHistory';
 import { MoveNavigator } from './MoveNavigator';
 import { GameControls } from './GameControls';
 import { GameOverModal, type PlayerEloUpdate } from './GameOverModal';
+import { AnalysisModal } from './AnalysisModal';
+import { analysisWorkerClient } from '@/core/analysis/analysisWorkerClient';
+import type { MoveQuality } from '@/core/analysis/analysisConfig';
+import { CANONICAL_ANALYSIS_CONFIG } from '@/core/analysis/analysisConfig';
+import type { GameAnalysisReport } from '@/core/analysis/analysisTypes';
+import { createEmptyAnalysisReport } from '@/core/analysis/accuracyCalculator';
 import { calculateEloUpdate } from '@/core/elo/eloService';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 import { isPatronUser, type PatronTier, type PatronSubscriptionStatus } from '@/components/common/PatronBadge';
 import { LOBBY_CONFIG, formatTimeControlDisplay } from '@/components/lobby/lobbyConfig';
+import { CANONICAL_DIGITAL_CLOCK_CONFIG } from './digitalClockConfig';
 
 /** Pure helper - defined at module scope so it is never re-created on render. */
 function getMaterialValue(pieces: Piece[]): number {
@@ -67,10 +74,17 @@ interface ArenaProps {
   onResign?: () => void;
   onTimeout?: (timedOutColor: PieceColor) => void;
   onGameComplete?: (finalState: BoardState) => void;
+  onAnalyze?: () => void;
+  onStartAnalysis?: (params: {
+    readonly depth: number;
+    readonly timeLimitSeconds: number;
+    readonly timeLimitMs: number;
+  }) => void;
   onExit: () => void;
   blueDisconnected?: boolean;
   greenDisconnected?: boolean;
   abandonCountdownSeconds?: number | null;
+  initialReviewMode?: boolean;
 }
 
 export const Arena: React.FC<ArenaProps> = ({
@@ -80,7 +94,9 @@ export const Arena: React.FC<ArenaProps> = ({
   blueElo,
   greenElo,
   timeControlMinutes = BOT_ENGINE_CONFIG.timeManagement.defaultMatchMinutes,
-  incrementSeconds = BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs / 1000,
+  incrementSeconds =
+    BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs /
+    CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond,
   isRanked = false,
   userColor,
   isComputer = false,
@@ -94,10 +110,13 @@ export const Arena: React.FC<ArenaProps> = ({
   onResign: customResign,
   onTimeout: customTimeout,
   onGameComplete,
+  onAnalyze,
+  onStartAnalysis,
   onExit,
   blueDisconnected,
   greenDisconnected,
   abandonCountdownSeconds,
+  initialReviewMode = false,
 }) => {
   const [gameState, setGameState] = useState<BoardState>(syncedGameState || initialState);
   const [viewMoveIndex, setViewMoveIndex] = useState<number>(() => {
@@ -105,6 +124,7 @@ export const Arena: React.FC<ArenaProps> = ({
     return historyLen > 0 ? historyLen - 1 : CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex;
   });
   const [isBotThinking, setIsBotThinking] = useState(false);
+  const [hasUnreadLiveMove, setHasUnreadLiveMove] = useState(false);
 
   const [orientation, setOrientation] = useState<'blue' | 'green'>(() => {
     if (userColor) return userColor;
@@ -121,11 +141,89 @@ export const Arena: React.FC<ArenaProps> = ({
     }
   }, [userColor, isSpectator, gameState.currentTurn]);
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
-  const [showGameOverModal, setShowGameOverModal] = useState(true);
-  const [gameOverEffectsPlayed, setGameOverEffectsPlayed] = useState(false);
+  const [showGameOverModal, setShowGameOverModal] = useState(() => !initialReviewMode);
+  const [gameOverEffectsPlayed, setGameOverEffectsPlayed] = useState(() => Boolean(initialReviewMode));
+  const [isReviewMode, setIsReviewMode] = useState(() => Boolean(initialReviewMode));
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [analyzedQualities, setAnalyzedQualities] = useState<Record<number, MoveQuality>>({});
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<{ current: number; total: number } | null>(null);
+  const [postGameAnalysis, setPostGameAnalysis] = useState<GameAnalysisReport | null>(null);
+  const [isPostGameAnalyzing, setIsPostGameAnalyzing] = useState(false);
+
   const handleGameOverEffectsPlayed = useCallback(() => {
     setGameOverEffectsPlayed(true);
   }, []);
+
+  const handleCancelAnalysis = useCallback(() => {
+    analysisWorkerClient.cancelAnalysis();
+    setIsAnalyzing(false);
+    setAnalysisProgress(null);
+  }, []);
+
+  const handleStartAnalysis = useCallback(
+    (params: {
+      readonly depth: number;
+      readonly timeLimitSeconds: number;
+      readonly timeLimitMs: number;
+    }) => {
+      setAnalyzedQualities({});
+      setIsAnalyzing(true);
+      setAnalysisProgress({ current: 0, total: gameState.moveHistory.length });
+
+      analysisWorkerClient.startAnalysis(
+        gameState.moveHistory,
+        params.depth,
+        params.timeLimitMs,
+        {
+          onPlyEvaluated: (plyIndex, evaluatedMove, progress) => {
+            setAnalyzedQualities((prev) => ({
+              ...prev,
+              [plyIndex]: evaluatedMove.quality,
+            }));
+            setAnalysisProgress(progress);
+          },
+          onComplete: () => {
+            setIsAnalyzing(false);
+            setAnalysisProgress(null);
+          },
+          onError: (err) => {
+            console.error('Game analysis failed:', err);
+            setIsAnalyzing(false);
+            setAnalysisProgress(null);
+          },
+        }
+      );
+
+      onStartAnalysis?.(params);
+    },
+    [gameState.moveHistory, onStartAnalysis]
+  );
+
+  useEffect(() => {
+    if (!gameState.isGameOver) {
+      setIsReviewMode(false);
+      analysisWorkerClient.cancelAnalysis();
+      setIsAnalyzing(false);
+      setAnalysisProgress(null);
+      setAnalyzedQualities({});
+      setPostGameAnalysis(null);
+      setIsPostGameAnalyzing(false);
+    }
+  }, [gameState.isGameOver]);
+
+  useEffect(() => {
+    return () => {
+      analysisWorkerClient.cancelAnalysis();
+    };
+  }, []);
+
+  const isReview = Boolean(gameState.isGameOver && (isReviewMode || !showGameOverModal));
+
+  const handleAnalyze = useCallback(() => {
+    setShowAnalysisModal(true);
+    onAnalyze?.();
+  }, [onAnalyze]);
 
   const prevIsGameOverRef = useRef(gameState.isGameOver);
   useEffect(() => {
@@ -133,6 +231,33 @@ export const Arena: React.FC<ArenaProps> = ({
       setShowGameOverModal(true);
       setGameOverEffectsPlayed(false);
       onGameComplete?.(gameState);
+
+      // Trigger automatic background analysis for GameOverModal
+      if (gameState.moveHistory.length === 0) {
+        setPostGameAnalysis(createEmptyAnalysisReport());
+        setIsPostGameAnalyzing(false);
+      } else {
+        setIsPostGameAnalyzing(true);
+        setPostGameAnalysis(null);
+        analysisWorkerClient.startAnalysis(
+          gameState.moveHistory,
+          CANONICAL_ANALYSIS_CONFIG.search.postGameDepth,
+          CANONICAL_ANALYSIS_CONFIG.search.postGameTimeLimitMs,
+          {
+            onPlyEvaluated: () => {},
+            onComplete: (report) => {
+              if (report) {
+                setPostGameAnalysis(report);
+              }
+              setIsPostGameAnalyzing(false);
+            },
+            onError: (err) => {
+              console.error('Post-game background analysis error:', err);
+              setIsPostGameAnalyzing(false);
+            },
+          }
+        );
+      }
     }
     prevIsGameOverRef.current = gameState.isGameOver;
   }, [gameState.isGameOver, onGameComplete, gameState]);
@@ -140,7 +265,11 @@ export const Arena: React.FC<ArenaProps> = ({
   const gameStateRef = useRef<BoardState>(gameState);
   gameStateRef.current = gameState;
 
+  const viewMoveIndexRef = useRef<number>(viewMoveIndex);
+  viewMoveIndexRef.current = viewMoveIndex;
+
   const prevMoveCountRef = useRef<number>(gameState.moveHistory.length);
+  const prevHistoryLenRef = useRef<number>(gameState.moveHistory.length);
   const lastAudibleMoveIndexRef = useRef<number>(
     (syncedGameState || initialState).moveHistory.length - 1
   );
@@ -176,6 +305,13 @@ export const Arena: React.FC<ArenaProps> = ({
       lastAudibleMoveIndexRef.current = Math.max(lastAudibleMoveIndexRef.current, incomingLen - 1);
       prevMoveCountRef.current = incomingLen;
 
+      // Determine if the user was actively following the live game before this incoming state
+      const currentViewIndex = viewMoveIndexRef.current;
+      const wasAtLivePosition =
+        currentLocalLen === 0
+          ? currentViewIndex === CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex
+          : currentViewIndex >= currentLocalLen - 1;
+
       // If incoming synced state matches our local optimistic state move count and game over status,
       // it is a server echo of our own move - skip redundant re-rendering
       if (
@@ -187,15 +323,57 @@ export const Arena: React.FC<ArenaProps> = ({
 
       gameStateRef.current = syncedGameState;
       setGameState(syncedGameState);
+
+      if (incomingLen > currentLocalLen) {
+        if (wasAtLivePosition) {
+          setViewMoveIndex(incomingLen - 1);
+          setHasUnreadLiveMove(false);
+        } else {
+          setHasUnreadLiveMove(true);
+        }
+      }
+      prevHistoryLenRef.current = incomingLen;
     }
   }, [syncedGameState]);
 
-  const prevHistoryLenRef = useRef<number>(gameState.moveHistory.length);
+  // Clear unread live move indicator once user navigates back to latest move
+  /**
+   * Clears the unread live move indicator when viewMoveIndex reaches or exceeds the latest move.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) constant time integer comparison.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   *
+   * Growth Rate:
+   * - O(1) flat growth rate.
+   */
+  useEffect(() => {
+    if (viewMoveIndex >= gameState.moveHistory.length - 1) {
+      setHasUnreadLiveMove(false);
+    }
+  }, [viewMoveIndex, gameState.moveHistory.length]);
+
+  /**
+   * Synchronizes viewMoveIndex when local gameState.moveHistory length changes externally.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) constant time integer boundary comparison.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   *
+   * Growth Rate:
+   * - O(1) flat growth rate, invariant to match history length.
+   */
   useEffect(() => {
     const currentLen = gameState.moveHistory.length;
     const prevLen = prevHistoryLenRef.current;
     if (currentLen > prevLen) {
-      setViewMoveIndex((prev) => (prev === prevLen - 1 ? currentLen - 1 : prev));
+      const wasAtLive =
+        prevLen === 0
+          ? viewMoveIndexRef.current === CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex
+          : viewMoveIndexRef.current >= prevLen - 1;
+      if (wasAtLive) {
+        setViewMoveIndex(currentLen - 1);
+      }
     } else if (currentLen < prevLen) {
       setViewMoveIndex(
         currentLen > 0 ? currentLen - 1 : CANONICAL_MOVE_NAVIGATOR_CONFIG.startMoveIndex
@@ -237,8 +415,21 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const computerColor: PieceColor | undefined =
     isComputer && userColor ? (userColor === 'blue' ? 'green' : 'blue') : undefined;
+ 
+  if (!LOBBY_CONFIG || typeof LOBBY_CONFIG.correspondenceCutoffMinutes !== 'number' || typeof LOBBY_CONFIG.secondsPerMinute !== 'number') {
+    throw new Error('Arena: Lobby configuration is missing or invalid.');
+  }
+  if (!CANONICAL_DIGITAL_CLOCK_CONFIG || typeof CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits?.msPerSecond !== 'number') {
+    throw new Error('Arena: Digital clock configuration is missing or invalid.');
+  }
 
-  const initialMs = timeControlMinutes > 0 ? timeControlMinutes * 60 * 1000 : 0;
+  const msPerMinute =
+    LOBBY_CONFIG.secondsPerMinute * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond;
+  const initialMs = timeControlMinutes > 0 ? timeControlMinutes * msPerMinute : 0;
+  const isCorrespondence =
+    typeof timeControlMinutes === 'number' &&
+    timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
+
   const [blueTime, setBlueTime] = useState<number>(syncedBlueTimeMs ?? initialMs);
   const [greenTime, setGreenTime] = useState<number>(syncedGreenTimeMs ?? initialMs);
 
@@ -329,42 +520,33 @@ export const Arena: React.FC<ArenaProps> = ({
     handleTimeout,
   ]);
 
+  /**
+   * Handles move execution from user interaction or bot automation.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) constant time board move execution and clock arithmetic.
+   * - Auxiliary Space Complexity: O(1) constant state allocation.
+   *
+   * Growth Rate:
+   * - O(1) flat growth rate, invariant to move history length or match volume.
+   */
   const handleMakeMove = useCallback((move: Move) => {
     const currentState = gameStateRef.current;
     if (currentState.isGameOver) return;
-
-    if (customMakeMove) {
-      if (move.captured) {
-        soundService.playCapture();
-      } else {
-        soundService.playMove();
-      }
-
-      if (move.piece.type !== 'pawn') {
-        const destRow = parseInt(move.to[1], 10) - 1;
-        const goalRow = move.piece.color === 'blue' ? 7 : 0;
-        if (destRow === goalRow) {
-          soundService.playGoal();
-        }
-      }
-
-      const nextState = executeMove(currentState, move);
-      gameStateRef.current = nextState;
-      const newMoveIndex = nextState.moveHistory.length - 1;
-      lastAudibleMoveIndexRef.current = newMoveIndex;
-      prevMoveCountRef.current = nextState.moveHistory.length;
-      prevHistoryLenRef.current = nextState.moveHistory.length;
-      setViewMoveIndex(newMoveIndex);
-      setGameState(nextState);
-      customMakeMove(move);
-      return;
-    }
 
     // Play appropriate sound effect
     if (move.captured) {
       soundService.playCapture();
     } else {
       soundService.playMove();
+    }
+
+    if (move.piece.type !== 'pawn') {
+      const destRow = parseInt(move.to[1], 10) - 1;
+      const goalRow = move.piece.color === 'blue' ? 7 : 0;
+      if (destRow === goalRow) {
+        soundService.playGoal();
+      }
     }
 
     const nextState = executeMove(currentState, move);
@@ -374,19 +556,13 @@ export const Arena: React.FC<ArenaProps> = ({
     prevMoveCountRef.current = nextState.moveHistory.length;
     prevHistoryLenRef.current = nextState.moveHistory.length;
     setViewMoveIndex(newMoveIndex);
+    setHasUnreadLiveMove(false);
 
-    // If a high piece reached goal, chime!
-    if (move.piece.type !== 'pawn') {
-      const destRow = parseInt(move.to[1], 10) - 1;
-      const goalRow = move.piece.color === 'blue' ? 7 : 0;
-      if (destRow === goalRow) {
-        soundService.playGoal();
-      }
-    }
-
-    // Apply Fischer increment to player who just moved
-    if (incrementSeconds > 0 && timeControlMinutes > 0) {
-      const addMs = incrementSeconds * 1000;
+    if (isCorrespondence) {
+      setBlueTime(initialMs);
+      setGreenTime(initialMs);
+    } else if (!customMakeMove && incrementSeconds > 0 && timeControlMinutes > 0) {
+      const addMs = incrementSeconds * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond;
       if (currentState.currentTurn === 'blue') {
         setBlueTime((prev) => prev + addMs);
       } else {
@@ -396,10 +572,12 @@ export const Arena: React.FC<ArenaProps> = ({
 
     setGameState(nextState);
 
-    if (nextState.isGameOver && onGameComplete) {
+    if (customMakeMove) {
+      customMakeMove(move);
+    } else if (nextState.isGameOver && onGameComplete) {
       onGameComplete(nextState);
     }
-  }, [customMakeMove, incrementSeconds, timeControlMinutes, onGameComplete]);
+  }, [customMakeMove, incrementSeconds, timeControlMinutes, initialMs, isCorrespondence, onGameComplete]);
 
   // Bot Turn Automation (via Web Worker with sync fallback)
   useEffect(() => {
@@ -417,7 +595,7 @@ export const Arena: React.FC<ArenaProps> = ({
         botLevel,
         gameStateRef.current.moveHistory,
         remainingTimeMs,
-        incrementSeconds * 1000
+        incrementSeconds * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond
       );
       if (!isSubscribed) return;
       setIsBotThinking(false);
@@ -521,9 +699,6 @@ export const Arena: React.FC<ArenaProps> = ({
   // Algorithmic Complexity: O(1) constant time, verifying whether game has unlimited time controls.
   // Growth Rate: O(1) flat.
   const isUnlimited = timeControlMinutes <= 0;
-  const isCorrespondence =
-    typeof timeControlMinutes === 'number' &&
-    timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
 
   const formattedTimeControl = useMemo(
     () =>
@@ -656,6 +831,7 @@ export const Arena: React.FC<ArenaProps> = ({
               currentIndex={viewMoveIndex}
               totalMoves={gameState.moveHistory.length}
               onNavigate={setViewMoveIndex}
+              hasUnreadLiveMove={hasUnreadLiveMove}
             />
           </div>
 
@@ -695,6 +871,13 @@ export const Arena: React.FC<ArenaProps> = ({
           history={gameState.moveHistory}
           currentMoveIndex={viewMoveIndex}
           onNavigateMove={setViewMoveIndex}
+          isReview={isReview}
+          onAnalyze={handleAnalyze}
+          isAnalyzing={isAnalyzing}
+          analysisProgress={analysisProgress}
+          analyzedQualities={analyzedQualities}
+          onCancelAnalysis={handleCancelAnalysis}
+          hasUnreadLiveMove={hasUnreadLiveMove}
         />
 
         {/* Action Controls */}
@@ -747,6 +930,13 @@ export const Arena: React.FC<ArenaProps> = ({
                 history={gameState.moveHistory}
                 currentMoveIndex={viewMoveIndex}
                 onNavigateMove={setViewMoveIndex}
+                isReview={isReview}
+                onAnalyze={handleAnalyze}
+                isAnalyzing={isAnalyzing}
+                analysisProgress={analysisProgress}
+                analyzedQualities={analyzedQualities}
+                onCancelAnalysis={handleCancelAnalysis}
+                hasUnreadLiveMove={hasUnreadLiveMove}
               />
             </div>
           </div>
@@ -769,9 +959,24 @@ export const Arena: React.FC<ArenaProps> = ({
           onClose={() => {
             setShowGameOverModal(false);
             setGameOverEffectsPlayed(true);
+            setIsReviewMode(true);
           }}
+          analysisReport={postGameAnalysis}
+          isAnalyzing={isPostGameAnalyzing}
+          moveHistory={gameState.moveHistory}
         />
       )}
+
+      {/* Analysis Settings Modal */}
+      <AnalysisModal
+        isOpen={showAnalysisModal}
+        totalMoves={gameState.moveHistory.length}
+        onClose={() => setShowAnalysisModal(false)}
+        onStartAnalysis={(params) => {
+          setShowAnalysisModal(false);
+          handleStartAnalysis(params);
+        }}
+      />
     </div>
   );
 };

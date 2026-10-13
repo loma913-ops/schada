@@ -45,10 +45,34 @@ describe('MoveNavigatorConfig validation and state calculation', () => {
       historyCopy: {
         headerTitle: '   ',
         emptyHistoryMessage: 'No moves',
+        analyzeButtonText: 'Analyze',
+        analyzeButtonAriaLabel: 'Analyze game moves',
       },
     };
     expect(() => validateMoveNavigatorConfig(emptyTitleConfig)).toThrowError(
       'MoveNavigatorConfigError: Invalid historyCopy.headerTitle: expected non-empty string.'
+    );
+
+    const emptyAnalyzeTextConfig = {
+      ...CANONICAL_MOVE_NAVIGATOR_CONFIG,
+      historyCopy: {
+        ...CANONICAL_MOVE_NAVIGATOR_CONFIG.historyCopy,
+        analyzeButtonText: '   ',
+      },
+    };
+    expect(() => validateMoveNavigatorConfig(emptyAnalyzeTextConfig)).toThrowError(
+      'MoveNavigatorConfigError: Invalid historyCopy.analyzeButtonText: expected non-empty string.'
+    );
+
+    const emptyAnalyzeAriaLabelConfig = {
+      ...CANONICAL_MOVE_NAVIGATOR_CONFIG,
+      historyCopy: {
+        ...CANONICAL_MOVE_NAVIGATOR_CONFIG.historyCopy,
+        analyzeButtonAriaLabel: '',
+      },
+    };
+    expect(() => validateMoveNavigatorConfig(emptyAnalyzeAriaLabelConfig)).toThrowError(
+      'MoveNavigatorConfigError: Invalid historyCopy.analyzeButtonAriaLabel: expected non-empty string.'
     );
   });
 
@@ -80,6 +104,20 @@ describe('MoveNavigatorConfig validation and state calculation', () => {
       'MoveNavigatorConfigError: Invalid ariaLabels.buttons.startOfGame: expected non-empty string.'
     );
 
+    const invalidUnreadLabel = {
+      ...CANONICAL_MOVE_NAVIGATOR_CONFIG,
+      ariaLabels: {
+        ...CANONICAL_MOVE_NAVIGATOR_CONFIG.ariaLabels,
+        buttons: {
+          ...CANONICAL_MOVE_NAVIGATOR_CONFIG.ariaLabels.buttons,
+          unreadLiveMove: '',
+        },
+      },
+    };
+    expect(() => validateMoveNavigatorConfig(invalidUnreadLabel)).toThrowError(
+      'MoveNavigatorConfigError: Invalid ariaLabels.buttons.unreadLiveMove: expected non-empty string.'
+    );
+
     const invalidTooltip = {
       ...CANONICAL_MOVE_NAVIGATOR_CONFIG,
       tooltips: {
@@ -89,6 +127,17 @@ describe('MoveNavigatorConfig validation and state calculation', () => {
     };
     expect(() => validateMoveNavigatorConfig(invalidTooltip)).toThrowError(
       'MoveNavigatorConfigError: Invalid tooltips.nextMove: expected non-empty string.'
+    );
+
+    const invalidUnreadTooltip = {
+      ...CANONICAL_MOVE_NAVIGATOR_CONFIG,
+      tooltips: {
+        ...CANONICAL_MOVE_NAVIGATOR_CONFIG.tooltips,
+        unreadLiveMove: '   ',
+      },
+    };
+    expect(() => validateMoveNavigatorConfig(invalidUnreadTooltip)).toThrowError(
+      'MoveNavigatorConfigError: Invalid tooltips.unreadLiveMove: expected non-empty string.'
     );
   });
 

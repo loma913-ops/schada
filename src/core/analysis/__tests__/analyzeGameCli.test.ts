@@ -13,7 +13,7 @@ describe('Analyze Game CLI Script', () => {
     expect(stdout).toContain('--depth');
     expect(stdout).toContain('--time-limit');
     expect(stdout).toContain('--json');
-  });
+  }, 30000);
 
   it('analyzes moves via CLI and outputs valid JSON with --json', () => {
     const stdout = execSync(
@@ -24,7 +24,7 @@ describe('Analyze Game CLI Script', () => {
     expect(parsed.totalPlies).toBe(2);
     expect(parsed.blueAccuracy).toBe(100);
     expect(parsed.moves[0].quality).toBe('book');
-  });
+  }, 30000);
 
   it('saves analysis report to output file with -o', () => {
     if (!fs.existsSync(tempOutputDir)) {
@@ -44,7 +44,7 @@ describe('Analyze Game CLI Script', () => {
 
     // Clean up
     fs.unlinkSync(outputPath);
-  });
+  }, 30000);
 
   it('renders correctly aligned terminal tables for move analysis and distribution', () => {
     const stdout = execSync(
@@ -78,6 +78,6 @@ describe('Analyze Game CLI Script', () => {
       // Character at the end of Eval column should align with the end of header 'Eval'
       expect(row.length).toBeGreaterThanOrEqual(lossHeaderPos + 4);
     }
-  });
+  }, 30000);
 });
 

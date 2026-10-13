@@ -4,7 +4,7 @@ import {
   validateAnalysisConfig,
   AnalysisConfigError,
 } from './analysisConfig';
-import type { EvaluatedMove, MoveQuality, PlayerQualityBreakdown } from './analysisTypes';
+import type { EvaluatedMove, MoveQuality, PlayerQualityBreakdown, GameAnalysisReport } from './analysisTypes';
 import type { PieceColor } from '../schada/types';
 
 /**
@@ -148,18 +148,7 @@ export function calculatePlayerAccuracy(
 ): PlayerQualityBreakdown {
   validateAnalysisConfig(config);
   const playerMoves = evaluatedMoves.filter((m) => m.turn === color);
-  const breakdown: Record<MoveQuality, number> = {
-    brilliant: 0,
-    great: 0,
-    best: 0,
-    excellent: 0,
-    good: 0,
-    book: 0,
-    inaccuracy: 0,
-    mistake: 0,
-    miss: 0,
-    blunder: 0,
-  };
+  const breakdown = createEmptyQualityBreakdown();
 
   if (playerMoves.length === 0) {
     return {
@@ -246,5 +235,59 @@ export function calculatePlayerAccuracy(
     accuracy: Math.min(config.accuracy.maxAccuracy, Math.max(config.accuracy.minAccuracy, roundedAccuracy)),
     moveCount: playerMoves.length,
     breakdown,
+  };
+}
+
+/**
+ * Creates an empty quality breakdown dictionary for all 10 move quality tiers.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time across fixed tiers.
+ * - Auxiliary Space Complexity: O(1) fixed-size dictionary.
+ *
+ * Growth Rate:
+ * - O(1) strictly constant, unaffected by game length.
+ */
+export function createEmptyQualityBreakdown(): Record<MoveQuality, number> {
+  return {
+    brilliant: 0,
+    great: 0,
+    best: 0,
+    excellent: 0,
+    good: 0,
+    book: 0,
+    inaccuracy: 0,
+    mistake: 0,
+    miss: 0,
+    blunder: 0,
+  };
+}
+
+/**
+ * Creates an empty game analysis report for games with zero moves or initial states.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time initialization.
+ * - Auxiliary Space Complexity: O(1) fixed-size report object.
+ *
+ * Growth Rate:
+ * - O(1) strictly constant.
+ */
+export function createEmptyAnalysisReport(
+  isComplete = true,
+  config: AnalysisConfig = CANONICAL_ANALYSIS_CONFIG
+): GameAnalysisReport {
+  validateAnalysisConfig(config);
+  return {
+    metadata: {},
+    moves: [],
+    blueAccuracy: config.accuracy.perfectAccuracy,
+    greenAccuracy: config.accuracy.perfectAccuracy,
+    blueBreakdown: createEmptyQualityBreakdown(),
+    greenBreakdown: createEmptyQualityBreakdown(),
+    isComplete,
+    totalPlies: 0,
+    analyzedAt: new Date().toISOString(),
+    durationMs: 0,
   };
 }
