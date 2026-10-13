@@ -16,6 +16,7 @@ import { LobbyTable } from './components/lobby/LobbyTable';
 import type { ArenaPlayer } from './components/game/Arena';
 import type { NavigationTab } from './components/layout/navigationTypes';
 import { isPatronUser } from './components/common/PatronBadge';
+import { isNativePlatform, initNativeMobileServices } from './services/native/mobileService';
 
 // Lazy-loaded routes and modal components for minimal initial bundle size
 const GameRoomView = lazy(() => import('./components/game/GameRoomView').then((m) => ({ default: m.GameRoomView })));
@@ -40,7 +41,7 @@ import { FORMAT_CONFIG } from './core/schada/formatConfig';
 import { localBackend, type UserProfile } from './services/firebase/localProvider';
 import { logPageView } from './services/firebase/analyticsService';
 
-import { updateUserStats } from './services/firebase/authService';
+import { updateUserStats, getOrCreateGuestId } from './services/firebase/authService';
 import {
   createGame,
   joinGame,
@@ -49,7 +50,6 @@ import {
 } from './services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
 import { SECURITY_CONFIG } from './core/security/securityConfig';
-import { safeSetItem } from './services/storage/storageCleanup';
 import { getBotTier } from './core/bot/botTiers';
 import type { BoardState, PieceColor } from './core/schada/types';
 
@@ -127,6 +127,25 @@ const MainApp: React.FC = () => {
     }
   }, [location.state, navigate, location.pathname]);
 
+  // Register native Android & iOS lifecycle and hardware back button listeners
+  useEffect(() => {
+    const cleanupNative = initNativeMobileServices({
+      hasOpenModal: () => authOpen || profileOpen || friendsOpen || customGameOpen || computerModalOpen || createRoomOpen,
+      closeActiveModal: () => {
+        if (authOpen) setAuthOpen(false);
+        else if (profileOpen) setProfileOpen(false);
+        else if (friendsOpen) setFriendsOpen(false);
+        else if (customGameOpen) setCustomGameOpen(false);
+        else if (computerModalOpen) setComputerModalOpen(false);
+        else if (createRoomOpen) setCreateRoomOpen(false);
+      },
+      isInGameMatch: () => location.pathname.startsWith('/game/') || Boolean(activeMatch),
+      navigateBack: () => navigate(-1),
+      isAtRootPlayTab: () => location.pathname === '/' && currentTab === 'play',
+    });
+    return () => cleanupNative();
+  }, [authOpen, profileOpen, friendsOpen, customGameOpen, computerModalOpen, createRoomOpen, location.pathname, activeMatch, currentTab, navigate]);
+
   useEffect(() => {
     if (!toastNotification) return;
     const timer = setTimeout(() => {
@@ -155,12 +174,7 @@ const MainApp: React.FC = () => {
 
   // Start a Quick Pair game (Player vs Player) - checks lobby for open game or creates new open room
   const handleStartQuickPair = async (minutes: number, increment: number, isRanked: boolean) => {
-    const guestIdKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId;
-    let guestId = localStorage.getItem(guestIdKey);
-    if (!guestId) {
-      guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      safeSetItem(guestIdKey, guestId);
-    }
+    const guestId = getOrCreateGuestId();
 
     const defaultGuestName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
     const defaultGuestRating = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating;
@@ -344,13 +358,8 @@ const MainApp: React.FC = () => {
 
   // Custom Match Creation (Player vs Player) - Routes to Multiplayer Room
   const handleCreateCustom = async (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => {
-    const { guestId: guestIdKey, guestName: guestNameKey } =
-      MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
-    let guestId = localStorage.getItem(guestIdKey);
-    if (!guestId) {
-      guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      safeSetItem(guestIdKey, guestId);
-    }
+    const guestId = getOrCreateGuestId();
+    const { guestName: guestNameKey } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
 
     const isDonor = isPatronUser(user);
 
@@ -488,7 +497,7 @@ const MainApp: React.FC = () => {
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/donate" element={<DonatePage />} />
+          {!isNativePlatform() && <Route path="/donate" element={<DonatePage />} />}
           <Route
             path="*"
             element={
@@ -534,9 +543,9 @@ const MainApp: React.FC = () => {
                   <RulesGuide />
                 ) : currentTab === 'history' ? (
                   <HistoryGuide />
-                ) : (
+                ) : !isNativePlatform() ? (
                   <DonatePage />
-                )}
+                ) : null}
               </main>
             }
           />

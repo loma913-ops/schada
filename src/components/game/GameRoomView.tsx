@@ -26,7 +26,7 @@ import type { PlayerEloUpdate } from './GameOverModal';
 import type { BoardState, Move, PieceColor } from '@/core/schada/types';
 import { Copy, Check, ArrowLeft, Loader2, Cpu, ShieldAlert, LogIn, Users } from 'lucide-react';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
-import { updateUserStats } from '@/services/firebase/authService';
+import { updateUserStats, getOrCreateGuestId } from '@/services/firebase/authService';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
@@ -35,6 +35,8 @@ import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { isGuestUser } from '@/services/firebase/gameTypes';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { SECURITY_CONFIG } from '@/core/security/securityConfig';
+import { getShareBaseUrl, copyToClipboard } from '@/services/native/mobileService';
+import { NATIVE_CONFIG } from '@/services/native/nativeConfig';
 
 const GAME_ID_REGEX = new RegExp(SECURITY_CONFIG.gameIdRegexPattern);
 
@@ -172,8 +174,7 @@ export const GameRoomView: React.FC = () => {
     if (!gameId || !game || hasJoined || authLoading) return;
 
     const existingToken = getLocalSessionToken(gameId);
-    const guestIdKey = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.guestId;
-    const guestId = typeof localStorage !== 'undefined' ? localStorage.getItem(guestIdKey) : null;
+    const guestId = getOrCreateGuestId();
 
     const isAlreadySeated = Boolean(
       (user &&
@@ -221,7 +222,7 @@ export const GameRoomView: React.FC = () => {
         patronSubscriptionStatus: user.patronSubscriptionStatus,
       }
       : {
-        id: 'guest_' + (guestId || Math.random().toString(36).substring(2, 8)),
+        id: guestId,
         username: guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName,
         elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating,
         gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
@@ -242,17 +243,13 @@ export const GameRoomView: React.FC = () => {
     if (!gameId) return;
 
     const trimmed = guestName.trim() || MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
-    const { guestName: guestNameKey, guestConfirmed: guestConfirmedKey, guestId: guestIdKey } =
+    const { guestName: guestNameKey, guestConfirmed: guestConfirmedKey } =
       MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
     safeSetItem(guestNameKey, trimmed);
     safeSetItem(guestConfirmedKey, 'true');
     setGuestPromptOpen(false);
 
-    let guestId = localStorage.getItem(guestIdKey);
-    if (!guestId) {
-      guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
-      safeSetItem(guestIdKey, guestId);
-    }
+    const guestId = getOrCreateGuestId();
 
     joinGame(gameId, {
       id: guestId,
@@ -269,12 +266,17 @@ export const GameRoomView: React.FC = () => {
     });
   };
 
-  const shareableUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const shareableUrl = typeof window !== 'undefined'
+    ? `${getShareBaseUrl()}${window.location.pathname}`
+    : '';
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareableUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    void copyToClipboard(shareableUrl).then((success) => {
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), NATIVE_CONFIG.clipboardFeedbackDurationMs);
+      }
+    });
   };
 
   // Determine user's role and color with multi-tier identification:

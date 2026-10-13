@@ -18,6 +18,7 @@ export interface AuthConfig {
   readonly maxUsernameLength: number;
   readonly usernameRegex: RegExp;
   readonly usernameRegexDescription: string;
+  readonly accountDeletionConfirmationPhrase: string;
 }
 
 /**
@@ -66,6 +67,13 @@ export function validateAuthConfig(config: AuthConfig): void {
   ) {
     throw new AuthConfigError('Invalid usernameRegexDescription: expected non-empty string.');
   }
+
+  if (
+    typeof config.accountDeletionConfirmationPhrase !== 'string' ||
+    config.accountDeletionConfirmationPhrase.trim().length === 0
+  ) {
+    throw new AuthConfigError('Invalid accountDeletionConfirmationPhrase: expected non-empty string.');
+  }
 }
 
 export const AUTH_CONFIG: AuthConfig = Object.freeze({
@@ -73,6 +81,7 @@ export const AUTH_CONFIG: AuthConfig = Object.freeze({
   maxUsernameLength: 20,
   usernameRegex: /^[a-zA-Z0-9_]+$/,
   usernameRegexDescription: 'letters, numbers, and underscores',
+  accountDeletionConfirmationPhrase: 'DELETE',
 });
 
 // Self-validate canonical auth configuration upon module load

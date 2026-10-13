@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import type { NavigationTab } from '@/components/layout/navigationTypes';
+import { isNativePlatform } from '@/services/native/mobileService';
 
 interface FooterProps {
   onSelectTab?: (tab: NavigationTab) => void;
@@ -37,14 +38,18 @@ export const Footer: React.FC<FooterProps> = ({ onSelectTab }) => {
             >
               History
             </Link>
-            <span className="footer-separator">•</span>
-            <Link
-              to="/donate"
-              onClick={() => onSelectTab?.('donate')}
-              className="footer-link"
-            >
-              Donate
-            </Link>
+            {!isNativePlatform() && (
+              <>
+                <span className="footer-separator">•</span>
+                <Link
+                  to="/donate"
+                  onClick={() => onSelectTab?.('donate')}
+                  className="footer-link"
+                >
+                  Donate
+                </Link>
+              </>
+            )}
           </div>
         </nav>
         <div className="footer-credits">

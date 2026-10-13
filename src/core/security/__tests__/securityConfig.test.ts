@@ -26,6 +26,16 @@ describe('Security Configuration and Validator', () => {
     expect(SECURITY_CONFIG.immutableGameKeys).toContain('id');
     expect(SECURITY_CONFIG.immutableGameKeys).toContain('createdAt');
     expect(SECURITY_CONFIG.immutableGameKeys).toContain('isRanked');
+    expect(SECURITY_CONFIG.guestIdRandomLength).toBe(10);
+    expect(SECURITY_CONFIG.guestIdPrefix).toBe('guest_');
+    expect(SECURITY_CONFIG.sessionIdRandomLength).toBe(12);
+    expect(SECURITY_CONFIG.sessionIdPrefix).toBe('session_');
+    expect(SECURITY_CONFIG.sessionTokenRandomLength).toBe(16);
+    expect(SECURITY_CONFIG.sessionTokenPrefix).toBe('tok_');
+    expect(SECURITY_CONFIG.userIdRandomLength).toBe(12);
+    expect(SECURITY_CONFIG.userIdPrefix).toBe('user_');
+    expect(SECURITY_CONFIG.friendRequestIdRandomLength).toBe(12);
+    expect(SECURITY_CONFIG.friendRequestIdPrefix).toBe('freq_');
   });
 
   it('throws SecurityConfigError if configuration object is null or undefined', () => {
@@ -126,5 +136,18 @@ describe('Security Configuration and Validator', () => {
 
     const invalidFloat = { ...SECURITY_CONFIG, toastNotificationDurationMs: 4000.5 };
     expect(() => validateSecurityConfig(invalidFloat)).toThrow(SecurityConfigError);
+  });
+
+  it('throws SecurityConfigError for invalid CSPRNG lengths and prefixes', () => {
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, guestIdRandomLength: 3 })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, guestIdPrefix: '' })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, sessionIdRandomLength: 2 })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, sessionIdPrefix: '' })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, sessionTokenRandomLength: 7 })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, sessionTokenPrefix: '' })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, userIdRandomLength: 1 })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, userIdPrefix: '' })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, friendRequestIdRandomLength: 0 })).toThrow(SecurityConfigError);
+    expect(() => validateSecurityConfig({ ...SECURITY_CONFIG, friendRequestIdPrefix: '' })).toThrow(SecurityConfigError);
   });
 });

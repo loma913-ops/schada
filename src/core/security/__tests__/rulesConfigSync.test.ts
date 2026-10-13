@@ -56,4 +56,8 @@ describe('Firestore Rules ↔ TypeScript Configuration Synchronization', () => {
     expect(rulesContent).toContain(`gameId.matches('${SECURITY_CONFIG.gameIdRegexPattern}')`);
     expect(rulesContent).toContain('request.resource.data.id == gameId');
   });
+
+  it('permits user profile deletion strictly to authenticated account owners', () => {
+    expect(rulesContent).toContain('allow delete: if isOwner(userId);');
+  });
 });

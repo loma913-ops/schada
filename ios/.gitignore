@@ -1,0 +1,22 @@
+# Xcode & SPM Build Outputs
+build/
+App/build/
+App/Pods/
+App/output/
+App/App/public/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+.build/
+
+# Cordova plugins for Capacitor
+capacitor-cordova-ios-plugins/
+
+# Generated Config files
+App/App/capacitor.config.json
+App/App/capacitor.plugins.json
+App/App/config.xml
+
+# OS Files
+.DS_Store

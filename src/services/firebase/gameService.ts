@@ -17,6 +17,11 @@ import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { isPatronUser } from '@/components/common/PatronBadge';
 import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
 import { SECURITY_CONFIG } from '@/core/security/securityConfig';
+import {
+  getSecureRandomString,
+  generateSecureToken,
+  getSecureRandomChoice,
+} from '@/core/security/cryptoUtils';
 import type { ArenaPlayer } from './gameTypes';
 
 // Re-exported modular domain services
@@ -84,34 +89,14 @@ export function setLocalSessionToken(gameId: string, token: string): void {
  *   generation overhead is O(1) constant with respect to total database volume.
  */
 export function generateGameId(): string {
-  const charset = SECURITY_CONFIG.gameIdCharset;
-  const length = SECURITY_CONFIG.gameIdLength;
-  const charsetLength = charset.length;
-  // Discard bytes beyond the largest multiple of charsetLength to eliminate modulo bias
-  const maxValidByte = 256 - (256 % charsetLength);
-
-  const cryptoObj = typeof crypto !== 'undefined' ? crypto : undefined;
-  if (!cryptoObj || typeof cryptoObj.getRandomValues !== 'function') {
-    throw new Error('Cryptographically secure PRNG (crypto.getRandomValues) is required for game ID generation.');
-  }
-
-  let result = '';
-  const randomBytes = new Uint8Array(length * 2);
-  while (result.length < length) {
-    cryptoObj.getRandomValues(randomBytes);
-    for (let i = 0; i < randomBytes.length && result.length < length; i++) {
-      const byte = randomBytes[i];
-      if (byte < maxValidByte) {
-        result += charset[byte % charsetLength];
-      }
-    }
-  }
-
-  return result;
+  return getSecureRandomString(
+    SECURITY_CONFIG.gameIdLength,
+    SECURITY_CONFIG.gameIdCharset
+  );
 }
 
 function generateToken(): string {
-  return 'tok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+  return generateSecureToken();
 }
 
 /**
@@ -138,7 +123,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
   const colorPref = params.colorPref || 'random';
   let creatorColor: PieceColor;
   if (colorPref === 'random') {
-    creatorColor = Math.random() < 0.5 ? 'blue' : 'green';
+    creatorColor = getSecureRandomChoice(['blue', 'green'] as const);
   } else {
     creatorColor = colorPref;
   }

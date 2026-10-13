@@ -17,6 +17,7 @@ import {
   computeCancellationExpiration,
   isPatronActive,
 } from '@/core/donate/patronService';
+import { generateLocalUserId, generateFriendRequestId } from '@/core/security/cryptoUtils';
 
 export interface UserProfile {
   id: string;
@@ -290,7 +291,7 @@ class LocalBackend {
       throw new Error(`Username "${username}" is already taken.`);
     }
 
-    const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const uid = generateLocalUserId();
     const newUser: UserProfile = {
       id: uid,
       email: email.trim(),
@@ -338,6 +339,40 @@ class LocalBackend {
     try {
       window.dispatchEvent(
         new CustomEvent(LOCAL_CONFIG.events.userStatusChanged, { detail: { status: 'offline' } })
+      );
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * Deletes a local mock user and clears session if active.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(1) key deletion in local mock users map.
+   * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+   *
+   * Growth Rate:
+   * - O(1) constant.
+   */
+  public deleteUser(userId: string): void {
+    if (!userId || typeof userId !== 'string') return;
+    if (typeof localStorage === 'undefined') return;
+    const users = this.getUsers();
+    if (users[userId]) {
+      delete users[userId];
+      this.saveUsers(users);
+    }
+    const currentId = localStorage.getItem(this.currentUserIdKey);
+    if (currentId === userId) {
+      localStorage.removeItem(this.currentUserIdKey);
+    }
+    try {
+      window.dispatchEvent(
+        new CustomEvent(LOCAL_CONFIG.events.userStatusChanged, { detail: { status: 'offline' } })
+      );
+      window.dispatchEvent(
+        new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: null })
       );
     } catch {
       // Ignore
@@ -598,7 +633,7 @@ class LocalBackend {
     }
 
     const newReq: LocalFriendRequest = {
-      id: `freq_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      id: generateFriendRequestId(),
       fromUserId: fromUser.id,
       fromUsername: fromUser.username,
       fromUserIsPatron: isPatronActive(fromUser),

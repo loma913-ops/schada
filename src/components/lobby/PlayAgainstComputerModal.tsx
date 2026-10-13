@@ -4,6 +4,7 @@ import type { PieceColor } from '@/core/schada/types';
 import { getBotTier } from '@/core/bot/botTiers';
 import { BOT_ENGINE_CONFIG } from '@/core/bot/botConfig';
 import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
+import { getSecureRandomChoice } from '@/core/security/cryptoUtils';
 
 
 interface PlayAgainstComputerModalProps {
@@ -57,9 +58,7 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
     // Resolve random side
     const resolvedColor: PieceColor =
       colorPref === 'random'
-        ? Math.random() < 0.5
-          ? 'blue'
-          : 'green'
+        ? getSecureRandomChoice(['blue', 'green'] as const)
         : colorPref;
 
     onStartGame({

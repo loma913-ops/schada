@@ -5,6 +5,8 @@
 graphify-out/
 node_modules/
 dist/
+android/
+ios/
 
 # Lock file — 296 KB of hashes, zero architectural signal
 # package.json already covers all dependency relationships

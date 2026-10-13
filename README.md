@@ -18,6 +18,7 @@ Schada combines a fast, minimalist, Lichess-inspired user experience with a math
 8. [Editing `src/core/schada/vectors.ts`](#8-editing-srccoreschadavectorsts)
 9. [Security & Threat Modeling](#9-security--threat-modeling)
 10. [Knowledge Graph (graphify)](#10-knowledge-graph-graphify)
+11. [Mobile Applications & Store Deployment (Android & iOS)](#11-mobile-applications--store-deployment-android--ios)
 
 ---
 
@@ -69,6 +70,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Standalone Bot Championship Simulator**: Local CLI tool pitting all 8 AI tiers against each other in multi-tournament brackets with Elo calibration, game notation, and cross-table export.
 - **Interactive Game Analysis Engine**: Post-game Move Quality Distribution table (10 tiers with graphical symbol badges) and player accuracy metrics in the Game Over modal alongside on-demand Web Worker notation review.
 - **9-Digit Alphanumeric Game URLs & Collision Protection**: Canonical Base62 (case-sensitive) 9-character game identifiers with CSPRNG generation, transactional collision prevention, and strict format validation.
+- **Native Mobile Applications**: Android and iOS app editions powered by Capacitor 8 with native hardware haptics.
 
 ---
 
@@ -523,6 +525,8 @@ Schada employs an authoritative defense-in-depth security model:
 - **Sensitive PII Segregation**: Registered user email addresses are omitted from public Firestore documents, eliminating database enumeration while hydrating seamlessly in memory via Firebase Auth tokens.
 - **HTTP Security Headers**: Strict hosting security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and CSP) deployed with zero-reload cache-control preservation.
 - **Canonical Game Identifier Hardening**: 9-character alphanumeric (case-sensitive, Base62) game identifiers generated via cryptographically secure pseudo-random values (`crypto.getRandomValues`), atomic collision-prevention transactions in Firestore, and strict regex schema enforcement in `firestore.rules`.
+- **Client Storage & Telemetry Hardening**: Local storage setters protected against format string injection vulnerabilities and unencrypted PII exposure with granular quota exhaustion recovery and inline security audit suppression.
+- **Cryptographically Secure Random Generation (CSPRNG)**: Full elimination of weak PRNG (`Math.random`) across all sensitive identity and authorization vectors—including guest user identifiers, client presence session IDs, player session tokens, and local account IDs—in favor of authoritative Web Crypto API (`crypto.getRandomValues`) with rejection sampling to eliminate modulo bias.
 
 ---
 
@@ -586,3 +590,133 @@ Run this after any update to keep the report in sync:
 ```powershell
 graphify cluster-only .
 ```
+
+---
+
+## 11. Mobile Applications & Store Deployment (Android & iOS)
+
+Schada provides first-class native mobile editions for **Android** and **iOS** powered by **Capacitor 8**. Both mobile apps share 100% of the core React 19 / TypeScript codebase with zero browser regressions or performance degradation.
+
+### Architecture & Native Capabilities
+
+- **Unified Single Codebase**: All gameplay logic, MiniMax bot Web Workers, SVG board rendering, and Firestore synchronization run identically across Web, Android, and iOS.
+- **Hardware Haptic Feedback**: Native vibration patterns trigger on moves, captures, goal line entries, and game completions via `@capacitor/haptics`.
+- **Hardware Back Button Handling**: On Android devices, the native back button closes open modals, steps back through navigation, or safely minimizes the application during active matches without accidental forfeits.
+- **Portrait Lock**: The native container enforces portrait orientation across handheld devices for an optimal 64-square vector board aspect ratio.
+- **Store Compliance**: 
+  - **Apple Guideline 3.1.1 & Google Play Billing**: Web donation and patron links are conditionally hidden within native application shells (`isNativePlatform()`).
+  - **Apple Guideline 5.1.1(v)**: In-app account deletion is built into the Player Profile settings (`ProfileModal.tsx`), allowing immediate and permanent self-service deletion of user profiles, ratings, and usernames with password re-authentication.
+
+### Local Development Commands
+
+| Command | Purpose |
+| :--- | :--- |
+| `npm run build` | Compiles production web bundle to `dist/` |
+| `npm run cap:sync` | Synchronizes web assets and native plugins to `android/` and `ios/` |
+| `npm run cap:android` | Opens the Android project in Android Studio |
+| `npm run cap:ios` | Opens the iOS project in Xcode (macOS only) |
+
+---
+
+### Backend & Pre-Deployment Configuration Checklist
+
+Before packaging mobile builds for Google Play or the Apple App Store, complete the following configuration requirements:
+
+1. **Deploy Updated Firestore Security Rules**:
+   The in-app account deletion feature requires the updated deletion authorization rule in production. Deploy rules to your live project:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+   *(Without deploying this rule, player account deletion requests will be rejected by Firestore with `PERMISSION_DENIED`.)*
+
+2. **Verify Production Environment Variables (`.env`)**:
+   Vite embeds environment variables at build time (`npm run build`), which are then copied directly into `android/` and `ios/`. Ensure your root `.env` points to live production Firebase credentials and `VITE_USE_FIREBASE_EMULATOR="false"`.
+
+3. **Firebase Authentication (No Domain Whitelist Changes Required)**:
+   Schada uses Email & Password authentication (`createUserWithEmailAndPassword`, `signInWithEmailAndPassword`) communicating directly with Google Identity Toolkit REST endpoints (`identitytoolkit.googleapis.com`) using `apiKey`. Unlike OAuth redirects, no custom domain or URI scheme authorization is required in the Firebase Console.
+
+4. **Verify Application ID / Bundle Identifier**:
+   The default application identifier is `org.schada.app`:
+   - Configured in `capacitor.config.ts`, `android/app/build.gradle`, and `ios/App/App/Info.plist`.
+   - Ensure `org.schada.app` matches your registered App ID in both the Google Play Console and the Apple Developer Program (or update both codebase and store profiles consistently).
+
+5. **Generate Production App Icons and Splash Screens**:
+   Capacitor generates placeholder icons upon initial setup. Before publishing to app stores, generate official icon and splash assets:
+   - Place `icon.png` (1024x1024) and `splash.png` (2732x2732) in an `assets/` folder.
+   - Run the asset generator:
+     ```bash
+     npx @capacitor/assets generate
+     ```
+
+---
+
+### Android Deployment (Google Play Store)
+
+#### 1. Prerequisites
+- Google Play Developer Account
+- Android Studio with Android SDK 34+ and JDK 21
+
+#### 2. Release Signing Configuration
+1. Generate an upload keystore (if not already existing):
+   ```bash
+   keytool -genkey -v -keystore android/release.keystore -alias schada -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Copy the template properties file:
+   ```bash
+   cp android/key.properties.example android/key.properties
+   ```
+3. Edit `android/key.properties` with your keystore path, alias, and passwords (`key.properties` and `*.keystore` are strictly excluded from git).
+
+#### 3. Building Android App Bundle (AAB)
+```bash
+# Build web assets and sync native container
+npm run build
+npm run cap:sync
+
+# Generate signed release bundle
+cd android
+./gradlew bundleRelease
+```
+The output file is generated at `android/app/build/outputs/bundle/release/app-release.aab`.
+
+#### 4. Publishing to Google Play Console
+1. In the [Google Play Console](https://play.google.com/console), create or select the **Schada** application.
+2. Complete Store Listing (screenshots, description, privacy policy link).
+3. Under **Release** > **Testing** > **Internal testing**, create a new release and upload `app-release.aab`.
+4. Validate test tracks and promote to Production.
+
+---
+
+### iOS Deployment (Apple App Store)
+
+#### 1. Prerequisites
+- Apple Developer Program membership ($99/year)
+- macOS workstation with Xcode 15+ and CocoaPods / Swift Package Manager
+
+#### 2. Synchronize & Open Xcode
+```bash
+npm run build
+npm run cap:sync
+npm run cap:ios
+```
+
+#### 3. Project Configuration & Signing
+1. In Xcode, select the root **App** project in the navigator.
+2. Under **Signing & Capabilities**, select your Apple Developer Team and ensure the Bundle Identifier matches `org.schada.app`.
+3. Verify that the deployment target is set to **iOS 15.0** or later.
+
+#### 4. Archiving & Submitting to App Store Connect
+1. Select the build target as **Any iOS Device (arm64)**.
+2. In the menu bar, select **Product** > **Archive**.
+3. Once the Organizer window appears, select the archive and click **Distribute App**.
+4. Choose **App Store Connect** and select **Upload**.
+5. When processing finishes in [App Store Connect](https://appstoreconnect.apple.com), open **TestFlight** to verify the build, then attach the build to the App Store release version and submit for review.
+
+---
+
+### Automated CI/CD (GitHub Actions)
+
+A dedicated multi-platform build workflow is available in `.github/workflows/build-mobile.yml`:
+- **Manual Trigger (`workflow_dispatch`)**: Choose between `debug` (generates test APK) and `release` (generates signed AAB).
+- **Automated Tag Trigger**: Pushing a version tag (`v*`) automatically builds and archives release artifacts for both Android and iOS targets.
+

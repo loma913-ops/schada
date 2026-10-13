@@ -48,6 +48,26 @@ export interface SecurityConfig {
   readonly invalidGameIdErrorMessage: string;
   /** Duration in milliseconds that application toast notifications remain visible */
   readonly toastNotificationDurationMs: number;
+  /** Character length of random suffix for guest identifiers */
+  readonly guestIdRandomLength: number;
+  /** Prefix for guest identifiers */
+  readonly guestIdPrefix: string;
+  /** Character length of random suffix for client session identifiers */
+  readonly sessionIdRandomLength: number;
+  /** Prefix for client session identifiers */
+  readonly sessionIdPrefix: string;
+  /** Character length of cryptographically secure player session tokens */
+  readonly sessionTokenRandomLength: number;
+  /** Prefix for player session tokens */
+  readonly sessionTokenPrefix: string;
+  /** Character length of random suffix for local user identifiers */
+  readonly userIdRandomLength: number;
+  /** Prefix for local user identifiers */
+  readonly userIdPrefix: string;
+  /** Character length of random suffix for local friend request identifiers */
+  readonly friendRequestIdRandomLength: number;
+  /** Prefix for local friend request identifiers */
+  readonly friendRequestIdPrefix: string;
 }
 
 /**
@@ -218,6 +238,91 @@ export function validateSecurityConfig(config: SecurityConfig): void {
       )}.`
     );
   }
+
+  if (
+    typeof config.guestIdRandomLength !== 'number' ||
+    !Number.isFinite(config.guestIdRandomLength) ||
+    config.guestIdRandomLength < 4 ||
+    !Number.isInteger(config.guestIdRandomLength)
+  ) {
+    throw new SecurityConfigError(
+      `Invalid guestIdRandomLength: expected positive integer >= 4, received ${String(
+        config.guestIdRandomLength
+      )}.`
+    );
+  }
+
+  if (typeof config.guestIdPrefix !== 'string' || config.guestIdPrefix.trim().length === 0) {
+    throw new SecurityConfigError('Invalid guestIdPrefix: expected non-empty string.');
+  }
+
+  if (
+    typeof config.sessionIdRandomLength !== 'number' ||
+    !Number.isFinite(config.sessionIdRandomLength) ||
+    config.sessionIdRandomLength < 4 ||
+    !Number.isInteger(config.sessionIdRandomLength)
+  ) {
+    throw new SecurityConfigError(
+      `Invalid sessionIdRandomLength: expected positive integer >= 4, received ${String(
+        config.sessionIdRandomLength
+      )}.`
+    );
+  }
+
+  if (typeof config.sessionIdPrefix !== 'string' || config.sessionIdPrefix.trim().length === 0) {
+    throw new SecurityConfigError('Invalid sessionIdPrefix: expected non-empty string.');
+  }
+
+  if (
+    typeof config.sessionTokenRandomLength !== 'number' ||
+    !Number.isFinite(config.sessionTokenRandomLength) ||
+    config.sessionTokenRandomLength < 8 ||
+    !Number.isInteger(config.sessionTokenRandomLength)
+  ) {
+    throw new SecurityConfigError(
+      `Invalid sessionTokenRandomLength: expected positive integer >= 8, received ${String(
+        config.sessionTokenRandomLength
+      )}.`
+    );
+  }
+
+  if (typeof config.sessionTokenPrefix !== 'string' || config.sessionTokenPrefix.trim().length === 0) {
+    throw new SecurityConfigError('Invalid sessionTokenPrefix: expected non-empty string.');
+  }
+
+  if (
+    typeof config.userIdRandomLength !== 'number' ||
+    !Number.isFinite(config.userIdRandomLength) ||
+    config.userIdRandomLength < 4 ||
+    !Number.isInteger(config.userIdRandomLength)
+  ) {
+    throw new SecurityConfigError(
+      `Invalid userIdRandomLength: expected positive integer >= 4, received ${String(
+        config.userIdRandomLength
+      )}.`
+    );
+  }
+
+  if (typeof config.userIdPrefix !== 'string' || config.userIdPrefix.trim().length === 0) {
+    throw new SecurityConfigError('Invalid userIdPrefix: expected non-empty string.');
+  }
+
+  if (
+    typeof config.friendRequestIdRandomLength !== 'number' ||
+    !Number.isFinite(config.friendRequestIdRandomLength) ||
+    config.friendRequestIdRandomLength < 4 ||
+    !Number.isInteger(config.friendRequestIdRandomLength)
+  ) {
+    throw new SecurityConfigError(
+      `Invalid friendRequestIdRandomLength: expected positive integer >= 4, received ${String(
+        config.friendRequestIdRandomLength
+      )}.`
+    );
+  }
+
+  if (typeof config.friendRequestIdPrefix !== 'string' || config.friendRequestIdPrefix.trim().length === 0) {
+    throw new SecurityConfigError('Invalid friendRequestIdPrefix: expected non-empty string.');
+  }
 }
 
 export const SECURITY_CONFIG: SecurityConfig = Object.freeze({
@@ -257,6 +362,16 @@ export const SECURITY_CONFIG: SecurityConfig = Object.freeze({
   maxGameIdCreationRetries: 3,
   invalidGameIdErrorMessage: 'Invalid game ID',
   toastNotificationDurationMs: 4000,
+  guestIdRandomLength: 10,
+  guestIdPrefix: 'guest_',
+  sessionIdRandomLength: 12,
+  sessionIdPrefix: 'session_',
+  sessionTokenRandomLength: 16,
+  sessionTokenPrefix: 'tok_',
+  userIdRandomLength: 12,
+  userIdPrefix: 'user_',
+  friendRequestIdRandomLength: 12,
+  friendRequestIdPrefix: 'freq_',
 });
 
 // Self-validate security configuration upon module initialization
