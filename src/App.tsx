@@ -95,6 +95,16 @@ const MainApp: React.FC = () => {
     void logPageView(location.pathname);
   }, [location.pathname]);
 
+  // Notify native Android wrapper that the app is mounted and ready for presentation
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const nativeSplash = (window as unknown as { NativeSplash?: { notifyAppReady: () => void } }).NativeSplash;
+      if (nativeSplash?.notifyAppReady) {
+        nativeSplash.notifyAppReady();
+      }
+    }
+  }, []);
+
   // Modals
   const [authOpen, setAuthOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);

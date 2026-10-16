@@ -1,5 +1,11 @@
 :root {
   color-scheme: dark light;
+  /* Safe Area Insets (Universal env fallback with Capacitor SystemBars CSS injection) */
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+  --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+
   /* Lichess-inspired Warm Graphite Dark Mode */
   --bg-primary: #161512;
   --bg-secondary: #262421;

@@ -71,7 +71,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Standalone Bot Championship Simulator**: Local CLI tool pitting all 8 AI tiers against each other in multi-tournament brackets with Elo calibration, game notation, and cross-table export.
 - **Interactive Game Analysis Engine**: Post-game Move Quality Distribution table (10 tiers with graphical symbol badges) and player accuracy metrics in the Game Over modal alongside on-demand Web Worker notation review.
 - **9-Digit Alphanumeric Game URLs & Collision Protection**: Canonical Base62 (case-sensitive) 9-character game identifiers with CSPRNG generation, transactional collision prevention, and strict format validation.
-- **Native Mobile Applications**: Android and iOS app editions powered by Capacitor 8 with native hardware haptics.
+- **Native Mobile Applications**: Android and iOS app editions powered by Capacitor 8 with native hardware haptics, edge-to-edge safe area layout, and adaptive splash screens.
 
 ---
 
