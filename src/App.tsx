@@ -13,6 +13,7 @@ import { OrientationLockOverlay } from './components/layout/OrientationLockOverl
 import { InstallModal } from './components/pwa/InstallModal';
 import { QuickPairingGrid } from './components/lobby/QuickPairingGrid';
 import { LobbyTable } from './components/lobby/LobbyTable';
+import { determineTimeCategory } from './components/lobby/lobbyConfig';
 import type { ArenaPlayer } from './components/game/Arena';
 import type { NavigationTab } from './components/layout/navigationTypes';
 import { isPatronUser } from './components/common/PatronBadge';
@@ -37,7 +38,7 @@ const CustomGameModal = lazy(() => import('./components/lobby/CustomGameModal').
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { ELO_CONFIG } from './core/elo/eloConfig';
-import { localBackend, type UserProfile } from './services/firebase/localProvider';
+import { localBackend, type UserProfile, getUserModeElo, getUserModeGamesPlayed } from './services/firebase/localProvider';
 import { logPageView } from './services/firebase/analyticsService';
 
 import { updateUserStats, getOrCreateGuestId } from './services/firebase/authService';
@@ -178,6 +179,7 @@ const MainApp: React.FC = () => {
   // Start a Quick Pair game (Player vs Player) - checks lobby for open game or creates new open room
   const handleStartQuickPair = async (minutes: number, increment: number, isRanked: boolean) => {
     const guestId = getOrCreateGuestId();
+    const category = determineTimeCategory(minutes, increment);
 
     const defaultGuestName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
     const defaultGuestRating = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating;
@@ -187,8 +189,8 @@ const MainApp: React.FC = () => {
       ? {
         id: user.id,
         username: user.username,
-        elo: user.eloRating,
-        gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        elo: getUserModeElo(user, category),
+        gamesPlayed: getUserModeGamesPlayed(user, category),
         isPatron: isDonor,
         hasDonated: isDonor,
         patronTier: user.patronTier,
@@ -276,6 +278,7 @@ const MainApp: React.FC = () => {
     userColor: PieceColor;
   }) => {
     const tier = getBotTier(difficultyLevel);
+    const category = determineTimeCategory(timeControlMinutes, incrementSeconds);
     const botOpponent: ArenaPlayer = {
       id: `bot_level_${difficultyLevel}`,
       username: `SchadaBot - Lvl ${difficultyLevel}`,
@@ -288,7 +291,8 @@ const MainApp: React.FC = () => {
       ? {
         id: user.id,
         username: user.username,
-        elo: user.eloRating,
+        elo: getUserModeElo(user, category),
+        gamesPlayed: getUserModeGamesPlayed(user, category),
         isPatron: isDonor,
         hasDonated: isDonor,
         patronTier: user.patronTier,
@@ -337,6 +341,7 @@ const MainApp: React.FC = () => {
   ) => {
     const guestId = getOrCreateGuestId();
     const { guestName: guestNameKey } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
+    const category = determineTimeCategory(minutes, increment);
 
     const isDonor = isPatronUser(user);
 
@@ -344,8 +349,8 @@ const MainApp: React.FC = () => {
       ? {
         id: user.id,
         username: user.username,
-        elo: user.eloRating,
-        gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        elo: getUserModeElo(user, category),
+        gamesPlayed: getUserModeGamesPlayed(user, category),
         isPatron: isDonor,
         hasDonated: isDonor,
         patronTier: user.patronTier,
@@ -372,8 +377,8 @@ const MainApp: React.FC = () => {
       targetOpponent = {
         id: challengedFriend.id,
         username: challengedFriend.username,
-        elo: challengedFriend.eloRating,
-        gamesPlayed: challengedFriend.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        elo: getUserModeElo(challengedFriend, category),
+        gamesPlayed: getUserModeGamesPlayed(challengedFriend, category),
         isPatron: friendIsDonor,
         hasDonated: friendIsDonor,
         patronTier: challengedFriend.patronTier,
@@ -411,8 +416,23 @@ const MainApp: React.FC = () => {
     const outcome = winner === 'draw' ? 'draw' : winner;
     if (!outcome) return;
 
-    const blueGames = activeMatch.bluePlayer.gamesPlayed ?? (activeMatch.bluePlayer.id === user?.id ? user?.gamesPlayed : undefined) ?? ELO_CONFIG.defaultAssumedGamesPlayed;
-    const greenGames = activeMatch.greenPlayer.gamesPlayed ?? (activeMatch.greenPlayer.id === user?.id ? user?.gamesPlayed : undefined) ?? ELO_CONFIG.defaultAssumedGamesPlayed;
+    const category = determineTimeCategory(
+      activeMatch.timeControlMinutes || 0,
+      activeMatch.incrementSeconds || 0
+    );
+
+    const blueGames =
+      activeMatch.bluePlayer.gamesPlayed ??
+      (activeMatch.bluePlayer.id === user?.id && user
+        ? getUserModeGamesPlayed(user, category)
+        : undefined) ??
+      ELO_CONFIG.defaultAssumedGamesPlayed;
+    const greenGames =
+      activeMatch.greenPlayer.gamesPlayed ??
+      (activeMatch.greenPlayer.id === user?.id && user
+        ? getUserModeGamesPlayed(user, category)
+        : undefined) ??
+      ELO_CONFIG.defaultAssumedGamesPlayed;
 
     // Calculate Elo update
     const eloResult = calculateEloUpdate(
@@ -426,10 +446,22 @@ const MainApp: React.FC = () => {
     const isDraw = outcome === 'draw';
 
     // Update Blue Player (e.g. host user)
-    const updatedBlue = await updateUserStats(activeMatch.bluePlayer.id, blueWon, isDraw, eloResult.blueDelta);
+    const updatedBlue = await updateUserStats(
+      activeMatch.bluePlayer.id,
+      blueWon,
+      isDraw,
+      eloResult.blueDelta,
+      category
+    );
 
     // Update Green Player (e.g. challenged friend or opponent)
-    const updatedGreen = await updateUserStats(activeMatch.greenPlayer.id, greenWon, isDraw, eloResult.greenDelta);
+    const updatedGreen = await updateUserStats(
+      activeMatch.greenPlayer.id,
+      greenWon,
+      isDraw,
+      eloResult.greenDelta,
+      category
+    );
 
     if (user && activeMatch.bluePlayer.id === user.id) {
       refreshUser(updatedBlue);

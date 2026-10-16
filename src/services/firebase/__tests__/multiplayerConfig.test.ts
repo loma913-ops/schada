@@ -189,6 +189,28 @@ describe('MultiplayerScaleConfig validation', () => {
       /Invalid matchmaking.leaderboardCacheTtlMs/
     );
 
+    const invalidBotExcludedPrefixes: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        botExcludedPrefixes: [] as any,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidBotExcludedPrefixes)).toThrowError(
+      /Invalid matchmaking.botExcludedPrefixes/
+    );
+
+    const invalidMinGames: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        minGamesPlayedForLeaderboard: -1,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidMinGames)).toThrowError(
+      /Invalid matchmaking.minGamesPlayedForLeaderboard/
+    );
+
     const missingStorageKeys = {
       ...MULTIPLAYER_SCALE_CONFIG,
       presence: {

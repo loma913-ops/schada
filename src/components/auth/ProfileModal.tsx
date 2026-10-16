@@ -7,6 +7,16 @@ import { SchadaStar } from '@/components/common/SchadaStar';
 import { getPatronStatusDescription } from '@/core/donate/patronService';
 import { useGamePreferences } from '@/context/GamePreferencesContext';
 import { AUTH_CONFIG } from '@/services/firebase/authConfig';
+import { TIME_CONTROL_CATEGORIES, type TimeControlCategory } from '@/components/lobby/lobbyConfig';
+import { getUserModeStats } from '@/services/firebase/localProvider';
+
+const MODE_DISPLAY_INFO: Record<TimeControlCategory, { label: string; icon: string }> = {
+  bullet: { label: 'Bullet', icon: '⚡' },
+  blitz: { label: 'Blitz', icon: '🔥' },
+  rapid: { label: 'Rapid', icon: '⏱️' },
+  classical: { label: 'Classical', icon: '♟️' },
+  correspondence: { label: 'Correspondence', icon: '✉️' },
+};
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -31,9 +41,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!isOpen || !user) return null;
-
-  const winRate =
-    user.gamesPlayed > 0 ? Math.round((user.gamesWon / user.gamesPlayed) * 100) : 0;
 
   const handleUpdateUsername = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,9 +138,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {user.email}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                  Rating: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-gold)' }}>{user.eloRating}</span>
-                </div>
               </div>
             </div>
             <div style={{ flexShrink: 0, alignSelf: 'flex-start' }}>
@@ -202,37 +206,133 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           )}
         </div>
 
-        {/* Statistics Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '0.5rem',
-            textAlign: 'center',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <div style={{ background: 'var(--bg-tertiary)', padding: '0.6rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{user.gamesPlayed}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>PLAYED</div>
+        {/* Per-Mode Ratings & Statistics */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div
+            style={{
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              color: 'var(--text-muted)',
+              marginBottom: '0.6rem',
+            }}
+          >
+            Ratings & Performance
           </div>
-          <div style={{ background: 'var(--bg-tertiary)', padding: '0.6rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-green)' }}>
-              {user.gamesWon}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>WON</div>
-          </div>
-          <div style={{ background: 'var(--bg-tertiary)', padding: '0.6rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-red)' }}>
-              {user.gamesLost}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>LOST</div>
-          </div>
-          <div style={{ background: 'var(--bg-tertiary)', padding: '0.6rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-blue)' }}>
-              {winRate}%
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>WIN %</div>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.45rem',
+            }}
+          >
+            {TIME_CONTROL_CATEGORIES.map((category) => {
+              const stats = getUserModeStats(user, category);
+              const modeWinRate =
+                stats.gamesPlayed > 0
+                  ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
+                  : 0;
+              const modeLossRate =
+                stats.gamesPlayed > 0
+                  ? Math.round((stats.gamesLost / stats.gamesPlayed) * 100)
+                  : 0;
+              const info = MODE_DISPLAY_INFO[category];
+
+              return (
+                <div
+                  key={category}
+                  style={{
+                    backgroundColor: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '0.6rem 0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.35rem',
+                  }}
+                >
+                  {/* Internal Row 1: Left: Mode; Right: Elo score */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                      }}
+                    >
+                      <span aria-hidden="true" style={{ fontSize: '1rem', lineHeight: 1 }}>
+                        {info.icon}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '0.9rem',
+                          fontWeight: 700,
+                          color: 'var(--text-primary)',
+                        }}
+                      >
+                        {info.label}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '1.15rem',
+                        fontWeight: 800,
+                        color: 'var(--accent-gold)',
+                      }}
+                    >
+                      {stats.elo}
+                    </div>
+                  </div>
+
+                  {/* Internal Row 2: Left: Games Played; Center: Record breakdown (W/L/D); Right: Win % and Loss % */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.74rem',
+                      color: 'var(--text-muted)',
+                      borderTop: '1px solid var(--border-subtle)',
+                      paddingTop: '0.35rem',
+                      gap: '0.35rem',
+                    }}
+                  >
+                    <div style={{ flex: '1 1 0', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                      Played:{' '}
+                      <strong style={{ color: 'var(--text-primary)' }}>
+                        {stats.gamesPlayed}
+                      </strong>
+                    </div>
+
+                    <div style={{ flex: '0 0 auto', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <span style={{ color: 'var(--accent-green)', fontWeight: 600 }}>{stats.gamesWon}W</span>{' '}
+                      · <span style={{ color: 'var(--accent-red)', fontWeight: 600 }}>{stats.gamesLost}L</span>{' '}
+                      · <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{stats.gamesDrawn}D</span>
+                    </div>
+
+                    <div style={{ flex: '1 1 0', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      Win:{' '}
+                      <strong style={{ color: 'var(--accent-blue)' }}>
+                        {modeWinRate}%
+                      </strong>{' '}
+                      · Loss:{' '}
+                      <strong style={{ color: 'var(--accent-red)' }}>
+                        {modeLossRate}%
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -472,7 +572,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                   lineHeight: '1.4',
                 }}
               >
-                <strong>Warning:</strong> Account deletion is immediate and permanent. Your rating ({user.eloRating}) and record will be erased, and the username "{user.username}" will become available to others.
+                <strong>Warning:</strong> Account deletion is immediate and permanent. Your ratings and match records will be erased, and the username "{user.username}" will become available to others.
               </div>
 
               {deleteError && (

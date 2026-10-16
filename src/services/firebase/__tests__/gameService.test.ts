@@ -940,6 +940,9 @@ describe('GameService Multiplayer Sync', () => {
     expect(updatedProfile?.gamesPlayed).toBe(1);
     expect(updatedProfile?.gamesLost).toBe(1);
     expect(updatedProfile?.eloRating).toBeLessThan(user1.eloRating);
+    expect(updatedProfile?.perModeStats?.blitz.elo).toBeLessThan(1200);
+    expect(updatedProfile?.perModeStats?.blitz.gamesPlayed).toBe(1);
+    expect(updatedProfile?.perModeStats?.blitz.gamesLost).toBe(1);
 
     // Now test unranked game
     const user2 = await registerUser('casual_resigner@example.com', 'password123', 'CasualResigner');
@@ -959,6 +962,8 @@ describe('GameService Multiplayer Sync', () => {
     expect(unrankedUpdated?.gamesPlayed).toBe(1);
     expect(unrankedUpdated?.gamesLost).toBe(1);
     expect(unrankedUpdated?.eloRating).toBe(user2.eloRating); // Unchanged in casual game
+    expect(unrankedUpdated?.perModeStats?.blitz.gamesPlayed).toBe(1);
+    expect(unrankedUpdated?.perModeStats?.blitz.elo).toBe(1200);
   });
 
   it('updates stats and returns UserProfile when timing out in ranked and unranked games', async () => {
@@ -979,6 +984,8 @@ describe('GameService Multiplayer Sync', () => {
     expect(updatedProfile?.gamesPlayed).toBe(1);
     expect(updatedProfile?.gamesLost).toBe(1);
     expect(updatedProfile?.eloRating).toBeLessThan(user1.eloRating);
+    expect(updatedProfile?.perModeStats?.blitz.elo).toBeLessThan(1200);
+    expect(updatedProfile?.perModeStats?.blitz.gamesPlayed).toBe(1);
 
     // Now test unranked timeout
     const user2 = await registerUser('casual_timeout@example.com', 'password123', 'CasualTimeout');
@@ -998,6 +1005,8 @@ describe('GameService Multiplayer Sync', () => {
     expect(unrankedUpdated?.gamesPlayed).toBe(1);
     expect(unrankedUpdated?.gamesLost).toBe(1);
     expect(unrankedUpdated?.eloRating).toBe(user2.eloRating);
+    expect(unrankedUpdated?.perModeStats?.blitz.gamesPlayed).toBe(1);
+    expect(unrankedUpdated?.perModeStats?.blitz.elo).toBe(1200);
   });
 
   it('preserves immutable initial ratings in computeRankedGameEloResult', async () => {

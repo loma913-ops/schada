@@ -22,6 +22,14 @@ export type TimeControlCategory =
   | 'classical'
   | 'correspondence';
 
+export const TIME_CONTROL_CATEGORIES: readonly TimeControlCategory[] = Object.freeze([
+  'bullet',
+  'blitz',
+  'rapid',
+  'classical',
+  'correspondence',
+]);
+
 export interface LobbyFilterState {
   readonly timeControls: {
     readonly bullet: boolean;

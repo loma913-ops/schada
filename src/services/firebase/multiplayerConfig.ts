@@ -63,6 +63,8 @@ export interface MatchmakingConfig {
   readonly friendBatchLookupSize: number;
   readonly leaderboardLimit: number;
   readonly leaderboardCacheTtlMs: number;
+  readonly botExcludedPrefixes: readonly string[];
+  readonly minGamesPlayedForLeaderboard: number;
   readonly clockSyncJitterThresholdMs: number;
   readonly reconcileEloBatchLimit: number;
   readonly guestRankedErrorMessage: string;
@@ -403,6 +405,26 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
+  if (
+    !Array.isArray(matchmaking.botExcludedPrefixes) ||
+    matchmaking.botExcludedPrefixes.length === 0 ||
+    matchmaking.botExcludedPrefixes.some((p) => typeof p !== 'string' || p.trim().length === 0)
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.botExcludedPrefixes: expected non-empty array of strings, received ${JSON.stringify(matchmaking.botExcludedPrefixes)}.`
+    );
+  }
+
+  if (
+    typeof matchmaking.minGamesPlayedForLeaderboard !== 'number' ||
+    matchmaking.minGamesPlayedForLeaderboard < 0 ||
+    !Number.isInteger(matchmaking.minGamesPlayedForLeaderboard)
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.minGamesPlayedForLeaderboard: expected non-negative integer, received ${matchmaking.minGamesPlayedForLeaderboard}.`
+    );
+  }
+
   if (typeof matchmaking.clockSyncJitterThresholdMs !== 'number' || matchmaking.clockSyncJitterThresholdMs <= 0) {
     throw new MultiplayerConfigError(
       `Invalid matchmaking.clockSyncJitterThresholdMs: expected positive number, received ${matchmaking.clockSyncJitterThresholdMs}.`
@@ -587,6 +609,8 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     friendBatchLookupSize: 30,
     leaderboardLimit: 50,
     leaderboardCacheTtlMs: 5 * 60 * 1000,
+    botExcludedPrefixes: Object.freeze(['guest_', 'mock-', 'bot_']),
+    minGamesPlayedForLeaderboard: 1,
     clockSyncJitterThresholdMs: 1500,
     reconcileEloBatchLimit: 5,
     guestRankedErrorMessage: 'Guests cannot play in ranked games. Please sign in to play ranked matches.',

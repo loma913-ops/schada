@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Navbar } from '../Navbar';
 
-// Mock contexts
+const mockUseAuth = vi.fn();
 vi.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({ user: null, isLoading: false }),
+  useAuth: () => mockUseAuth(),
 }));
 
 vi.mock('@/context/ThemeContext', () => ({
@@ -14,6 +14,7 @@ vi.mock('@/context/ThemeContext', () => ({
 describe('Navbar Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: null, isLoading: false });
   });
 
   it('renders navbar brand, tabs, and sign in button', () => {
@@ -48,5 +49,35 @@ describe('Navbar Component', () => {
 
     expect(html).not.toContain('install-btn');
     expect(html).not.toContain('Install App');
+  });
+
+  it('renders profile button without static elo badge when user is authenticated', () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        id: 'user_1',
+        username: 'TestUser',
+        eloRating: 1450,
+        status: 'online',
+        gamesPlayed: 10,
+        gamesWon: 5,
+        gamesLost: 5,
+        usernameChangeCount: 0,
+      },
+      isLoading: false,
+    });
+
+    const html = renderToStaticMarkup(
+      <Navbar
+        currentTab="play"
+        onSelectTab={vi.fn()}
+        onOpenAuth={vi.fn()}
+        onOpenProfile={vi.fn()}
+        onOpenFriends={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('nav-profile-btn');
+    expect(html).not.toContain('nav-user-elo');
+    expect(html).not.toContain('1450');
   });
 });

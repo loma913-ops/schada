@@ -9,6 +9,8 @@ import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
 import { useNavigate } from 'react-router-dom';
 import { isPatronUser } from '@/components/common/PatronBadge';
 import { isGuestUser } from '@/services/firebase/gameTypes';
+import { determineTimeCategory } from './lobbyConfig';
+import { getUserModeElo, getUserModeGamesPlayed } from '@/services/firebase/localProvider';
 
 interface CreateRoomModalProps {
   isOpen: boolean;
@@ -44,13 +46,14 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
           : MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
 
       const isDonor = isPatronUser(user);
+      const category = determineTimeCategory(timeControl, increment);
 
       const creator = user
         ? {
             id: user.id,
             username: user.username,
-            elo: user.eloRating,
-            gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+            elo: getUserModeElo(user, category),
+            gamesPlayed: getUserModeGamesPlayed(user, category),
             isPatron: isDonor,
             hasDonated: isDonor,
             patronTier: user.patronTier,

@@ -12,6 +12,46 @@
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "perModeStats.bullet.elo", "order": "DESCENDING" },
+        { "fieldPath": "perModeStats.bullet.gamesPlayed", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "perModeStats.blitz.elo", "order": "DESCENDING" },
+        { "fieldPath": "perModeStats.blitz.gamesPlayed", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "perModeStats.rapid.elo", "order": "DESCENDING" },
+        { "fieldPath": "perModeStats.rapid.gamesPlayed", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "perModeStats.classical.elo", "order": "DESCENDING" },
+        { "fieldPath": "perModeStats.classical.gamesPlayed", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "perModeStats.correspondence.elo", "order": "DESCENDING" },
+        { "fieldPath": "perModeStats.correspondence.gamesPlayed", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "lastSeen", "order": "DESCENDING" }
       ]

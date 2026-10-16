@@ -15,7 +15,7 @@ import type { UserProfile } from './localProvider';
 import { safeSetItem } from '../storage/storageCleanup';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { isPatronUser } from '@/components/common/PatronBadge';
-import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
+import { LOBBY_CONFIG, determineTimeCategory, type TimeControlCategory } from '@/components/lobby/lobbyConfig';
 import { SECURITY_CONFIG } from '@/core/security/securityConfig';
 import {
   getSecureRandomString,
@@ -481,6 +481,7 @@ export async function resignGameAction(
       let resigningPlayerId: string | null = null;
       let resigningDelta = 0;
       let isRankedGame = false;
+      let gameCategory: TimeControlCategory = 'blitz';
 
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(docRef);
@@ -489,6 +490,7 @@ export async function resignGameAction(
         const game = snap.data() as GameRoom;
         if (game.status !== 'in_progress') return;
 
+        gameCategory = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
         const transition = computeResignTransition(game, resigningColor);
         resigningPlayerId = transition.resigningPlayerId;
         resigningDelta = transition.resigningDelta;
@@ -503,7 +505,8 @@ export async function resignGameAction(
             resigningPlayerId,
             false,
             false,
-            isRankedGame ? resigningDelta : 0
+            isRankedGame ? resigningDelta : 0,
+            gameCategory
           );
           await markGameEloProcessed(gameId, resigningPlayerId);
           return updated;
@@ -517,6 +520,7 @@ export async function resignGameAction(
     const game = localGameStore.getRaw(gameId);
     if (!game || game.status !== 'in_progress') return null;
 
+    const gameCategory = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
     const transition = computeResignTransition(game, resigningColor);
     localGameStore.set({ ...game, ...transition.updatePayload });
 
@@ -526,7 +530,8 @@ export async function resignGameAction(
           transition.winningPlayerId,
           true,
           false,
-          transition.isRanked ? transition.winningDelta : 0
+          transition.isRanked ? transition.winningDelta : 0,
+          gameCategory
         );
         await markGameEloProcessed(gameId, transition.winningPlayerId);
       } catch (e) {
@@ -540,7 +545,8 @@ export async function resignGameAction(
           transition.resigningPlayerId,
           false,
           false,
-          transition.isRanked ? transition.resigningDelta : 0
+          transition.isRanked ? transition.resigningDelta : 0,
+          gameCategory
         );
         await markGameEloProcessed(gameId, transition.resigningPlayerId);
         return updated;
@@ -569,6 +575,7 @@ export async function timeoutGameAction(
       let timeoutWinnerPlayerId: string | null = null;
       let timeoutWinnerDelta = 0;
       let isRankedGame = false;
+      let gameCategory: TimeControlCategory = 'blitz';
 
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(docRef);
@@ -577,6 +584,7 @@ export async function timeoutGameAction(
         const game = snap.data() as GameRoom;
         if (game.status !== 'in_progress') return;
 
+        gameCategory = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
         const callerId = auth?.currentUser?.uid;
         const transition = computeTimeoutTransition(game, timedOutColor, callerId);
         timedOutPlayerId = transition.timedOutPlayerId;
@@ -594,7 +602,8 @@ export async function timeoutGameAction(
             timeoutWinnerPlayerId,
             true,
             false,
-            isRankedGame ? timeoutWinnerDelta : 0
+            isRankedGame ? timeoutWinnerDelta : 0,
+            gameCategory
           );
           await markGameEloProcessed(gameId, timeoutWinnerPlayerId);
           return updated;
@@ -609,7 +618,8 @@ export async function timeoutGameAction(
             timedOutPlayerId,
             false,
             false,
-            isRankedGame ? timedOutDelta : 0
+            isRankedGame ? timedOutDelta : 0,
+            gameCategory
           );
           await markGameEloProcessed(gameId, timedOutPlayerId);
           return updated;
@@ -623,6 +633,7 @@ export async function timeoutGameAction(
     const game = localGameStore.getRaw(gameId);
     if (!game || game.status !== 'in_progress') return null;
 
+    const gameCategory = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
     const transition = computeTimeoutTransition(game, timedOutColor);
     localGameStore.set({ ...game, ...transition.updatePayload });
 
@@ -632,7 +643,8 @@ export async function timeoutGameAction(
           transition.timeoutWinnerPlayerId,
           true,
           false,
-          transition.isRanked ? transition.timeoutWinnerDelta : 0
+          transition.isRanked ? transition.timeoutWinnerDelta : 0,
+          gameCategory
         );
         await markGameEloProcessed(gameId, transition.timeoutWinnerPlayerId);
       } catch (e) {
@@ -646,7 +658,8 @@ export async function timeoutGameAction(
           transition.timedOutPlayerId,
           false,
           false,
-          transition.isRanked ? transition.timedOutDelta : 0
+          transition.isRanked ? transition.timedOutDelta : 0,
+          gameCategory
         );
         await markGameEloProcessed(gameId, transition.timedOutPlayerId);
         return updated;
@@ -746,6 +759,7 @@ export async function abandonGameDueToDisconnectAction(
       let winnerPlayerId: string | null = null;
       let winnerDelta = 0;
       let isRankedGame = false;
+      let gameCategory: TimeControlCategory = 'blitz';
 
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(docRef);
@@ -760,6 +774,7 @@ export async function abandonGameDueToDisconnectAction(
           return;
         }
 
+        gameCategory = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
         const callerId = auth?.currentUser?.uid;
         const transition = computeAbandonmentTransition(game, abandonedColor, callerId);
         abandonedPlayerId = transition.abandonedPlayerId;
@@ -777,7 +792,8 @@ export async function abandonGameDueToDisconnectAction(
             winnerPlayerId,
             true,
             false,
-            isRankedGame ? winnerDelta : 0
+            isRankedGame ? winnerDelta : 0,
+            gameCategory
           );
           await markGameEloProcessed(gameId, winnerPlayerId);
           return updated;
@@ -792,7 +808,8 @@ export async function abandonGameDueToDisconnectAction(
             abandonedPlayerId,
             false,
             false,
-            isRankedGame ? abandonedDelta : 0
+            isRankedGame ? abandonedDelta : 0,
+            gameCategory
           );
           await markGameEloProcessed(gameId, abandonedPlayerId);
           return updated;
@@ -813,6 +830,7 @@ export async function abandonGameDueToDisconnectAction(
       return null;
     }
 
+    const gameCategory = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
     const transition = computeAbandonmentTransition(game, abandonedColor);
     localGameStore.set({ ...game, ...transition.updatePayload });
 
@@ -822,7 +840,8 @@ export async function abandonGameDueToDisconnectAction(
           transition.winnerPlayerId,
           true,
           false,
-          transition.isRanked ? transition.winnerDelta : 0
+          transition.isRanked ? transition.winnerDelta : 0,
+          gameCategory
         );
         await markGameEloProcessed(gameId, transition.winnerPlayerId);
       } catch (e) {
@@ -836,7 +855,8 @@ export async function abandonGameDueToDisconnectAction(
           transition.abandonedPlayerId,
           false,
           false,
-          transition.isRanked ? transition.abandonedDelta : 0
+          transition.isRanked ? transition.abandonedDelta : 0,
+          gameCategory
         );
         await markGameEloProcessed(gameId, transition.abandonedPlayerId);
         return updated;

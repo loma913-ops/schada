@@ -89,6 +89,14 @@ export function validateLocalConfig(config: LocalConfig): void {
     if (!user || user.id !== id || typeof user.username !== 'string' || typeof user.eloRating !== 'number') {
       throw new LocalConfigError(`Invalid defaultUsers entry for "${id}": malformed UserProfile.`);
     }
+    if (user.perModeStats) {
+      for (const mode of ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'] as const) {
+        const ms = user.perModeStats[mode];
+        if (!ms || typeof ms.elo !== 'number' || typeof ms.gamesPlayed !== 'number') {
+          throw new LocalConfigError(`Invalid defaultUsers entry for "${id}": malformed perModeStats.${mode}.`);
+        }
+      }
+    }
   }
 }
 
@@ -113,6 +121,13 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
       usernameLower: 'schadagrandmaster',
       usernameChangeCount: 0,
       eloRating: 1650,
+      perModeStats: Object.freeze({
+        bullet: Object.freeze({ elo: 1620, gamesPlayed: 10, gamesWon: 7, gamesLost: 2, gamesDrawn: 1 }),
+        blitz: Object.freeze({ elo: 1650, gamesPlayed: 20, gamesWon: 16, gamesLost: 3, gamesDrawn: 1 }),
+        rapid: Object.freeze({ elo: 1680, gamesPlayed: 12, gamesWon: 9, gamesLost: 2, gamesDrawn: 1 }),
+        classical: Object.freeze({ elo: 1700, gamesPlayed: 4, gamesWon: 3, gamesLost: 0, gamesDrawn: 1 }),
+        correspondence: Object.freeze({ elo: 1600, gamesPlayed: 2, gamesWon: 1, gamesLost: 1, gamesDrawn: 0 }),
+      }),
       gamesPlayed: 48,
       gamesWon: 36,
       gamesLost: 8,
@@ -129,6 +144,13 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
       usernameLower: 'boogerd1936',
       usernameChangeCount: 0,
       eloRating: 1420,
+      perModeStats: Object.freeze({
+        bullet: Object.freeze({ elo: 1400, gamesPlayed: 5, gamesWon: 3, gamesLost: 2, gamesDrawn: 0 }),
+        blitz: Object.freeze({ elo: 1420, gamesPlayed: 12, gamesWon: 8, gamesLost: 3, gamesDrawn: 1 }),
+        rapid: Object.freeze({ elo: 1450, gamesPlayed: 6, gamesWon: 4, gamesLost: 1, gamesDrawn: 1 }),
+        classical: Object.freeze({ elo: 1460, gamesPlayed: 2, gamesWon: 1, gamesLost: 1, gamesDrawn: 0 }),
+        correspondence: Object.freeze({ elo: 1400, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
+      }),
       gamesPlayed: 25,
       gamesWon: 16,
       gamesLost: 7,
@@ -143,6 +165,13 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
       usernameLower: 'boardmaster',
       usernameChangeCount: 1,
       eloRating: 1220,
+      perModeStats: Object.freeze({
+        bullet: Object.freeze({ elo: 1200, gamesPlayed: 2, gamesWon: 1, gamesLost: 1, gamesDrawn: 0 }),
+        blitz: Object.freeze({ elo: 1220, gamesPlayed: 5, gamesWon: 3, gamesLost: 2, gamesDrawn: 0 }),
+        rapid: Object.freeze({ elo: 1240, gamesPlayed: 2, gamesWon: 1, gamesLost: 1, gamesDrawn: 0 }),
+        classical: Object.freeze({ elo: 1200, gamesPlayed: 1, gamesWon: 0, gamesLost: 0, gamesDrawn: 1 }),
+        correspondence: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
+      }),
       gamesPlayed: 10,
       gamesWon: 5,
       gamesLost: 4,
@@ -157,6 +186,13 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
       usernameLower: 'mutagenicpixels',
       usernameChangeCount: 0,
       eloRating: 1200,
+      perModeStats: Object.freeze({
+        bullet: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
+        blitz: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
+        rapid: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
+        classical: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
+        correspondence: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
+      }),
       gamesPlayed: 0,
       gamesWon: 0,
       gamesLost: 0,

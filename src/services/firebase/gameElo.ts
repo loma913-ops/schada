@@ -17,6 +17,7 @@ import type { UserProfile } from './localProvider';
 import type { PieceColor } from '@/core/schada/types';
 import { type GameRoom, type GameEloResult, isGuestUser } from './gameTypes';
 import { localGameStore } from './localGameStore';
+import { determineTimeCategory } from '@/components/lobby/lobbyConfig';
 
 /**
  * Computes ranked Elo update for both players upon game completion.
@@ -188,9 +189,10 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
 
           const eloRes = game.eloResult || computeRankedGameEloResult(game, winner);
           const delta = eloRes ? (myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta) : 0;
+          const category = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
 
           try {
-            const updated = await updateUserStats(userId, won, isDraw, delta);
+            const updated = await updateUserStats(userId, won, isDraw, delta, category);
             if (updated) {
               latestProfile = updated;
             }
@@ -225,9 +227,10 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
 
       const eloRes = game.eloResult || computeRankedGameEloResult(game, winner);
       const delta = eloRes ? (myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta) : 0;
+      const category = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
 
       try {
-        const updated = await updateUserStats(userId, won, isDraw, delta);
+        const updated = await updateUserStats(userId, won, isDraw, delta, category);
         if (updated) {
           latestProfile = updated;
         }

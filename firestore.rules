@@ -31,7 +31,7 @@ service cloud.firestore {
         request.resource.data.gamesDrawn == 0;
       allow update: if isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'lastSeen', 'eloRating', 'gamesPlayed', 'gamesWon', 'gamesLost', 'gamesDrawn',
+          'status', 'lastSeen', 'eloRating', 'perModeStats', 'gamesPlayed', 'gamesWon', 'gamesLost', 'gamesDrawn',
           'username', 'usernameLower', 'usernameChangeCount', 'updatedAt', 'email'
         ]) &&
         // Constrain username changes to at most 1

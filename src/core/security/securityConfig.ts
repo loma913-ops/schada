@@ -337,6 +337,7 @@ export const SECURITY_CONFIG: SecurityConfig = Object.freeze({
     'status',
     'lastSeen',
     'eloRating',
+    'perModeStats',
     'gamesPlayed',
     'gamesWon',
     'gamesLost',

@@ -53,6 +53,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Optimized Multiplayer Synchronization & Move Pipeline**: 0ms optimistic local moves, atomic multi-tab broadcast sync, automatic live position advancement, and non-disruptive unread move notifications.
 - **Cross-Platform Hybrid Audio Engine**: Web Audio API with immediate transient attack playback, realistic synthesized fallbacks, and zero-latency desktop and mobile sound.
 - **Authoritative Symmetrical Elo Engine**: Immutable initial/final Elo ratings and deltas stored in match documents for symmetrical cross-client synchronization.
+- **Per-Mode Elo & Performance Statistics**: Independent Elo ratings and match records for Bullet, Blitz, Rapid, Classical, and Correspondence modes across in-game play, profiles, and human-only leaderboards with instant stale-while-revalidate local caching.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
 - **Zero-Cache Deployment & Session Recovery**: Immediate cache bypass, background service worker updates, and seamless auto-recovery without hard reload.
 - **Optimized Firestore CRUD Architecture**: Composite index-aligned FIFO lobby/matchmaking queries, localStorage SWR leaderboard cache with immediate Elo-change invalidation, in-memory friends profile and username search caches, time-bounded cleanup queries, and self-healing ordered Elo reconciliation with automatic fallback.

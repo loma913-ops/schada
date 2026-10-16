@@ -18,6 +18,128 @@ import {
   isPatronActive,
 } from '@/core/donate/patronService';
 import { generateLocalUserId, generateFriendRequestId } from '@/core/security/cryptoUtils';
+import { type TimeControlCategory, TIME_CONTROL_CATEGORIES } from '@/components/lobby/lobbyConfig';
+
+export interface ModeStats {
+  elo: number;
+  gamesPlayed: number;
+  gamesWon: number;
+  gamesLost: number;
+  gamesDrawn: number;
+}
+
+export type PerModeStats = Record<TimeControlCategory, ModeStats>;
+
+export function createDefaultModeStats(startingElo: number = ELO_CONFIG.defaultStartingRating): ModeStats {
+  return {
+    elo: startingElo,
+    gamesPlayed: 0,
+    gamesWon: 0,
+    gamesLost: 0,
+    gamesDrawn: 0,
+  };
+}
+
+export function createDefaultPerModeStats(startingElo: number = ELO_CONFIG.defaultStartingRating): PerModeStats {
+  return {
+    bullet: createDefaultModeStats(startingElo),
+    blitz: createDefaultModeStats(startingElo),
+    rapid: createDefaultModeStats(startingElo),
+    classical: createDefaultModeStats(startingElo),
+    correspondence: createDefaultModeStats(startingElo),
+  };
+}
+
+export function ensurePerModeStats(
+  existing?: Partial<PerModeStats> | null,
+  fallbackElo: number = ELO_CONFIG.defaultStartingRating
+): PerModeStats {
+  const defaults = createDefaultPerModeStats(fallbackElo);
+  if (!existing || typeof existing !== 'object') {
+    return defaults;
+  }
+  const result = { ...defaults };
+  for (const cat of TIME_CONTROL_CATEGORIES) {
+    const s = existing[cat];
+    if (s && typeof s === 'object') {
+      result[cat] = {
+        elo: typeof s.elo === 'number' && Number.isFinite(s.elo) ? Math.max(ELO_CONFIG.minimumRating, s.elo) : fallbackElo,
+        gamesPlayed: typeof s.gamesPlayed === 'number' && s.gamesPlayed >= 0 ? s.gamesPlayed : 0,
+        gamesWon: typeof s.gamesWon === 'number' && s.gamesWon >= 0 ? s.gamesWon : 0,
+        gamesLost: typeof s.gamesLost === 'number' && s.gamesLost >= 0 ? s.gamesLost : 0,
+        gamesDrawn: typeof s.gamesDrawn === 'number' && s.gamesDrawn >= 0 ? s.gamesDrawn : 0,
+      };
+    }
+  }
+  return result;
+}
+
+export function getUserModeStats(
+  user: Pick<UserProfile, 'perModeStats' | 'eloRating'> | null | undefined,
+  category: TimeControlCategory
+): ModeStats {
+  if (!user) {
+    return createDefaultModeStats();
+  }
+  if (user.perModeStats && user.perModeStats[category]) {
+    return user.perModeStats[category];
+  }
+  return createDefaultModeStats(ELO_CONFIG.defaultStartingRating);
+}
+
+export function getUserModeElo(
+  user: Pick<UserProfile, 'perModeStats' | 'eloRating'> | null | undefined,
+  category: TimeControlCategory
+): number {
+  return getUserModeStats(user, category).elo;
+}
+
+export function getUserModeGamesPlayed(
+  user: Pick<UserProfile, 'perModeStats' | 'eloRating'> | null | undefined,
+  category: TimeControlCategory
+): number {
+  return getUserModeStats(user, category).gamesPlayed;
+}
+
+/**
+ * Evaluates whether a user account represents an authentic human player eligible for leaderboard ranking.
+ *
+ * Eligibility Criteria:
+ * 1. Must be a valid UserProfile with a non-empty string ID and non-empty username.
+ * 2. ID must NOT start with any prefix defined in MULTIPLAYER_SCALE_CONFIG.matchmaking.botExcludedPrefixes ('guest_', 'mock-', 'bot_').
+ * 3. Must have completed at least MULTIPLAYER_SCALE_CONFIG.matchmaking.minGamesPlayedForLeaderboard games
+ *    in the specified time control category.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(P) where P is the length of botExcludedPrefixes (P = 3, strictly O(1) constant time).
+ * - Auxiliary Space Complexity: O(1) constant memory.
+ * - Growth Rate: Constant O(1) scale invariant.
+ *
+ * @param user The user profile to evaluate.
+ * @param category The active time control category.
+ * @returns True if the user is a human player with qualifying rated matches in the category.
+ */
+export function isHumanLeaderboardEligible(
+  user: UserProfile | null | undefined,
+  category: TimeControlCategory
+): boolean {
+  if (!user || typeof user.id !== 'string' || user.id.trim().length === 0) {
+    return false;
+  }
+  if (typeof user.username !== 'string' || user.username.trim().length === 0) {
+    return false;
+  }
+
+  const prefixes = MULTIPLAYER_SCALE_CONFIG.matchmaking.botExcludedPrefixes;
+  for (const prefix of prefixes) {
+    if (user.id.startsWith(prefix)) {
+      return false;
+    }
+  }
+
+  const gamesPlayed = getUserModeGamesPlayed(user, category);
+  return gamesPlayed >= MULTIPLAYER_SCALE_CONFIG.matchmaking.minGamesPlayedForLeaderboard;
+}
 
 export interface UserProfile {
   id: string;
@@ -26,6 +148,7 @@ export interface UserProfile {
   usernameLower: string;
   usernameChangeCount: number; // 0 initially; max 1 edit allowed
   eloRating: number;
+  perModeStats?: PerModeStats;
   gamesPlayed: number;
   gamesWon: number;
   gamesLost: number;
@@ -299,6 +422,7 @@ class LocalBackend {
       usernameLower,
       usernameChangeCount: 0,
       eloRating: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
+      perModeStats: createDefaultPerModeStats(),
       gamesPlayed: 0,
       gamesWon: 0,
       gamesLost: 0,
@@ -446,7 +570,13 @@ class LocalBackend {
    * Growth Rate:
    * - O(U) linear with respect to local cached users; for individual user lookup and mutation it is O(1).
    */
-  public updateStats(userId: string, won: boolean, isDraw: boolean, eloDelta: number): void {
+  public updateStats(
+    userId: string,
+    won: boolean,
+    isDraw: boolean,
+    eloDelta: number,
+    category: TimeControlCategory = 'blitz'
+  ): void {
     const users = this.getUsers();
     const u = users[userId];
     if (!u) return;
@@ -460,6 +590,18 @@ class LocalBackend {
       u.gamesLost += 1;
     }
     u.eloRating = Math.max(ELO_CONFIG.minimumRating, u.eloRating + eloDelta);
+
+    u.perModeStats = ensurePerModeStats(u.perModeStats, u.eloRating);
+    const m = u.perModeStats[category];
+    m.gamesPlayed += 1;
+    if (isDraw) {
+      m.gamesDrawn += 1;
+    } else if (won) {
+      m.gamesWon += 1;
+    } else {
+      m.gamesLost += 1;
+    }
+    m.elo = Math.max(ELO_CONFIG.minimumRating, m.elo + eloDelta);
 
     users[userId] = u;
     this.saveUsers(users);
@@ -568,7 +710,7 @@ class LocalBackend {
   }
 
   /**
-   * Returns a leaderboard sorted by Elo rating in descending order.
+   * Returns a leaderboard sorted by mode Elo rating in descending order.
    *
    * Algorithmic Complexity:
    * - Time Complexity: O(U log U) comparison sort where U is user count.
@@ -577,9 +719,19 @@ class LocalBackend {
    * Growth Rate:
    * - O(U log U) log-linear with respect to user count.
    */
-  public getLeaderboard(): UserProfile[] {
+  public getLeaderboard(category: TimeControlCategory = 'blitz'): UserProfile[] {
     const users = this.getUsers();
-    return Object.values(users).sort((a, b) => b.eloRating - a.eloRating);
+    return Object.values(users)
+      .map((u) => ({
+        ...u,
+        perModeStats: ensurePerModeStats(u.perModeStats, u.eloRating),
+      }))
+      .filter((u) => isHumanLeaderboardEligible(u, category))
+      .sort((a, b) => {
+        const diff = b.perModeStats[category].elo - a.perModeStats[category].elo;
+        if (diff !== 0) return diff;
+        return b.perModeStats[category].gamesPlayed - a.perModeStats[category].gamesPlayed;
+      });
   }
 
   // Friend Requests

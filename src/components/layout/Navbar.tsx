@@ -159,19 +159,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               title={`Status: ${user.status}`}
             />
             <User size={15} color="var(--accent-gold)" />
-            <span
-              className="nav-user-elo"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '0.8rem',
-                color: 'var(--accent-gold)',
-                background: 'var(--accent-gold-subtle)',
-                padding: '1px 6px',
-                borderRadius: '4px',
-              }}
-            >
-              {user.eloRating}
-            </span>
           </button>
         ) : isLoading ? (
           <div

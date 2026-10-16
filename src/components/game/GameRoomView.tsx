@@ -29,7 +29,8 @@ import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { updateUserStats, getOrCreateGuestId } from '@/services/firebase/authService';
 import { setActivityContext } from '@/services/firebase/presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
-import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
+import { LOBBY_CONFIG, determineTimeCategory } from '@/components/lobby/lobbyConfig';
+import { getUserModeElo, getUserModeGamesPlayed } from '@/services/firebase/localProvider';
 import { safeSetItem } from '@/services/storage/storageCleanup';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { isGuestUser } from '@/services/firebase/gameTypes';
@@ -207,14 +208,15 @@ export const GameRoomView: React.FC = () => {
     }
 
     const isDonor = isPatronUser(user);
+    const category = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
 
     // Auto join with either authenticated account or confirmed guest name
     const joinUser = user
       ? {
         id: user.id,
         username: user.username,
-        elo: user.eloRating,
-        gamesPlayed: user.gamesPlayed,
+        elo: getUserModeElo(user, category),
+        gamesPlayed: getUserModeGamesPlayed(user, category),
         isPatron: isDonor,
         hasDonated: isDonor,
         patronTier: user.patronTier,
@@ -466,9 +468,11 @@ export const GameRoomView: React.FC = () => {
         }
       }
 
+      const category = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
+
       const updatePromise = (async () => {
         try {
-          const updatedProfile = await updateUserStats(user.id, won, isDraw, delta);
+          const updatedProfile = await updateUserStats(user.id, won, isDraw, delta, category);
           if (updatedProfile) {
             refreshUser(updatedProfile);
           }

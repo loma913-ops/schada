@@ -145,6 +145,30 @@ describe('authService caching and hydration', () => {
     expect(massiveLoss?.eloRating).toBe(ELO_CONFIG.minimumRating);
   });
 
+  it('updates per-mode stats independently across time control categories', async () => {
+    const user = await registerUser('per_mode_test@example.com', 'password123', 'mode_player');
+    expect(user.perModeStats?.bullet.elo).toBe(1200);
+    expect(user.perModeStats?.blitz.elo).toBe(1200);
+
+    // Win a bullet game +20
+    const afterBullet = await updateUserStats(user.id, true, false, 20, 'bullet');
+    expect(afterBullet?.perModeStats?.bullet.elo).toBe(1220);
+    expect(afterBullet?.perModeStats?.bullet.gamesPlayed).toBe(1);
+    expect(afterBullet?.perModeStats?.bullet.gamesWon).toBe(1);
+    // Blitz remains default
+    expect(afterBullet?.perModeStats?.blitz.elo).toBe(1200);
+    expect(afterBullet?.perModeStats?.blitz.gamesPlayed).toBe(0);
+
+    // Lose a blitz game -15
+    const afterBlitz = await updateUserStats(user.id, false, false, -15, 'blitz');
+    expect(afterBlitz?.perModeStats?.blitz.elo).toBe(1185);
+    expect(afterBlitz?.perModeStats?.blitz.gamesPlayed).toBe(1);
+    expect(afterBlitz?.perModeStats?.blitz.gamesLost).toBe(1);
+    // Bullet remains 1220
+    expect(afterBlitz?.perModeStats?.bullet.elo).toBe(1220);
+    expect(afterBlitz?.perModeStats?.bullet.gamesPlayed).toBe(1);
+  });
+
   it('reloads user profile and syncs cached credentials', async () => {
     const user = await registerUser('reload_test@example.com', 'password123', 'reload_user');
     await updateUserStats(user.id, true, false, 25);

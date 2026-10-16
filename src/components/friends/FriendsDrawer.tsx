@@ -235,8 +235,8 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
                           <span>{f.username}</span>
                           {isPatronUser(f) && <PatronBadge size={13} />}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--accent-gold)', fontFamily: 'var(--font-mono)' }}>
-                          {f.eloRating} Elo
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {f.status === 'online' ? 'Online' : f.status === 'in-game' ? 'In Game' : 'Offline'}
                         </div>
                       </div>
                     </div>

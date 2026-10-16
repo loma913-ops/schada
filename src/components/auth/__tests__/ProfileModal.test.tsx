@@ -97,5 +97,40 @@ describe('ProfileModal - PWA Install App Section', () => {
     expect(html).not.toContain(PWA_CONFIG.copy.installSectionDescription);
     expect(html).toContain('Delete Account');
   });
+
+  it('renders 5-mode breakdown and omits static header rating', () => {
+    mockUsePwa.mockReturnValue({
+      isStandalone: true,
+      isMobile: false,
+      installModalOpen: false,
+      setInstallModalOpen: vi.fn(),
+      promptInstall: vi.fn(),
+      config: PWA_CONFIG,
+    });
+
+    const html = renderToStaticMarkup(
+      <ProfileModal isOpen={true} onClose={vi.fn()} />
+    );
+
+    // Static rating in header is removed
+    expect(html).not.toContain('Rating:');
+    expect(html).not.toContain('1850');
+
+    // 5-mode ratings & statistics are present
+    expect(html).toContain('Ratings &amp; Performance');
+    expect(html).toContain('Bullet');
+    expect(html).toContain('Blitz');
+    expect(html).toContain('Rapid');
+    expect(html).toContain('Classical');
+    expect(html).toContain('Correspondence');
+
+    // Two internal rows elements: Played, record breakdown (W/L/D), and Win/Loss percentages
+    expect(html).toContain('Played:');
+    expect(html).toContain('Win:');
+    expect(html).toContain('Loss:');
+    expect(html).toContain('0W');
+    expect(html).toContain('0L');
+    expect(html).toContain('0D');
+  });
 });
 

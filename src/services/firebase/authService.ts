@@ -18,7 +18,15 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
-import { localBackend, type UserProfile } from './localProvider';
+import {
+  localBackend,
+  type UserProfile,
+  type ModeStats,
+  type PerModeStats,
+  createDefaultPerModeStats,
+  ensurePerModeStats,
+} from './localProvider';
+import { type TimeControlCategory, TIME_CONTROL_CATEGORIES } from '@/components/lobby/lobbyConfig';
 import {
   isCurrentClientActive,
   syncPresenceHeartbeat,
@@ -111,10 +119,11 @@ export async function updateUserStats(
   userId: string,
   won: boolean,
   isDraw: boolean,
-  eloDelta: number
+  eloDelta: number,
+  category: TimeControlCategory = 'blitz'
 ): Promise<UserProfile | null> {
   // 1. Update local provider store
-  localBackend.updateStats(userId, won, isDraw, eloDelta);
+  localBackend.updateStats(userId, won, isDraw, eloDelta, category);
 
   // 2. If Firebase is active and the authenticated user owns this profile record
   if (isFirebaseConfigured() && db && auth) {
@@ -139,6 +148,21 @@ export async function updateUserStats(
             ? data.eloRating
             : ELO_CONFIG.defaultStartingRating;
 
+          const currentPerMode = ensurePerModeStats(data.perModeStats, currentElo);
+          const currentMode = currentPerMode[category];
+          const newModeElo = Math.max(ELO_CONFIG.minimumRating, currentMode.elo + eloDelta);
+          const newModeStats: ModeStats = {
+            elo: newModeElo,
+            gamesPlayed: currentMode.gamesPlayed + 1,
+            gamesWon: isDraw ? currentMode.gamesWon : won ? currentMode.gamesWon + 1 : currentMode.gamesWon,
+            gamesLost: isDraw ? currentMode.gamesLost : !won ? currentMode.gamesLost + 1 : currentMode.gamesLost,
+            gamesDrawn: isDraw ? currentMode.gamesDrawn + 1 : currentMode.gamesDrawn,
+          };
+          const updatedPerMode: PerModeStats = {
+            ...currentPerMode,
+            [category]: newModeStats,
+          };
+
           const newElo = Math.max(ELO_CONFIG.minimumRating, currentElo + eloDelta);
           const newGamesPlayed = currentGamesPlayed + 1;
           const newGamesWon = isDraw ? currentGamesWon : won ? currentGamesWon + 1 : currentGamesWon;
@@ -147,6 +171,7 @@ export async function updateUserStats(
 
           await updateDoc(userDocRef, {
             eloRating: newElo,
+            perModeStats: updatedPerMode,
             gamesPlayed: newGamesPlayed,
             gamesWon: newGamesWon,
             gamesLost: newGamesLost,
@@ -157,6 +182,7 @@ export async function updateUserStats(
           const updatedProfile: UserProfile = {
             ...data,
             eloRating: newElo,
+            perModeStats: updatedPerMode,
             gamesPlayed: newGamesPlayed,
             gamesWon: newGamesWon,
             gamesLost: newGamesLost,
@@ -213,6 +239,21 @@ export async function updateUserStats(
             ? parsed.eloRating
             : ELO_CONFIG.defaultStartingRating;
 
+          const currentPerMode = ensurePerModeStats(parsed.perModeStats, currentElo);
+          const currentMode = currentPerMode[category];
+          const newModeElo = Math.max(ELO_CONFIG.minimumRating, currentMode.elo + eloDelta);
+          const newModeStats: ModeStats = {
+            elo: newModeElo,
+            gamesPlayed: currentMode.gamesPlayed + 1,
+            gamesWon: isDraw ? currentMode.gamesWon : won ? currentMode.gamesWon + 1 : currentMode.gamesWon,
+            gamesLost: isDraw ? currentMode.gamesLost : !won ? currentMode.gamesLost + 1 : currentMode.gamesLost,
+            gamesDrawn: isDraw ? currentMode.gamesDrawn + 1 : currentMode.gamesDrawn,
+          };
+          const updatedPerMode: PerModeStats = {
+            ...currentPerMode,
+            [category]: newModeStats,
+          };
+
           const newElo = Math.max(ELO_CONFIG.minimumRating, currentElo + eloDelta);
           const newGamesPlayed = currentGamesPlayed + 1;
           const newGamesWon = isDraw ? currentGamesWon : won ? currentGamesWon + 1 : currentGamesWon;
@@ -222,6 +263,7 @@ export async function updateUserStats(
           const updatedLocal: UserProfile = {
             ...parsed,
             eloRating: newElo,
+            perModeStats: updatedPerMode,
             gamesPlayed: newGamesPlayed,
             gamesWon: newGamesWon,
             gamesLost: newGamesLost,
@@ -263,7 +305,12 @@ export async function reloadUserProfile(): Promise<UserProfile | null> {
         const status = active ? 'online' : 'offline';
         const data = snap.data() as UserProfile;
         const authEmail = auth.currentUser?.email ?? data.email ?? SECURITY_CONFIG.emptyEmailFallback;
-        const profile: UserProfile = { ...data, email: authEmail, status };
+        const profile: UserProfile = {
+          ...data,
+          email: authEmail,
+          status,
+          perModeStats: ensurePerModeStats(data.perModeStats, data.eloRating),
+        };
         persistCachedProfile(profile);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
@@ -322,6 +369,7 @@ export function getCachedAuthProfile(): UserProfile | null {
       if (auth?.currentUser?.email) {
         parsed.email = auth.currentUser.email;
       }
+      parsed.perModeStats = ensurePerModeStats(parsed.perModeStats, parsed.eloRating);
       return parsed;
     }
   } catch (e) {
@@ -388,6 +436,7 @@ export async function registerUser(
       usernameLower,
       usernameChangeCount: 0,
       eloRating: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
+      perModeStats: createDefaultPerModeStats(),
       gamesPlayed: 0,
       gamesWon: 0,
       gamesLost: 0,
@@ -435,7 +484,12 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
     const status = active ? 'online' : 'offline';
     const data = userDoc.data() as UserProfile;
     const authEmail = auth.currentUser?.email ?? email;
-    const profileWithStatus: UserProfile = { ...data, email: authEmail, status };
+    const profileWithStatus: UserProfile = {
+      ...data,
+      email: authEmail,
+      status,
+      perModeStats: ensurePerModeStats(data.perModeStats, data.eloRating),
+    };
     persistCachedProfile(profileWithStatus);
     syncPresenceHeartbeat();
     return profileWithStatus;
@@ -547,7 +601,7 @@ function hasMeaningfulProfileChanged(
 ): boolean {
   if (!prev && !next) return false;
   if (!prev || !next) return true;
-  return (
+  if (
     prev.id !== next.id ||
     prev.email !== next.email ||
     prev.username !== next.username ||
@@ -558,7 +612,23 @@ function hasMeaningfulProfileChanged(
     prev.gamesDrawn !== next.gamesDrawn ||
     prev.status !== next.status ||
     prev.usernameChangeCount !== next.usernameChangeCount
-  );
+  ) {
+    return true;
+  }
+  for (const cat of TIME_CONTROL_CATEGORIES) {
+    const prevMode = prev.perModeStats?.[cat];
+    const nextMode = next.perModeStats?.[cat];
+    if (
+      prevMode?.elo !== nextMode?.elo ||
+      prevMode?.gamesPlayed !== nextMode?.gamesPlayed ||
+      prevMode?.gamesWon !== nextMode?.gamesWon ||
+      prevMode?.gamesLost !== nextMode?.gamesLost ||
+      prevMode?.gamesDrawn !== nextMode?.gamesDrawn
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // In-memory set tracking user accounts whose PII email field has already been scheduled for deletion
@@ -610,6 +680,7 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
                   ...data,
                   email: authEmail,
                   status: currentStatus,
+                  perModeStats: ensurePerModeStats(data.perModeStats, data.eloRating),
                 };
                 // Only dispatch callback when meaningful profile fields change (avoids lastSeen ping-pong loops)
                 if (hasMeaningfulProfileChanged(lastProfileSnapshot, profile)) {
