@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { X, LogOut, Edit2, CheckCircle2, AlertTriangle, Sliders, AlertCircle, Trash2 } from 'lucide-react';
+import { usePwa } from '@/context/PwaContext';
+import { X, LogOut, Edit2, CheckCircle2, AlertTriangle, Sliders, AlertCircle, Trash2, Smartphone } from 'lucide-react';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { SchadaStar } from '@/components/common/SchadaStar';
 import { getPatronStatusDescription } from '@/core/donate/patronService';
@@ -15,6 +16,7 @@ interface ProfileModalProps {
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
   const { user, updateUsername, logout, deleteAccount } = useAuth();
   const { showThreatIndicators, setShowThreatIndicators } = useGamePreferences();
+  const { isStandalone, setInstallModalOpen, config: pwaConfig } = usePwa();
   const [newUsername, setNewUsername] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -373,6 +375,52 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             </p>
           )}
         </div>
+
+        {/* Progressive Web Application (PWA) Install Section */}
+        {!isStandalone && (
+          <div
+            style={{
+              padding: '1rem',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: '1.25rem',
+              backgroundColor: 'var(--bg-tertiary)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Smartphone size={16} color="var(--accent-gold)" />
+                <span>{pwaConfig.copy.installSectionTitle}</span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+              {pwaConfig.copy.installSectionDescription}
+            </p>
+
+            <button
+              type="button"
+              className="action-btn"
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+              }}
+              onClick={() => {
+                onClose();
+                setInstallModalOpen(true);
+              }}
+              title={pwaConfig.copy.installAppTitle}
+              aria-label={pwaConfig.copy.installAppAriaLabel}
+            >
+              <Smartphone size={15} />
+              <span>{pwaConfig.copy.installAppButtonText}</span>
+            </button>
+          </div>
+        )}
 
         {/* Account Deletion Section (Store Compliance: Apple Guideline 5.1.1(v)) */}
         <div

@@ -38,6 +38,8 @@ export interface PwaConfig {
     readonly installAppButtonText: string;
     readonly installAppAriaLabel: string;
     readonly installAppTitle: string;
+    readonly installSectionTitle: string;
+    readonly installSectionDescription: string;
   };
 }
 
@@ -155,6 +157,8 @@ export function validatePwaConfig(config: PwaConfig): void {
     'installAppButtonText',
     'installAppAriaLabel',
     'installAppTitle',
+    'installSectionTitle',
+    'installSectionDescription',
   ];
 
   for (const key of requiredCopyKeys) {
@@ -189,5 +193,8 @@ export const PWA_CONFIG: PwaConfig = Object.freeze({
     installAppButtonText: 'Install App',
     installAppAriaLabel: 'Install Schada App',
     installAppTitle: 'Install Schada App',
+    installSectionTitle: 'Install Application',
+    installSectionDescription:
+      'Install Schada on your device for fast home screen access, full-screen play, and offline support.',
   }),
 });

@@ -1,8 +1,7 @@
 import React from 'react';
-import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, Smartphone, History, Heart } from 'lucide-react';
+import { Crown, Users, Trophy, BookOpen, Sun, Moon, LogIn, User, History, Heart } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { usePwa } from '@/context/PwaContext';
 import { SchadaStar } from '@/components/common/SchadaStar';
 import type { NavigationTab } from '@/components/layout/navigationTypes';
 import { isNativePlatform } from '@/services/native/mobileService';
@@ -26,7 +25,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { user, isLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { isStandalone, isMobile, setInstallModalOpen, config: pwaConfig } = usePwa();
 
   return (
     <nav className="navbar">
@@ -89,20 +87,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             aria-label="Support Schada • Donate"
           >
             <Heart size={16} />
-          </button>
-        )}
-
-        {/* PWA Install Trigger (only visible on mobile devices, hidden on desktop browser and if already installed) */}
-        {!isStandalone && isMobile && (
-          <button
-            type="button"
-            className="action-btn install-btn"
-            onClick={() => setInstallModalOpen(true)}
-            title={pwaConfig.copy.installAppTitle}
-            aria-label={pwaConfig.copy.installAppAriaLabel}
-          >
-            <Smartphone size={16} />
-            <span className="install-btn-text">{pwaConfig.copy.installAppButtonText}</span>
           </button>
         )}
 

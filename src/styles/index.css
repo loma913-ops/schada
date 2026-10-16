@@ -86,7 +86,6 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
-.install-btn,
 .mobile-donate-btn {
   display: none !important;
 }
@@ -154,37 +153,6 @@ body {
 
 }
 
-/* Only display install-btn on mobile devices (coarse pointer / touch), never on desktop */
-@media (max-width: 768px) and (pointer: coarse), (max-width: 768px) and (hover: none) {
-  .install-btn {
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    height: 36px !important;
-    padding: 0 0.65rem !important;
-    box-sizing: border-box !important;
-    border-radius: var(--radius-sm);
-    background-color: var(--accent-gold-subtle) !important;
-    border: 1px solid var(--accent-gold) !important;
-    color: var(--accent-gold) !important;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .install-btn:hover {
-    background-color: var(--accent-gold-muted) !important;
-    border-color: var(--accent-gold-hover) !important;
-    color: var(--accent-gold-hover) !important;
-  }
-
-  .install-btn-text {
-    display: inline;
-    font-size: 0.78rem;
-  }
-}
-
 @media (max-width: 480px) {
   .action-btn.mobile-donate-btn,
   .mobile-donate-btn {
@@ -192,26 +160,6 @@ body {
     height: 36px !important;
     padding: 0 !important;
     box-sizing: border-box !important;
-  }
-}
-
-@media (max-width: 480px) and (pointer: coarse), (max-width: 480px) and (hover: none) {
-  .install-btn-text {
-    display: none;
-  }
-
-  .install-btn {
-    width: 36px !important;
-    height: 36px !important;
-    padding: 0 !important;
-    box-sizing: border-box !important;
-  }
-}
-
-/* Explicit guarantee: Never show install-btn on desktop browsers with mouse pointer */
-@media (hover: hover) and (pointer: fine) {
-  .install-btn {
-    display: none !important;
   }
 }
 

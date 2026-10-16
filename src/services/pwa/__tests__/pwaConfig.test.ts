@@ -121,5 +121,19 @@ describe('PWA Configuration and Validator', () => {
         copy: { ...PWA_CONFIG.copy, installAppButtonText: '' },
       })
     ).toThrow('Invalid copy.installAppButtonText: expected non-empty string.');
+
+    expect(() =>
+      validatePwaConfig({
+        ...PWA_CONFIG,
+        copy: { ...PWA_CONFIG.copy, installSectionTitle: '' },
+      })
+    ).toThrow('Invalid copy.installSectionTitle: expected non-empty string.');
+
+    expect(() =>
+      validatePwaConfig({
+        ...PWA_CONFIG,
+        copy: { ...PWA_CONFIG.copy, installSectionDescription: '   ' },
+      })
+    ).toThrow('Invalid copy.installSectionDescription: expected non-empty string.');
   });
 });
