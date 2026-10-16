@@ -6,13 +6,13 @@ import {
   limit,
   getDocs,
   writeBatch,
-  Timestamp,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { isGameTimedOut } from './gameClock';
 import { evaluateGameAbandonment } from './gameTransitions';
 import { localGameStore } from './localGameStore';
+import { pruneStaleGuestSessions } from './presenceService';
 import { ABANDONED_GAME_EXPIRY_MS, type GameRoom } from './gameTypes';
 import { LOBBY_CONFIG } from '@/components/lobby/lobbyConfig';
 import type { PieceColor } from '@/core/schada/types';
@@ -70,12 +70,12 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
       // 1. Remove games explicitly marked as 'abandoned' and older than maxAgeMs in a single atomic batch.
       //    The where + orderBy clause uses the (status, createdAt ASC) composite index, returning
       //    only genuinely-eligible documents and reading 0 docs when there are no stale games.
-      const abandonedCutoff = Timestamp.fromMillis(now - maxAgeMs);
+      const abandonedCutoff = now - maxAgeMs;
       const qAbandoned = query(
         collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
         where('status', '==', 'abandoned'),
-        where('abandonedAt', '<=', abandonedCutoff),
-        orderBy('abandonedAt', 'asc'),
+        where('createdAt', '<=', abandonedCutoff),
+        orderBy('createdAt', 'asc'),
         limit(batchLimit)
       );
       const snapAbandoned = await getDocs(qAbandoned);
@@ -83,11 +83,15 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
       let abandonedDeleteCount = 0;
 
       for (const docSnap of snapAbandoned.docs) {
-        batchAbandoned.delete(docSnap.ref);
-        abandonedDeleteCount++;
-        removedIds.push(docSnap.id);
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(SESSION_STORAGE_PREFIX + docSnap.id);
+        const game = docSnap.data() as GameRoom;
+        const abandonedTime = game.abandonedAt || game.createdAt;
+        if (abandonedTime && now - abandonedTime >= maxAgeMs) {
+          batchAbandoned.delete(docSnap.ref);
+          abandonedDeleteCount++;
+          removedIds.push(docSnap.id);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem(SESSION_STORAGE_PREFIX + docSnap.id);
+          }
         }
       }
 
@@ -124,7 +128,7 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
         // 3. Mark stale waiting games as abandoned if older than maxAgeMs in a single atomic batch.
         //    The where + orderBy clause eliminates documents created within maxAgeMs, reading 0 docs
         //    when no rooms have been waiting long enough.
-        const waitingCutoff = Timestamp.fromMillis(now - maxAgeMs);
+        const waitingCutoff = now - maxAgeMs;
         const qWaiting = query(
           collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
           where('status', '==', 'waiting'),
@@ -158,6 +162,11 @@ export async function cleanupAbandonedGames(maxAgeMs: number = ABANDONED_GAME_EX
           await batchWaiting.commit();
         }
       }
+
+      // 4. Opportunistically prune stale guest sessions older than 15 minutes
+      await pruneStaleGuestSessions().catch((err) => {
+        console.warn('Failed to prune stale guest sessions in cleanup:', err);
+      });
     } catch (err) {
       console.warn('Failed to cleanup abandoned games from Firestore:', err);
     }

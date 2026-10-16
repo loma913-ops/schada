@@ -412,12 +412,14 @@ export function startPresenceTracking(): () => void {
     window.addEventListener('pagehide', onUnload);
     window.addEventListener('beforeunload', onUnload);
 
-    // Initial heartbeat
+    // Initial heartbeat & stale session sanitation
     syncPresenceHeartbeat();
+    pruneStaleGuestSessions().catch(() => {});
 
     // Heartbeat loop
     heartbeatIntervalId = setInterval(() => {
       syncPresenceHeartbeat();
+      pruneStaleGuestSessions().catch(() => {});
     }, HEARTBEAT_INTERVAL_MS);
   }
 

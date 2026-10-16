@@ -16,6 +16,10 @@ import {
   serverTimestamp,
   onSnapshot,
   writeBatch,
+  collection,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import {
@@ -484,8 +488,12 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
     const status = active ? 'online' : 'offline';
     const data = userDoc.data() as UserProfile;
     const authEmail = auth.currentUser?.email ?? email;
+    const createdAtStr = (data.createdAt as any)?.toDate?.()
+      ? (data.createdAt as any).toDate().toISOString()
+      : (typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString());
     const profileWithStatus: UserProfile = {
       ...data,
+      createdAt: createdAtStr,
       email: authEmail,
       status,
       perModeStats: ensurePerModeStats(data.perModeStats, data.eloRating),
@@ -676,8 +684,13 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
                   });
                 }
 
+                const createdAtStr = (data.createdAt as any)?.toDate?.()
+                  ? (data.createdAt as any).toDate().toISOString()
+                  : (typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString());
+
                 const profile: UserProfile = {
                   ...data,
+                  createdAt: createdAtStr,
                   email: authEmail,
                   status: currentStatus,
                   perModeStats: ensurePerModeStats(data.perModeStats, data.eloRating),
@@ -768,6 +781,35 @@ export async function deleteUserAccount(password: string): Promise<void> {
     if (usernameLower) {
       batch.delete(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.usernames, usernameLower));
     }
+
+    // Clean up userFriends subcollection and reciprocal friendship references
+    try {
+      const friendsSnap = await getDocs(
+        collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users, uid, MULTIPLAYER_SCALE_CONFIG.collections.userFriends)
+      );
+      for (const friendDoc of friendsSnap.docs) {
+        batch.delete(friendDoc.ref);
+        batch.delete(
+          doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, friendDoc.id, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, uid)
+        );
+      }
+    } catch (e) {
+      console.warn('Could not clean up userFriends on account deletion:', e);
+    }
+
+    // Clean up associated friend requests
+    try {
+      const [sentReqs, recvReqs] = await Promise.all([
+        getDocs(query(collection(db, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('fromUserId', '==', uid))),
+        getDocs(query(collection(db, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('toUserId', '==', uid))),
+      ]);
+      for (const reqDoc of [...sentReqs.docs, ...recvReqs.docs]) {
+        batch.delete(reqDoc.ref);
+      }
+    } catch (e) {
+      console.warn('Could not clean up friendRequests on account deletion:', e);
+    }
+
     await batch.commit();
 
     // 4. Delete Auth user credentials
