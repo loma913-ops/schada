@@ -56,11 +56,14 @@ describe('Navbar Component', () => {
       user: {
         id: 'user_1',
         username: 'TestUser',
-        eloRating: 1450,
+        perModeStats: {
+          bullet: { elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 },
+          blitz: { elo: 1450, gamesPlayed: 10, gamesWon: 5, gamesLost: 5, gamesDrawn: 0 },
+          rapid: { elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 },
+          classical: { elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 },
+          correspondence: { elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 },
+        },
         status: 'online',
-        gamesPlayed: 10,
-        gamesWon: 5,
-        gamesLost: 5,
         usernameChangeCount: 0,
       },
       isLoading: false,

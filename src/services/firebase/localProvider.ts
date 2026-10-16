@@ -51,10 +51,9 @@ export function createDefaultPerModeStats(startingElo: number = ELO_CONFIG.defau
 }
 
 export function ensurePerModeStats(
-  existing?: Partial<PerModeStats> | null,
-  fallbackElo: number = ELO_CONFIG.defaultStartingRating
+  existing?: Partial<PerModeStats> | null
 ): PerModeStats {
-  const defaults = createDefaultPerModeStats(fallbackElo);
+  const defaults = createDefaultPerModeStats();
   if (!existing || typeof existing !== 'object') {
     return defaults;
   }
@@ -63,7 +62,7 @@ export function ensurePerModeStats(
     const s = existing[cat];
     if (s && typeof s === 'object') {
       result[cat] = {
-        elo: typeof s.elo === 'number' && Number.isFinite(s.elo) ? Math.max(ELO_CONFIG.minimumRating, s.elo) : fallbackElo,
+        elo: typeof s.elo === 'number' && Number.isFinite(s.elo) ? Math.max(ELO_CONFIG.minimumRating, s.elo) : ELO_CONFIG.defaultStartingRating,
         gamesPlayed: typeof s.gamesPlayed === 'number' && s.gamesPlayed >= 0 ? s.gamesPlayed : 0,
         gamesWon: typeof s.gamesWon === 'number' && s.gamesWon >= 0 ? s.gamesWon : 0,
         gamesLost: typeof s.gamesLost === 'number' && s.gamesLost >= 0 ? s.gamesLost : 0,
@@ -75,7 +74,7 @@ export function ensurePerModeStats(
 }
 
 export function getUserModeStats(
-  user: Pick<UserProfile, 'perModeStats' | 'eloRating'> | null | undefined,
+  user: Pick<UserProfile, 'perModeStats'> | null | undefined,
   category: TimeControlCategory
 ): ModeStats {
   if (!user) {
@@ -88,14 +87,14 @@ export function getUserModeStats(
 }
 
 export function getUserModeElo(
-  user: Pick<UserProfile, 'perModeStats' | 'eloRating'> | null | undefined,
+  user: Pick<UserProfile, 'perModeStats'> | null | undefined,
   category: TimeControlCategory
 ): number {
   return getUserModeStats(user, category).elo;
 }
 
 export function getUserModeGamesPlayed(
-  user: Pick<UserProfile, 'perModeStats' | 'eloRating'> | null | undefined,
+  user: Pick<UserProfile, 'perModeStats'> | null | undefined,
   category: TimeControlCategory
 ): number {
   return getUserModeStats(user, category).gamesPlayed;
@@ -147,12 +146,7 @@ export interface UserProfile {
   username: string;
   usernameLower: string;
   usernameChangeCount: number; // 0 initially; max 1 edit allowed
-  eloRating: number;
-  perModeStats?: PerModeStats;
-  gamesPlayed: number;
-  gamesWon: number;
-  gamesLost: number;
-  gamesDrawn: number;
+  perModeStats: PerModeStats;
   status: 'online' | 'in-game' | 'offline';
   isPatron?: boolean;
   hasDonated?: boolean;
@@ -421,12 +415,7 @@ class LocalBackend {
       username: username.trim(),
       usernameLower,
       usernameChangeCount: 0,
-      eloRating: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
       perModeStats: createDefaultPerModeStats(),
-      gamesPlayed: 0,
-      gamesWon: 0,
-      gamesLost: 0,
-      gamesDrawn: 0,
       status: 'online',
       lastSeen: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -581,17 +570,7 @@ class LocalBackend {
     const u = users[userId];
     if (!u) return;
 
-    u.gamesPlayed += 1;
-    if (isDraw) {
-      u.gamesDrawn += 1;
-    } else if (won) {
-      u.gamesWon += 1;
-    } else {
-      u.gamesLost += 1;
-    }
-    u.eloRating = Math.max(ELO_CONFIG.minimumRating, u.eloRating + eloDelta);
-
-    u.perModeStats = ensurePerModeStats(u.perModeStats, u.eloRating);
+    u.perModeStats = ensurePerModeStats(u.perModeStats);
     const m = u.perModeStats[category];
     m.gamesPlayed += 1;
     if (isDraw) {
@@ -724,7 +703,7 @@ class LocalBackend {
     return Object.values(users)
       .map((u) => ({
         ...u,
-        perModeStats: ensurePerModeStats(u.perModeStats, u.eloRating),
+        perModeStats: ensurePerModeStats(u.perModeStats),
       }))
       .filter((u) => isHumanLeaderboardEligible(u, category))
       .sort((a, b) => {

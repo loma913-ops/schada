@@ -53,11 +53,6 @@ describe('LeaderboardTable & Human Player Filtering', () => {
       usernameLower: 'humangrandmaster',
       email: 'human@schada.org',
       usernameChangeCount: 0,
-      eloRating: 1450,
-      gamesPlayed: 10,
-      gamesWon: 7,
-      gamesLost: 2,
-      gamesDrawn: 1,
       status: 'offline',
       createdAt: '2026-01-01T00:00:00.000Z',
       perModeStats: {
@@ -126,11 +121,6 @@ describe('LeaderboardTable & Human Player Filtering', () => {
         usernameLower: 'kasparovschada',
         email: 'champ@schada.org',
         usernameChangeCount: 0,
-        eloRating: 1720,
-        gamesPlayed: 25,
-        gamesWon: 20,
-        gamesLost: 3,
-        gamesDrawn: 2,
         status: 'online',
         createdAt: '2026-01-01T00:00:00.000Z',
         perModeStats: {

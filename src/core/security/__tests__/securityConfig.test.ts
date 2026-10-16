@@ -21,7 +21,8 @@ describe('Security Configuration and Validator', () => {
     expect(SECURITY_CONFIG.guestSessionAllowedKeys).toContain('lastSeen');
     expect(SECURITY_CONFIG.guestSessionAllowedKeys).toContain('updatedAt');
     expect(SECURITY_CONFIG.mutableUserKeys).toContain('username');
-    expect(SECURITY_CONFIG.mutableUserKeys).toContain('eloRating');
+    expect(SECURITY_CONFIG.mutableUserKeys).toContain('perModeStats');
+    expect(SECURITY_CONFIG.mutableUserKeys).not.toContain('eloRating');
     expect(SECURITY_CONFIG.mutableUserKeys).toContain('email');
     expect(SECURITY_CONFIG.immutableGameKeys).toContain('id');
     expect(SECURITY_CONFIG.immutableGameKeys).toContain('createdAt');

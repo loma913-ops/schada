@@ -588,13 +588,14 @@ export const GameRoomView: React.FC = () => {
     ? { newElo: eloResult.newGreenElo, delta: eloResult.greenDelta }
     : undefined;
 
+  const modeCategory = game ? determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0) : 'blitz';
   const blueGames = typeof game.bluePlayer?.gamesPlayed === 'number'
     ? game.bluePlayer.gamesPlayed
-    : (game.bluePlayer?.id === user?.id && typeof user?.gamesPlayed === 'number' ? user.gamesPlayed : 0);
+    : (game.bluePlayer?.id === user?.id ? getUserModeGamesPlayed(user, modeCategory) : 0);
 
   const greenGames = typeof game.greenPlayer?.gamesPlayed === 'number'
     ? game.greenPlayer.gamesPlayed
-    : (game.greenPlayer?.id === user?.id && typeof user?.gamesPlayed === 'number' ? user.gamesPlayed : 0);
+    : (game.greenPlayer?.id === user?.id ? getUserModeGamesPlayed(user, modeCategory) : 0);
 
   const bluePlayer: ArenaPlayer = game.bluePlayer
     ? {

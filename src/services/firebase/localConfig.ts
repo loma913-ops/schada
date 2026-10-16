@@ -86,15 +86,13 @@ export function validateLocalConfig(config: LocalConfig): void {
   }
 
   for (const [id, user] of Object.entries(config.defaultUsers)) {
-    if (!user || user.id !== id || typeof user.username !== 'string' || typeof user.eloRating !== 'number') {
+    if (!user || user.id !== id || typeof user.username !== 'string' || !user.perModeStats || typeof user.perModeStats !== 'object') {
       throw new LocalConfigError(`Invalid defaultUsers entry for "${id}": malformed UserProfile.`);
     }
-    if (user.perModeStats) {
-      for (const mode of ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'] as const) {
-        const ms = user.perModeStats[mode];
-        if (!ms || typeof ms.elo !== 'number' || typeof ms.gamesPlayed !== 'number') {
-          throw new LocalConfigError(`Invalid defaultUsers entry for "${id}": malformed perModeStats.${mode}.`);
-        }
+    for (const mode of ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'] as const) {
+      const ms = user.perModeStats[mode];
+      if (!ms || typeof ms.elo !== 'number' || typeof ms.gamesPlayed !== 'number') {
+        throw new LocalConfigError(`Invalid defaultUsers entry for "${id}": malformed perModeStats.${mode}.`);
       }
     }
   }
@@ -120,7 +118,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
       username: 'SchadaGrandmaster',
       usernameLower: 'schadagrandmaster',
       usernameChangeCount: 0,
-      eloRating: 1650,
       perModeStats: Object.freeze({
         bullet: Object.freeze({ elo: 1620, gamesPlayed: 10, gamesWon: 7, gamesLost: 2, gamesDrawn: 1 }),
         blitz: Object.freeze({ elo: 1650, gamesPlayed: 20, gamesWon: 16, gamesLost: 3, gamesDrawn: 1 }),
@@ -128,10 +125,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
         classical: Object.freeze({ elo: 1700, gamesPlayed: 4, gamesWon: 3, gamesLost: 0, gamesDrawn: 1 }),
         correspondence: Object.freeze({ elo: 1600, gamesPlayed: 2, gamesWon: 1, gamesLost: 1, gamesDrawn: 0 }),
       }),
-      gamesPlayed: 48,
-      gamesWon: 36,
-      gamesLost: 8,
-      gamesDrawn: 4,
       status: 'offline' as const,
       isPatron: true,
       hasDonated: true,
@@ -143,7 +136,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
       username: 'Boogerd1936',
       usernameLower: 'boogerd1936',
       usernameChangeCount: 0,
-      eloRating: 1420,
       perModeStats: Object.freeze({
         bullet: Object.freeze({ elo: 1400, gamesPlayed: 5, gamesWon: 3, gamesLost: 2, gamesDrawn: 0 }),
         blitz: Object.freeze({ elo: 1420, gamesPlayed: 12, gamesWon: 8, gamesLost: 3, gamesDrawn: 1 }),
@@ -151,10 +143,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
         classical: Object.freeze({ elo: 1460, gamesPlayed: 2, gamesWon: 1, gamesLost: 1, gamesDrawn: 0 }),
         correspondence: Object.freeze({ elo: 1400, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
       }),
-      gamesPlayed: 25,
-      gamesWon: 16,
-      gamesLost: 7,
-      gamesDrawn: 2,
       status: 'offline' as const,
       createdAt: '2026-01-01T00:00:00.000Z',
     }),
@@ -164,7 +152,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
       username: 'BoardMaster',
       usernameLower: 'boardmaster',
       usernameChangeCount: 1,
-      eloRating: 1220,
       perModeStats: Object.freeze({
         bullet: Object.freeze({ elo: 1200, gamesPlayed: 2, gamesWon: 1, gamesLost: 1, gamesDrawn: 0 }),
         blitz: Object.freeze({ elo: 1220, gamesPlayed: 5, gamesWon: 3, gamesLost: 2, gamesDrawn: 0 }),
@@ -172,10 +159,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
         classical: Object.freeze({ elo: 1200, gamesPlayed: 1, gamesWon: 0, gamesLost: 0, gamesDrawn: 1 }),
         correspondence: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
       }),
-      gamesPlayed: 10,
-      gamesWon: 5,
-      gamesLost: 4,
-      gamesDrawn: 1,
       status: 'offline' as const,
       createdAt: '2026-01-01T00:00:00.000Z',
     }),
@@ -185,7 +168,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
       username: 'mutagenicpixels',
       usernameLower: 'mutagenicpixels',
       usernameChangeCount: 0,
-      eloRating: 1200,
       perModeStats: Object.freeze({
         bullet: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
         blitz: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
@@ -193,10 +175,6 @@ export const LOCAL_CONFIG: LocalConfig = Object.freeze({
         classical: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
         correspondence: Object.freeze({ elo: 1200, gamesPlayed: 0, gamesWon: 0, gamesLost: 0, gamesDrawn: 0 }),
       }),
-      gamesPlayed: 0,
-      gamesWon: 0,
-      gamesLost: 0,
-      gamesDrawn: 0,
       status: 'offline' as const,
       isPatron: true,
       hasDonated: true,

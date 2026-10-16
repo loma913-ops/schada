@@ -19,31 +19,54 @@ service cloud.firestore {
              request.resource.data.creatorColorPref == resource.data.creatorColorPref;
     }
 
+    function isValidInitialModeStats(stats) {
+      return stats.elo == 1200 &&
+             stats.gamesPlayed == 0 &&
+             stats.gamesWon == 0 &&
+             stats.gamesLost == 0 &&
+             stats.gamesDrawn == 0;
+    }
+
+    function isValidInitialPerModeStats(pms) {
+      return pms != null &&
+             isValidInitialModeStats(pms.bullet) &&
+             isValidInitialModeStats(pms.blitz) &&
+             isValidInitialModeStats(pms.rapid) &&
+             isValidInitialModeStats(pms.classical) &&
+             isValidInitialModeStats(pms.correspondence);
+    }
+
+    function isValidModeStatUpdate(mode) {
+      return request.resource.data.perModeStats[mode] == resource.data.perModeStats[mode] ||
+        (
+          request.resource.data.perModeStats[mode].gamesPlayed == resource.data.perModeStats[mode].gamesPlayed + 1 &&
+          request.resource.data.perModeStats[mode].elo >= resource.data.perModeStats[mode].elo - 64 &&
+          request.resource.data.perModeStats[mode].elo <= resource.data.perModeStats[mode].elo + 64
+        );
+    }
+
     // User profiles (public read for leaderboards and friend search, locked writes)
     match /users/{userId} {
       allow read: if true;
       allow create: if isOwner(userId) &&
-        request.resource.data.eloRating == 1200 &&
         request.resource.data.usernameChangeCount == 0 &&
-        request.resource.data.gamesPlayed == 0 &&
-        request.resource.data.gamesWon == 0 &&
-        request.resource.data.gamesLost == 0 &&
-        request.resource.data.gamesDrawn == 0;
+        isValidInitialPerModeStats(request.resource.data.perModeStats) &&
+        !request.resource.data.keys().hasAny(['eloRating', 'gamesPlayed', 'gamesWon', 'gamesLost', 'gamesDrawn']);
       allow update: if isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'lastSeen', 'eloRating', 'perModeStats', 'gamesPlayed', 'gamesWon', 'gamesLost', 'gamesDrawn',
+          'status', 'lastSeen', 'perModeStats',
           'username', 'usernameLower', 'usernameChangeCount', 'updatedAt', 'email'
         ]) &&
         // Constrain username changes to at most 1
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['username']) ||
           (resource.data.usernameChangeCount == 0 && request.resource.data.usernameChangeCount == 1)) &&
-        // Monotonic gamesPlayed increment when stats are updated
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['gamesPlayed']) ||
-          request.resource.data.gamesPlayed == resource.data.gamesPlayed + 1) &&
-        // Bounded Elo rating update (capped per game)
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['eloRating']) ||
-          (request.resource.data.eloRating >= resource.data.eloRating - 64 &&
-           request.resource.data.eloRating <= resource.data.eloRating + 64));
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['perModeStats']) || (
+          isValidModeStatUpdate('bullet') &&
+          isValidModeStatUpdate('blitz') &&
+          isValidModeStatUpdate('rapid') &&
+          isValidModeStatUpdate('classical') &&
+          isValidModeStatUpdate('correspondence')
+        ));
       allow delete: if isOwner(userId);
 
       // User friends subcollection

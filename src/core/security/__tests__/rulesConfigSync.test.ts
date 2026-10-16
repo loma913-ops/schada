@@ -7,7 +7,7 @@ import { SECURITY_CONFIG } from '../securityConfig';
 describe('Firestore Rules ↔ TypeScript Configuration Synchronization', () => {
   it('synchronizes starting Elo rating between rules and SECURITY_CONFIG / ELO_CONFIG', () => {
     const expectedStartingElo = SECURITY_CONFIG.startingEloRating;
-    expect(rulesContent).toContain(`request.resource.data.eloRating == ${expectedStartingElo}`);
+    expect(rulesContent).toContain(`stats.elo == ${expectedStartingElo}`);
     expect(expectedStartingElo).toBe(ELO_CONFIG.defaultStartingRating);
     expect(expectedStartingElo).toBe(1200);
   });
@@ -20,8 +20,8 @@ describe('Firestore Rules ↔ TypeScript Configuration Synchronization', () => {
   });
 
   it('guarantees maximum single-game Elo delta in rules matches SECURITY_CONFIG and exceeds provisional K-factor', () => {
-    expect(rulesContent).toContain(`request.resource.data.eloRating <= resource.data.eloRating + ${SECURITY_CONFIG.maxSingleGameEloDelta}`);
-    expect(rulesContent).toContain(`request.resource.data.eloRating >= resource.data.eloRating - ${SECURITY_CONFIG.maxSingleGameEloDelta}`);
+    expect(rulesContent).toContain(`request.resource.data.perModeStats[mode].elo <= resource.data.perModeStats[mode].elo + ${SECURITY_CONFIG.maxSingleGameEloDelta}`);
+    expect(rulesContent).toContain(`request.resource.data.perModeStats[mode].elo >= resource.data.perModeStats[mode].elo - ${SECURITY_CONFIG.maxSingleGameEloDelta}`);
     expect(SECURITY_CONFIG.maxSingleGameEloDelta).toBeGreaterThanOrEqual(ELO_CONFIG.provisionalKFactor);
   });
 
@@ -55,6 +55,22 @@ describe('Firestore Rules ↔ TypeScript Configuration Synchronization', () => {
     expect(rulesContent).toContain(`gameId.size() == ${SECURITY_CONFIG.gameIdLength}`);
     expect(rulesContent).toContain(`gameId.matches('${SECURITY_CONFIG.gameIdRegexPattern}')`);
     expect(rulesContent).toContain('request.resource.data.id == gameId');
+  });
+
+  it('strictly excludes legacy overall stats fields from allowed user mutations and creation', () => {
+    const legacyKeys = ['eloRating', 'gamesPlayed', 'gamesWon', 'gamesLost', 'gamesDrawn'];
+    expect(rulesContent).toContain(
+      "!request.resource.data.keys().hasAny(['eloRating', 'gamesPlayed', 'gamesWon', 'gamesLost', 'gamesDrawn'])"
+    );
+
+    const updateBlockMatch = rulesContent.match(/allow update:[\s\S]*?affectedKeys\(\)\.hasOnly\(\[([\s\S]*?)\]\)/);
+    expect(updateBlockMatch).not.toBeNull();
+    const updateAllowedKeys = updateBlockMatch ? updateBlockMatch[1] : '';
+
+    legacyKeys.forEach((key) => {
+      expect(SECURITY_CONFIG.mutableUserKeys).not.toContain(key);
+      expect(updateAllowedKeys).not.toContain(`'${key}'`);
+    });
   });
 
   it('permits user profile deletion strictly to authenticated account owners', () => {

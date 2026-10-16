@@ -336,12 +336,7 @@ export const SECURITY_CONFIG: SecurityConfig = Object.freeze({
   mutableUserKeys: Object.freeze([
     'status',
     'lastSeen',
-    'eloRating',
     'perModeStats',
-    'gamesPlayed',
-    'gamesWon',
-    'gamesLost',
-    'gamesDrawn',
     'username',
     'usernameLower',
     'usernameChangeCount',

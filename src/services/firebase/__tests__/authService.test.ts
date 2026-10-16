@@ -118,31 +118,31 @@ describe('authService caching and hydration', () => {
 
   it('updates user stats and Elo correctly with updateUserStats', async () => {
     const user = await registerUser('elo_test@example.com', 'password123', 'elo_player');
-    const initialElo = user.eloRating;
+    const initialElo = user.perModeStats.blitz.elo;
 
     // Simulate winning a match with +16 delta
     const updated = await updateUserStats(user.id, true, false, 16);
     expect(updated).not.toBeNull();
-    expect(updated?.eloRating).toBe(initialElo + 16);
-    expect(updated?.gamesPlayed).toBe(1);
-    expect(updated?.gamesWon).toBe(1);
-    expect(updated?.gamesLost).toBe(0);
+    expect(updated?.perModeStats.blitz.elo).toBe(initialElo + 16);
+    expect(updated?.perModeStats.blitz.gamesPlayed).toBe(1);
+    expect(updated?.perModeStats.blitz.gamesWon).toBe(1);
+    expect(updated?.perModeStats.blitz.gamesLost).toBe(0);
 
     // Verify cached profile is updated
     const cached = getCachedAuthProfile();
-    expect(cached?.eloRating).toBe(initialElo + 16);
-    expect(cached?.gamesWon).toBe(1);
+    expect(cached?.perModeStats.blitz.elo).toBe(initialElo + 16);
+    expect(cached?.perModeStats.blitz.gamesWon).toBe(1);
 
     // Simulate losing a match with -12 delta
     const afterLoss = await updateUserStats(user.id, false, false, -12);
-    expect(afterLoss?.eloRating).toBe(initialElo + 4);
-    expect(afterLoss?.gamesPlayed).toBe(2);
-    expect(afterLoss?.gamesWon).toBe(1);
-    expect(afterLoss?.gamesLost).toBe(1);
+    expect(afterLoss?.perModeStats.blitz.elo).toBe(initialElo + 4);
+    expect(afterLoss?.perModeStats.blitz.gamesPlayed).toBe(2);
+    expect(afterLoss?.perModeStats.blitz.gamesWon).toBe(1);
+    expect(afterLoss?.perModeStats.blitz.gamesLost).toBe(1);
 
     // Verify rating never drops below central ELO_CONFIG.minimumRating
     const massiveLoss = await updateUserStats(user.id, false, false, -5000);
-    expect(massiveLoss?.eloRating).toBe(ELO_CONFIG.minimumRating);
+    expect(massiveLoss?.perModeStats.blitz.elo).toBe(ELO_CONFIG.minimumRating);
   });
 
   it('updates per-mode stats independently across time control categories', async () => {
@@ -176,7 +176,7 @@ describe('authService caching and hydration', () => {
     const reloaded = await reloadUserProfile();
     expect(reloaded).not.toBeNull();
     expect(reloaded?.id).toBe(user.id);
-    expect(reloaded?.eloRating).toBe(user.eloRating + 25);
+    expect(reloaded?.perModeStats.blitz.elo).toBe(user.perModeStats.blitz.elo + 25);
   });
 
   it('rejects account deletion when password is empty or blank', async () => {

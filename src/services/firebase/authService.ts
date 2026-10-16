@@ -144,15 +144,7 @@ export async function updateUserStats(
         const snap = await getDoc(userDocRef);
         if (snap.exists()) {
           const data = snap.data() as UserProfile;
-          const currentGamesPlayed = data.gamesPlayed || 0;
-          const currentGamesWon = data.gamesWon || 0;
-          const currentGamesLost = data.gamesLost || 0;
-          const currentGamesDrawn = data.gamesDrawn || 0;
-          const currentElo = typeof data.eloRating === 'number'
-            ? data.eloRating
-            : ELO_CONFIG.defaultStartingRating;
-
-          const currentPerMode = ensurePerModeStats(data.perModeStats, currentElo);
+          const currentPerMode = ensurePerModeStats(data.perModeStats);
           const currentMode = currentPerMode[category];
           const newModeElo = Math.max(ELO_CONFIG.minimumRating, currentMode.elo + eloDelta);
           const newModeStats: ModeStats = {
@@ -167,30 +159,14 @@ export async function updateUserStats(
             [category]: newModeStats,
           };
 
-          const newElo = Math.max(ELO_CONFIG.minimumRating, currentElo + eloDelta);
-          const newGamesPlayed = currentGamesPlayed + 1;
-          const newGamesWon = isDraw ? currentGamesWon : won ? currentGamesWon + 1 : currentGamesWon;
-          const newGamesLost = isDraw ? currentGamesLost : !won ? currentGamesLost + 1 : currentGamesLost;
-          const newGamesDrawn = isDraw ? currentGamesDrawn + 1 : currentGamesDrawn;
-
           await updateDoc(userDocRef, {
-            eloRating: newElo,
             perModeStats: updatedPerMode,
-            gamesPlayed: newGamesPlayed,
-            gamesWon: newGamesWon,
-            gamesLost: newGamesLost,
-            gamesDrawn: newGamesDrawn,
             updatedAt: serverTimestamp(),
           });
 
           const updatedProfile: UserProfile = {
             ...data,
-            eloRating: newElo,
             perModeStats: updatedPerMode,
-            gamesPlayed: newGamesPlayed,
-            gamesWon: newGamesWon,
-            gamesLost: newGamesLost,
-            gamesDrawn: newGamesDrawn,
           };
 
           persistCachedProfile(updatedProfile);
@@ -235,15 +211,7 @@ export async function updateUserStats(
       try {
         const parsed = JSON.parse(raw) as UserProfile;
         if (parsed?.id === userId) {
-          const currentGamesPlayed = parsed.gamesPlayed || 0;
-          const currentGamesWon = parsed.gamesWon || 0;
-          const currentGamesLost = parsed.gamesLost || 0;
-          const currentGamesDrawn = parsed.gamesDrawn || 0;
-          const currentElo = typeof parsed.eloRating === 'number'
-            ? parsed.eloRating
-            : ELO_CONFIG.defaultStartingRating;
-
-          const currentPerMode = ensurePerModeStats(parsed.perModeStats, currentElo);
+          const currentPerMode = ensurePerModeStats(parsed.perModeStats);
           const currentMode = currentPerMode[category];
           const newModeElo = Math.max(ELO_CONFIG.minimumRating, currentMode.elo + eloDelta);
           const newModeStats: ModeStats = {
@@ -258,20 +226,9 @@ export async function updateUserStats(
             [category]: newModeStats,
           };
 
-          const newElo = Math.max(ELO_CONFIG.minimumRating, currentElo + eloDelta);
-          const newGamesPlayed = currentGamesPlayed + 1;
-          const newGamesWon = isDraw ? currentGamesWon : won ? currentGamesWon + 1 : currentGamesWon;
-          const newGamesLost = isDraw ? currentGamesLost : !won ? currentGamesLost + 1 : currentGamesLost;
-          const newGamesDrawn = isDraw ? currentGamesDrawn + 1 : currentGamesDrawn;
-
           const updatedLocal: UserProfile = {
             ...parsed,
-            eloRating: newElo,
             perModeStats: updatedPerMode,
-            gamesPlayed: newGamesPlayed,
-            gamesWon: newGamesWon,
-            gamesLost: newGamesLost,
-            gamesDrawn: newGamesDrawn,
           };
           persistCachedProfile(updatedLocal);
           if (typeof window !== 'undefined') {
@@ -313,7 +270,7 @@ export async function reloadUserProfile(): Promise<UserProfile | null> {
           ...data,
           email: authEmail,
           status,
-          perModeStats: ensurePerModeStats(data.perModeStats, data.eloRating),
+          perModeStats: ensurePerModeStats(data.perModeStats),
         };
         persistCachedProfile(profile);
         if (typeof window !== 'undefined') {
@@ -373,7 +330,7 @@ export function getCachedAuthProfile(): UserProfile | null {
       if (auth?.currentUser?.email) {
         parsed.email = auth.currentUser.email;
       }
-      parsed.perModeStats = ensurePerModeStats(parsed.perModeStats, parsed.eloRating);
+      parsed.perModeStats = ensurePerModeStats(parsed.perModeStats);
       return parsed;
     }
   } catch (e) {
@@ -439,12 +396,7 @@ export async function registerUser(
       username: username.trim(),
       usernameLower,
       usernameChangeCount: 0,
-      eloRating: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
       perModeStats: createDefaultPerModeStats(),
-      gamesPlayed: 0,
-      gamesWon: 0,
-      gamesLost: 0,
-      gamesDrawn: 0,
       status: 'online',
       createdAt: new Date().toISOString(),
     };
@@ -496,7 +448,7 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
       createdAt: createdAtStr,
       email: authEmail,
       status,
-      perModeStats: ensurePerModeStats(data.perModeStats, data.eloRating),
+      perModeStats: ensurePerModeStats(data.perModeStats),
     };
     persistCachedProfile(profileWithStatus);
     syncPresenceHeartbeat();
@@ -613,11 +565,6 @@ function hasMeaningfulProfileChanged(
     prev.id !== next.id ||
     prev.email !== next.email ||
     prev.username !== next.username ||
-    prev.eloRating !== next.eloRating ||
-    prev.gamesPlayed !== next.gamesPlayed ||
-    prev.gamesWon !== next.gamesWon ||
-    prev.gamesLost !== next.gamesLost ||
-    prev.gamesDrawn !== next.gamesDrawn ||
     prev.status !== next.status ||
     prev.usernameChangeCount !== next.usernameChangeCount
   ) {
@@ -693,7 +640,7 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
                   createdAt: createdAtStr,
                   email: authEmail,
                   status: currentStatus,
-                  perModeStats: ensurePerModeStats(data.perModeStats, data.eloRating),
+                  perModeStats: ensurePerModeStats(data.perModeStats),
                 };
                 // Only dispatch callback when meaningful profile fields change (avoids lastSeen ping-pong loops)
                 if (hasMeaningfulProfileChanged(lastProfileSnapshot, profile)) {

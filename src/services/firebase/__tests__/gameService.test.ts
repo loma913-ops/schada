@@ -924,7 +924,7 @@ describe('GameService Multiplayer Sync', () => {
 
   it('updates stats and returns UserProfile when resigning in ranked and unranked games', async () => {
     const user1 = await registerUser('ranked_resigner@example.com', 'password123', 'RankedResigner');
-    const creator = { id: user1.id, username: user1.username, elo: user1.eloRating, gamesPlayed: user1.gamesPlayed };
+    const creator = { id: user1.id, username: user1.username, elo: user1.perModeStats.blitz.elo, gamesPlayed: user1.perModeStats.blitz.gamesPlayed };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
       colorPref: 'blue',
@@ -937,16 +937,13 @@ describe('GameService Multiplayer Sync', () => {
 
     const updatedProfile = await resignGameAction(gameId, 'blue');
     expect(updatedProfile).not.toBeNull();
-    expect(updatedProfile?.gamesPlayed).toBe(1);
-    expect(updatedProfile?.gamesLost).toBe(1);
-    expect(updatedProfile?.eloRating).toBeLessThan(user1.eloRating);
-    expect(updatedProfile?.perModeStats?.blitz.elo).toBeLessThan(1200);
     expect(updatedProfile?.perModeStats?.blitz.gamesPlayed).toBe(1);
     expect(updatedProfile?.perModeStats?.blitz.gamesLost).toBe(1);
+    expect(updatedProfile?.perModeStats?.blitz.elo).toBeLessThan(user1.perModeStats.blitz.elo);
 
     // Now test unranked game
     const user2 = await registerUser('casual_resigner@example.com', 'password123', 'CasualResigner');
-    const unrankedCreator = { id: user2.id, username: user2.username, elo: user2.eloRating, gamesPlayed: user2.gamesPlayed };
+    const unrankedCreator = { id: user2.id, username: user2.username, elo: user2.perModeStats.blitz.elo, gamesPlayed: user2.perModeStats.blitz.gamesPlayed };
     const { gameId: unrankedId } = await createGame({
       timeControlMinutes: 5,
       colorPref: 'blue',
@@ -959,16 +956,14 @@ describe('GameService Multiplayer Sync', () => {
 
     const unrankedUpdated = await resignGameAction(unrankedId, 'blue');
     expect(unrankedUpdated).not.toBeNull();
-    expect(unrankedUpdated?.gamesPlayed).toBe(1);
-    expect(unrankedUpdated?.gamesLost).toBe(1);
-    expect(unrankedUpdated?.eloRating).toBe(user2.eloRating); // Unchanged in casual game
     expect(unrankedUpdated?.perModeStats?.blitz.gamesPlayed).toBe(1);
-    expect(unrankedUpdated?.perModeStats?.blitz.elo).toBe(1200);
+    expect(unrankedUpdated?.perModeStats?.blitz.gamesLost).toBe(1);
+    expect(unrankedUpdated?.perModeStats?.blitz.elo).toBe(1200); // Unchanged in casual game
   });
 
   it('updates stats and returns UserProfile when timing out in ranked and unranked games', async () => {
     const user1 = await registerUser('ranked_timeout@example.com', 'password123', 'RankedTimeout');
-    const creator = { id: user1.id, username: user1.username, elo: user1.eloRating, gamesPlayed: user1.gamesPlayed };
+    const creator = { id: user1.id, username: user1.username, elo: user1.perModeStats.blitz.elo, gamesPlayed: user1.perModeStats.blitz.gamesPlayed };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
       colorPref: 'green',
@@ -981,15 +976,13 @@ describe('GameService Multiplayer Sync', () => {
 
     const updatedProfile = await timeoutGameAction(gameId, 'green');
     expect(updatedProfile).not.toBeNull();
-    expect(updatedProfile?.gamesPlayed).toBe(1);
-    expect(updatedProfile?.gamesLost).toBe(1);
-    expect(updatedProfile?.eloRating).toBeLessThan(user1.eloRating);
-    expect(updatedProfile?.perModeStats?.blitz.elo).toBeLessThan(1200);
     expect(updatedProfile?.perModeStats?.blitz.gamesPlayed).toBe(1);
+    expect(updatedProfile?.perModeStats?.blitz.gamesLost).toBe(1);
+    expect(updatedProfile?.perModeStats?.blitz.elo).toBeLessThan(user1.perModeStats.blitz.elo);
 
     // Now test unranked timeout
     const user2 = await registerUser('casual_timeout@example.com', 'password123', 'CasualTimeout');
-    const unrankedCreator = { id: user2.id, username: user2.username, elo: user2.eloRating, gamesPlayed: user2.gamesPlayed };
+    const unrankedCreator = { id: user2.id, username: user2.username, elo: user2.perModeStats.blitz.elo, gamesPlayed: user2.perModeStats.blitz.gamesPlayed };
     const { gameId: unrankedId } = await createGame({
       timeControlMinutes: 5,
       colorPref: 'green',
@@ -1002,10 +995,8 @@ describe('GameService Multiplayer Sync', () => {
 
     const unrankedUpdated = await timeoutGameAction(unrankedId, 'green');
     expect(unrankedUpdated).not.toBeNull();
-    expect(unrankedUpdated?.gamesPlayed).toBe(1);
-    expect(unrankedUpdated?.gamesLost).toBe(1);
-    expect(unrankedUpdated?.eloRating).toBe(user2.eloRating);
     expect(unrankedUpdated?.perModeStats?.blitz.gamesPlayed).toBe(1);
+    expect(unrankedUpdated?.perModeStats?.blitz.gamesLost).toBe(1);
     expect(unrankedUpdated?.perModeStats?.blitz.elo).toBe(1200);
   });
 
@@ -1045,11 +1036,11 @@ describe('GameService Multiplayer Sync', () => {
       timeControlMinutes: 5,
       colorPref: 'blue',
       isRanked: true,
-      creator: { id: userA.id, username: userA.username, elo: userA.eloRating, gamesPlayed: userA.gamesPlayed },
+      creator: { id: userA.id, username: userA.username, elo: userA.perModeStats.blitz.elo, gamesPlayed: userA.perModeStats.blitz.gamesPlayed },
     });
 
     localStorage.removeItem('schada_player_token_' + gameId);
-    await joinGame(gameId, { id: userB.id, username: userB.username, elo: userB.eloRating, gamesPlayed: userB.gamesPlayed });
+    await joinGame(gameId, { id: userB.id, username: userB.username, elo: userB.perModeStats.blitz.elo, gamesPlayed: userB.perModeStats.blitz.gamesPlayed });
 
     // Blue player resigns -> Green player (userB) wins
     await resignGameAction(gameId, 'blue');
@@ -1059,13 +1050,13 @@ describe('GameService Multiplayer Sync', () => {
 
     expect(updatedUserA).not.toBeNull();
     expect(updatedUserB).not.toBeNull();
-    expect(updatedUserA!.gamesPlayed).toBe(1);
-    expect(updatedUserA!.gamesLost).toBe(1);
-    expect(updatedUserA!.eloRating).toBeLessThan(userA.eloRating);
+    expect(updatedUserA!.perModeStats.blitz.gamesPlayed).toBe(1);
+    expect(updatedUserA!.perModeStats.blitz.gamesLost).toBe(1);
+    expect(updatedUserA!.perModeStats.blitz.elo).toBeLessThan(userA.perModeStats.blitz.elo);
 
-    expect(updatedUserB!.gamesPlayed).toBe(1);
-    expect(updatedUserB!.gamesWon).toBe(1);
-    expect(updatedUserB!.eloRating).toBeGreaterThan(userB.eloRating);
+    expect(updatedUserB!.perModeStats.blitz.gamesPlayed).toBe(1);
+    expect(updatedUserB!.perModeStats.blitz.gamesWon).toBe(1);
+    expect(updatedUserB!.perModeStats.blitz.elo).toBeGreaterThan(userB.perModeStats.blitz.elo);
   });
 
   it('reconciles pending Elo for a user whose game ended without processed rating', async () => {
@@ -1076,11 +1067,11 @@ describe('GameService Multiplayer Sync', () => {
       timeControlMinutes: 5,
       colorPref: 'blue',
       isRanked: true,
-      creator: { id: userA.id, username: userA.username, elo: userA.eloRating, gamesPlayed: userA.gamesPlayed },
+      creator: { id: userA.id, username: userA.username, elo: userA.perModeStats.blitz.elo, gamesPlayed: userA.perModeStats.blitz.gamesPlayed },
     });
 
     localStorage.removeItem('schada_player_token_' + gameId);
-    await joinGame(gameId, { id: userB.id, username: userB.username, elo: userB.eloRating, gamesPlayed: userB.gamesPlayed });
+    await joinGame(gameId, { id: userB.id, username: userB.username, elo: userB.perModeStats.blitz.elo, gamesPlayed: userB.perModeStats.blitz.gamesPlayed });
 
     // Mark game completed in localGameStore where userB won but only userA was marked processed
     const game = localGameStore.get(gameId);
@@ -1096,9 +1087,9 @@ describe('GameService Multiplayer Sync', () => {
     const reconciled = await reconcilePendingElo(userB.id);
 
     expect(reconciled).not.toBeNull();
-    expect(reconciled!.gamesPlayed).toBe(1);
-    expect(reconciled!.gamesWon).toBe(1);
-    expect(reconciled!.eloRating).toBeGreaterThan(userB.eloRating);
+    expect(reconciled!.perModeStats.blitz.gamesPlayed).toBe(1);
+    expect(reconciled!.perModeStats.blitz.gamesWon).toBe(1);
+    expect(reconciled!.perModeStats.blitz.elo).toBeGreaterThan(userB.perModeStats.blitz.elo);
   });
 
   describe('9-digit Alphanumeric Game ID Generation and Collision Prevention', () => {

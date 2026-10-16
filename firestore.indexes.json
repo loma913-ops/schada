@@ -4,14 +4,6 @@
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "eloRating", "order": "DESCENDING" },
-        { "fieldPath": "gamesPlayed", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "perModeStats.bullet.elo", "order": "DESCENDING" },
         { "fieldPath": "perModeStats.bullet.gamesPlayed", "order": "DESCENDING" }
       ]
