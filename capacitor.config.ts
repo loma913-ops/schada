@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     SystemBars: {
-      insetsHandling: 'css',
+      insetsHandling: 'disable',
       style: 'DEFAULT',
       hidden: false,
     },
