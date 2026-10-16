@@ -74,6 +74,7 @@ export interface MatchmakingConfig {
   readonly disconnectionCountdownPrefix: string;
   readonly disconnectionTooltipText: string;
   readonly disconnectionTooltipCountdownPrefix: string;
+  readonly challengeReservedErrorMessage: string;
 }
 
 export interface MultiplayerCollectionsConfig {
@@ -468,6 +469,7 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     disconnectionCountdownPrefix: matchmaking.disconnectionCountdownPrefix,
     disconnectionTooltipText: matchmaking.disconnectionTooltipText,
     disconnectionTooltipCountdownPrefix: matchmaking.disconnectionTooltipCountdownPrefix,
+    challengeReservedErrorMessage: matchmaking.challengeReservedErrorMessage,
   };
   for (const [keyName, val] of Object.entries(disconnectStrings)) {
     if (typeof val !== 'string' || val.trim().length === 0) {
@@ -596,6 +598,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     disconnectionCountdownPrefix: 'Abandoning in ',
     disconnectionTooltipText: 'Player disconnected',
     disconnectionTooltipCountdownPrefix: 'Opponent disconnected. Abandoning in ',
+    challengeReservedErrorMessage: 'This match is reserved for another player.',
   }),
   collections: Object.freeze({
     users: 'users',

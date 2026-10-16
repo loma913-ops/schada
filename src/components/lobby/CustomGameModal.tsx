@@ -6,6 +6,7 @@ import { FORMAT_CONFIG } from '@/core/schada/formatConfig';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { isGuestUser } from '@/services/firebase/gameTypes';
 import { CANONICAL_DIGITAL_CLOCK_CONFIG } from '@/components/game/digitalClockConfig';
+import { LOBBY_CONFIG } from './lobbyConfig';
 
 export type CustomGameTab = 'realtime' | 'correspondence';
 
@@ -14,6 +15,7 @@ interface CustomGameModalProps {
   onClose: () => void;
   onCreateGame: (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => void;
   initialTab?: CustomGameTab;
+  challengedFriendUsername?: string | null;
 }
 
 export const CustomGameModal: React.FC<CustomGameModalProps> = ({
@@ -21,20 +23,28 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
   onClose,
   onCreateGame,
   initialTab = 'realtime',
+  challengedFriendUsername,
 }) => {
   const { user } = useAuth();
   const isGuest = isGuestUser(user);
 
   const [activeTab, setActiveTab] = useState<CustomGameTab>(initialTab);
 
-  const defaultMinutesIndex = FORMAT_CONFIG.realTimeMinutesSequence.indexOf(FORMAT_CONFIG.defaultMatchMinutes);
+  const targetMinutes = challengedFriendUsername
+    ? FORMAT_CONFIG.defaultFriendChallenge.minutes
+    : FORMAT_CONFIG.defaultMatchMinutes;
+  const defaultMinutesIndex = FORMAT_CONFIG.realTimeMinutesSequence.indexOf(targetMinutes);
   if (defaultMinutesIndex < 0) {
     throw new Error(
-      `CustomGameModal: defaultMatchMinutes (${FORMAT_CONFIG.defaultMatchMinutes}) not found in realTimeMinutesSequence.`
+      `CustomGameModal: targetMinutes (${targetMinutes}) not found in realTimeMinutesSequence.`
     );
   }
   const [minutesIndex, setMinutesIndex] = useState(defaultMinutesIndex);
-  const [increment, setIncrement] = useState(FORMAT_CONFIG.defaultIncrementSeconds);
+  const [increment, setIncrement] = useState(
+    challengedFriendUsername
+      ? FORMAT_CONFIG.defaultFriendChallenge.increment
+      : FORMAT_CONFIG.defaultIncrementSeconds
+  );
 
   const defaultDaysIndex = FORMAT_CONFIG.correspondenceDaysSequence.indexOf(FORMAT_CONFIG.defaultCorrespondenceDays);
   if (defaultDaysIndex < 0) {
@@ -97,11 +107,16 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({
     return `${mins} min`;
   };
 
+  const modalTitle =
+    challengedFriendUsername && challengedFriendUsername.trim().length > 0
+      ? `${LOBBY_CONFIG.modalTitles.challengePrefix} ${challengedFriendUsername.trim()}`
+      : LOBBY_CONFIG.modalTitles.createMatch;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Create Match</h2>
+          <h2 className="modal-title">{modalTitle}</h2>
           <button className="modal-close-btn" onClick={onClose} aria-label="Close modal">
             <X size={18} />
           </button>

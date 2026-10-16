@@ -188,6 +188,18 @@ export function validateFormatConfig(config: FormatConfig): void {
     );
   }
 
+  if (!config.realTimeMinutesSequence.includes(config.defaultFriendChallenge.minutes)) {
+    throw new FormatConfigError(
+      `Invalid defaultFriendChallenge.minutes: "${config.defaultFriendChallenge.minutes}" not found in realTimeMinutesSequence.`
+    );
+  }
+
+  if (!config.realTimeIncrementSequence.includes(config.defaultFriendChallenge.increment)) {
+    throw new FormatConfigError(
+      `Invalid defaultFriendChallenge.increment: "${config.defaultFriendChallenge.increment}" not found in realTimeIncrementSequence.`
+    );
+  }
+
   if (typeof config.minutesPerDay !== 'number' || config.minutesPerDay !== 1440) {
     throw new FormatConfigError('Invalid minutesPerDay: expected 1440.');
   }

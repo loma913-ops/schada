@@ -86,5 +86,17 @@ describe('formatConfig', () => {
       defaultIncrementSeconds: 999,
     };
     expect(() => validateFormatConfig(invalidIncrementSeconds)).toThrow('Invalid defaultIncrementSeconds');
+
+    const invalidFriendMinutes = {
+      ...FORMAT_CONFIG,
+      defaultFriendChallenge: { minutes: 999, increment: 0 },
+    };
+    expect(() => validateFormatConfig(invalidFriendMinutes)).toThrow('Invalid defaultFriendChallenge.minutes');
+
+    const invalidFriendIncrement = {
+      ...FORMAT_CONFIG,
+      defaultFriendChallenge: { minutes: 5, increment: 999 },
+    };
+    expect(() => validateFormatConfig(invalidFriendIncrement)).toThrow('Invalid defaultFriendChallenge.increment');
   });
 });

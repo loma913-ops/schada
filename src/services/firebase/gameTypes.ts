@@ -38,6 +38,7 @@ export interface GameRoom {
   abandonedAt?: number;
   blueDisconnectedAt?: number | null;
   greenDisconnectedAt?: number | null;
+  targetOpponent?: ArenaPlayer | null;
 }
 
 export interface GameTimeoutResult {
@@ -54,6 +55,7 @@ export interface CreateGameParams {
   colorPref?: PieceColor | 'random';
   isPrivate?: boolean;
   creator: ArenaPlayer;
+  targetOpponent?: ArenaPlayer | null;
 }
 
 export interface JoinGameResult {

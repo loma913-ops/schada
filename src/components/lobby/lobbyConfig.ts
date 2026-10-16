@@ -67,6 +67,10 @@ export interface LobbyConfig {
     readonly casual: string;
     readonly ranked: string;
   };
+  readonly modalTitles: {
+    readonly createMatch: string;
+    readonly challengePrefix: string;
+  };
 }
 
 /**
@@ -226,6 +230,16 @@ export function validateLobbyConfig(config: LobbyConfig): void {
   ) {
     throw new LobbyConfigError('Invalid modeLabels configuration in LobbyConfig.');
   }
+
+  if (
+    !config.modalTitles ||
+    typeof config.modalTitles.createMatch !== 'string' ||
+    config.modalTitles.createMatch.trim().length === 0 ||
+    typeof config.modalTitles.challengePrefix !== 'string' ||
+    config.modalTitles.challengePrefix.trim().length === 0
+  ) {
+    throw new LobbyConfigError('Invalid modalTitles configuration in LobbyConfig.');
+  }
 }
 
 export const LOBBY_CONFIG: LobbyConfig = Object.freeze({
@@ -270,6 +284,10 @@ export const LOBBY_CONFIG: LobbyConfig = Object.freeze({
   modeLabels: Object.freeze({
     casual: 'Casual',
     ranked: 'Rated',
+  }),
+  modalTitles: Object.freeze({
+    createMatch: 'Create Match',
+    challengePrefix: 'Challenge',
   }),
 });
 
@@ -427,13 +445,21 @@ export function isUserGameRoom(
   if (!room) return false;
 
   if (userId) {
-    if (room.bluePlayer?.id === userId || room.greenPlayer?.id === userId) {
+    if (
+      room.bluePlayer?.id === userId ||
+      room.greenPlayer?.id === userId ||
+      room.targetOpponent?.id === userId
+    ) {
       return true;
     }
   }
 
   if (guestId) {
-    if (room.bluePlayer?.id === guestId || room.greenPlayer?.id === guestId) {
+    if (
+      room.bluePlayer?.id === guestId ||
+      room.greenPlayer?.id === guestId ||
+      room.targetOpponent?.id === guestId
+    ) {
       return true;
     }
   }

@@ -61,7 +61,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Threat Detection Indicators**: Real-time visual attack badges on vulnerable pieces with toggleable player preferences.
 - **Goal Invulnerability Shield Badges**: Golden shield badges displayed on goal-line high pieces denoting capture immunity.
 - **Patron & Donation System**: Lichess-inspired patron page with configurable contribution tiers, fee offsets, and Stripe Payment Link integration.
-- **Correspondence Game Mode & Precision Custom Pairing**: Multi-day turn-based matches (1–14 days per move) and real-time custom time control sliders (0.5–180 min) with dedicated lobby filtering and adaptive clock formatting.
+- **Correspondence Game Mode & Precision Custom Pairing**: Multi-day turn-based matches (1–14 days per move), configurable friend challenges, and real-time custom time control sliders (0.5–180 min) with dedicated lobby filtering and adaptive clock formatting.
 - **Real-Time Abandonment & Disconnect Protection**: 60-second abandonment countdown for disconnected players on turn in real-time matches with automatic victory resolution and clock-timeout precedence.
 - **Patron Star Badge Recognition**: Golden Schada star badge displayed across lobbies, player cards, friends lists, leaderboards, and user profiles with automated duration tracking.
 - **Privacy-Preserving Telemetry & Google Analytics**: Integrated Firebase Google Analytics telemetry for application health, performance monitoring, and session metrics.
@@ -195,7 +195,7 @@ cd schada
 # 2. Install dependencies
 npm install
 
-# 3. Run unit test suite (72 test files, 655+ tests)
+# 3. Run unit test suite (76 test files, 708 tests)
 npm test
 
 # 4. Start local development server with HMR
@@ -414,7 +414,7 @@ schada/
 │   │   ├── board/                  # SVG board rendering, piece icons, vector lines, square highlights
 │   │   ├── game/                   # Arena layout, player cards, digital clocks, move navigator, game over modal
 │   │   ├── lobby/                  # Quick pairing, custom games, bot selection modal, player counts
-│   │   ├── friends/                # Social drawer, search, incoming/outgoing friend challenges
+│   │   ├── friends/                # Social drawer, search, incoming/outgoing friend challenges via Custom Game modal
 │   │   ├── leaderboard/            # Global Elo ranking table and tier badges
 │   │   ├── learn/                  # Interactive visual rules guide and movement vector diagrams
 │   │   ├── history/                # Historical background and origin of Jan Boogerd's 1936 game

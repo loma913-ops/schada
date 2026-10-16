@@ -37,7 +37,6 @@ const CustomGameModal = lazy(() => import('./components/lobby/CustomGameModal').
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
 import { ELO_CONFIG } from './core/elo/eloConfig';
-import { FORMAT_CONFIG } from './core/schada/formatConfig';
 import { localBackend, type UserProfile } from './services/firebase/localProvider';
 import { logPageView } from './services/firebase/analyticsService';
 
@@ -99,6 +98,7 @@ const MainApp: React.FC = () => {
   const [authOpen, setAuthOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [challengedFriend, setChallengedFriend] = useState<UserProfile | null>(null);
   const [customGameOpen, setCustomGameOpen] = useState(false);
   const [customGameInitialTab, setCustomGameInitialTab] = useState<'realtime' | 'correspondence'>('realtime');
   const [computerModalOpen, setComputerModalOpen] = useState(false);
@@ -135,7 +135,10 @@ const MainApp: React.FC = () => {
         if (authOpen) setAuthOpen(false);
         else if (profileOpen) setProfileOpen(false);
         else if (friendsOpen) setFriendsOpen(false);
-        else if (customGameOpen) setCustomGameOpen(false);
+        else if (customGameOpen) {
+          setCustomGameOpen(false);
+          setChallengedFriend(null);
+        }
         else if (computerModalOpen) setComputerModalOpen(false);
         else if (createRoomOpen) setCreateRoomOpen(false);
       },
@@ -320,50 +323,24 @@ const MainApp: React.FC = () => {
   const handleChallengeFriend = (friend: UserProfile) => {
     if (!user) return;
     setFriendsOpen(false);
-
-    const isDonor = isPatronUser(user);
-    const friendIsDonor = isPatronUser(friend);
-
-    setActiveMatch({
-      bluePlayer: {
-        id: user.id,
-        username: user.username,
-        elo: user.eloRating,
-        gamesPlayed: user.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
-        isPatron: isDonor,
-        hasDonated: isDonor,
-        patronTier: user.patronTier,
-        patronExpiresAt: user.patronExpiresAt,
-        patronSubscriptionStatus: user.patronSubscriptionStatus,
-      },
-      greenPlayer: {
-        id: friend.id,
-        username: friend.username,
-        elo: friend.eloRating,
-        gamesPlayed: ELO_CONFIG.defaultAssumedGamesPlayed,
-        isPatron: friendIsDonor,
-        hasDonated: friendIsDonor,
-        patronTier: friend.patronTier,
-        patronExpiresAt: friend.patronExpiresAt,
-        patronSubscriptionStatus: friend.patronSubscriptionStatus,
-      },
-      timeControlMinutes: FORMAT_CONFIG.defaultFriendChallenge.minutes,
-      incrementSeconds: FORMAT_CONFIG.defaultFriendChallenge.increment,
-      isRanked: true,
-      userColor: 'blue',
-      isComputer: false,
-      initialState: createInitialGameState(),
-    });
+    setChallengedFriend(friend);
+    setCustomGameInitialTab('realtime');
+    setCustomGameOpen(true);
   };
 
-  // Custom Match Creation (Player vs Player) - Routes to Multiplayer Room
-  const handleCreateCustom = async (minutes: number, increment: number, isRanked: boolean, colorPref?: PieceColor) => {
+  // Custom Match Creation (Player vs Player) - Routes to Multiplayer Room or Friend Match
+  const handleCreateCustom = async (
+    minutes: number,
+    increment: number,
+    isRanked: boolean,
+    colorPref?: PieceColor
+  ) => {
     const guestId = getOrCreateGuestId();
     const { guestName: guestNameKey } = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys;
 
     const isDonor = isPatronUser(user);
 
-    const creator = user
+    const creator: ArenaPlayer = user
       ? {
         id: user.id,
         username: user.username,
@@ -389,17 +366,41 @@ const MainApp: React.FC = () => {
         hasDonated: false,
       };
 
-    const result = await createGame({
-      timeControlMinutes: minutes,
-      incrementSeconds: minutes === 0 ? 0 : increment,
-      isRanked: isRanked && Boolean(user),
-      colorPref: colorPref ?? 'random',
-      isPrivate: false,
-      creator,
-    });
+    let targetOpponent: ArenaPlayer | null = null;
+    if (challengedFriend) {
+      const friendIsDonor = isPatronUser(challengedFriend);
+      targetOpponent = {
+        id: challengedFriend.id,
+        username: challengedFriend.username,
+        elo: challengedFriend.eloRating,
+        gamesPlayed: challengedFriend.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+        isPatron: friendIsDonor,
+        hasDonated: friendIsDonor,
+        patronTier: challengedFriend.patronTier,
+        patronExpiresAt: challengedFriend.patronExpiresAt,
+        patronSubscriptionStatus: challengedFriend.patronSubscriptionStatus,
+      };
+    }
 
+    try {
+      const result = await createGame({
+        timeControlMinutes: minutes,
+        incrementSeconds: minutes === 0 ? 0 : increment,
+        isRanked: isRanked && Boolean(user),
+        colorPref: colorPref ?? 'random',
+        isPrivate: false,
+        creator,
+        targetOpponent,
+      });
 
-    navigate(`/game/${result.gameId}`);
+      setChallengedFriend(null);
+      setCustomGameOpen(false);
+      navigate(`/game/${result.gameId}`);
+    } catch (err) {
+      console.error('Failed to create custom game / challenge:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      alert(`Failed to create game: ${message}`);
+    }
   };
 
   // Game completion handler (updates Elo and records if ranked)
@@ -505,7 +506,11 @@ const MainApp: React.FC = () => {
                 {currentTab === 'play' ? (
                   activeMatch ? (
                     <Arena
-                      key={activeMatch.userColor ? `match-${activeMatch.userColor}-${activeMatch.isComputer ? 'bot' : 'pvp'}` : 'match-pass-and-play'}
+                      key={
+                        activeMatch.userColor
+                          ? `match-${activeMatch.bluePlayer.id}-${activeMatch.greenPlayer.id}-${activeMatch.timeControlMinutes}-${activeMatch.incrementSeconds ?? 0}-${activeMatch.userColor}-${activeMatch.isComputer ? 'bot' : 'pvp'}`
+                          : 'match-pass-and-play'
+                      }
                       initialState={activeMatch.initialState}
                       bluePlayer={activeMatch.bluePlayer}
                       greenPlayer={activeMatch.greenPlayer}
@@ -525,6 +530,7 @@ const MainApp: React.FC = () => {
                           onSelectTimeControl={handleStartQuickPair}
                           onStartPassAndPlay={handleStartPassAndPlay}
                           onOpenCustomModal={(tab) => {
+                            setChallengedFriend(null);
                             setCustomGameInitialTab(tab || 'realtime');
                             setCustomGameOpen(true);
                           }}
@@ -587,9 +593,13 @@ const MainApp: React.FC = () => {
         {customGameOpen && (
           <CustomGameModal
             isOpen={customGameOpen}
-            onClose={() => setCustomGameOpen(false)}
+            onClose={() => {
+              setCustomGameOpen(false);
+              setChallengedFriend(null);
+            }}
             onCreateGame={handleCreateCustom}
             initialTab={customGameInitialTab}
+            challengedFriendUsername={challengedFriend?.username}
           />
         )}
         {computerModalOpen && (

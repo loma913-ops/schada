@@ -74,4 +74,41 @@ describe('CustomGameModal Component', () => {
     expect(correspondenceHtml).toContain('Preferred Army Color');
     expect(correspondenceHtml).toContain('Create Match &amp; Add to Lobby');
   });
+
+  it('renders Challenge <Username> title when challengedFriendUsername is provided', () => {
+    const html = renderToStaticMarkup(
+      <CustomGameModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onCreateGame={vi.fn()}
+        challengedFriendUsername="Pokshtya"
+      />
+    );
+    expect(html).toContain('Challenge Pokshtya');
+    expect(html).not.toContain('<h2 class="modal-title">Create Match</h2>');
+    // Button text remains standard as per user review
+    expect(html).toContain('Create Match &amp; Add to Lobby');
+  });
+
+  it('falls back to Create Match title when challengedFriendUsername is null or empty', () => {
+    const nullHtml = renderToStaticMarkup(
+      <CustomGameModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onCreateGame={vi.fn()}
+        challengedFriendUsername={null}
+      />
+    );
+    expect(nullHtml).toContain('<h2 class="modal-title">Create Match</h2>');
+
+    const emptyHtml = renderToStaticMarkup(
+      <CustomGameModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onCreateGame={vi.fn()}
+        challengedFriendUsername="   "
+      />
+    );
+    expect(emptyHtml).toContain('<h2 class="modal-title">Create Match</h2>');
+  });
 });

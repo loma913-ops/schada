@@ -113,6 +113,42 @@ describe('GameService Multiplayer Sync', () => {
     expect(specRes.role).toBe('spectator');
   });
 
+  it('restricts joining to targetOpponent when targetOpponent is specified', async () => {
+    const creator = { id: 'host_id', username: 'HostUser', elo: 1300 };
+    const targetOpponent = { id: 'target_id', username: 'TargetUser', elo: 1350 };
+    const { gameId } = await createGame({
+      timeControlMinutes: 10,
+      colorPref: 'blue',
+      isPrivate: false,
+      creator,
+      targetOpponent,
+    });
+
+    const room = localGameStore.get(gameId);
+    expect(room?.targetOpponent?.id).toBe('target_id');
+    expect(room?.targetOpponent?.username).toBe('TargetUser');
+
+    // Clear local session token
+    localStorage.removeItem('schada_player_token_' + gameId);
+
+    // Unrelated player attempts to join
+    const randomUser = { id: 'random_id', username: 'RandomUser', elo: 1200 };
+    const randomRes = await joinGame(gameId, randomUser);
+    expect(randomRes.success).toBe(false);
+    expect(randomRes.role).toBe('spectator');
+    expect(randomRes.error).toBe(MULTIPLAYER_SCALE_CONFIG.matchmaking.challengeReservedErrorMessage);
+
+    // Targeted opponent joins
+    const targetRes = await joinGame(gameId, targetOpponent);
+    expect(targetRes.success).toBe(true);
+    expect(targetRes.role).toBe('player');
+    expect(targetRes.color).toBe('green');
+
+    const updatedRoom = localGameStore.get(gameId);
+    expect(updatedRoom?.status).toBe('in_progress');
+    expect(updatedRoom?.greenPlayer?.id).toBe('target_id');
+  });
+
   it('allows players to execute moves and switches turns', async () => {
     const creator = { id: 'p1', username: 'BluePlayer', elo: 1300 };
     const { gameId } = await createGame({

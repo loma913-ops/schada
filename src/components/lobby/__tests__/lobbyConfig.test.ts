@@ -132,6 +132,27 @@ describe('LobbyConfig validation and helpers', () => {
     expect(() => validateLobbyConfig(emptyCasualLabel)).toThrowError(
       /Invalid modeLabels configuration/
     );
+
+    const invalidModalTitles = { ...LOBBY_CONFIG, modalTitles: null as any };
+    expect(() => validateLobbyConfig(invalidModalTitles)).toThrowError(
+      /Invalid modalTitles configuration/
+    );
+
+    const emptyCreateMatch = {
+      ...LOBBY_CONFIG,
+      modalTitles: { createMatch: '  ', challengePrefix: 'Challenge' },
+    };
+    expect(() => validateLobbyConfig(emptyCreateMatch)).toThrowError(
+      /Invalid modalTitles configuration/
+    );
+
+    const emptyChallengePrefix = {
+      ...LOBBY_CONFIG,
+      modalTitles: { createMatch: 'Create Match', challengePrefix: '' },
+    };
+    expect(() => validateLobbyConfig(emptyChallengePrefix)).toThrowError(
+      /Invalid modalTitles configuration/
+    );
   });
 
   describe('parseStoredLobbyFilters', () => {
@@ -271,6 +292,18 @@ describe('LobbyConfig validation and helpers', () => {
       expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_blue')).toBe(true);
       expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_green')).toBe(true);
       expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_random')).toBe(false);
+    });
+
+    it('identifies room ownership when user is the targetOpponent', () => {
+      const targetedRoom: GameRoom = {
+        ...baseRoom,
+        bluePlayer: { id: 'challenger_1', username: 'Challenger', elo: 1200, sessionToken: 'tok_chal' },
+        greenPlayer: null,
+        targetOpponent: { id: 'challengee_2', username: 'Challengee', elo: 1300 },
+      };
+      expect(isUserGameRoom(targetedRoom, 'challengee_2')).toBe(true);
+      expect(isUserGameRoom(targetedRoom, undefined, 'challengee_2')).toBe(true);
+      expect(isUserGameRoom(targetedRoom, 'unrelated_user')).toBe(false);
     });
 
     it('returns false when no matching credentials are provided', () => {

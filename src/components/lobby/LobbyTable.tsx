@@ -184,6 +184,9 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
       if (room.status === 'in_progress' && !filters.statuses.inProgress) return false;
       if (room.status !== 'waiting' && room.status !== 'in_progress') return false;
 
+      // Do not show targeted challenges to unrelated players in Available Games
+      if (room.status === 'waiting' && room.targetOpponent) return false;
+
       // 2. Time category filter
       const category = determineTimeCategory(room.timeControlMinutes, room.incrementSeconds || 0);
       if (!filters.timeControls[category]) return false;
@@ -227,7 +230,7 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
         ? room.bluePlayer === host
           ? room.greenPlayer
           : room.bluePlayer
-        : null;
+        : room.targetOpponent || null;
 
     const defaultHostName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;
     const defaultOpponentName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestName;
@@ -269,17 +272,23 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
           />
           <span
             className="player-names-text"
-            title={isWaiting ? `${hostName} vs ?` : `${hostName} vs ${oppName}`}
+            title={
+              isWaiting
+                ? oppName
+                  ? `${hostName} vs ${oppName}`
+                  : `${hostName} vs ?`
+                : `${hostName} vs ${oppName}`
+            }
           >
             <strong className="host-name">{hostName}</strong>
             {isPatronUser(host) && (
               <PatronBadge size={11} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
             )}
             <span className="vs-sep"> vs </span>
-            <span className={isWaiting ? 'waiting-placeholder' : 'opponent-name'}>
+            <span className={isWaiting && !oppName ? 'waiting-placeholder' : 'opponent-name'}>
               {oppName || '?'}
             </span>
-            {!isWaiting && isPatronUser(opponent) && (
+            {isPatronUser(opponent) && (
               <PatronBadge size={11} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
             )}
           </span>

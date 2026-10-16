@@ -393,5 +393,63 @@ describe('LobbyTable Component - Guest Ranked Restriction', () => {
       expect(html).not.toContain(LOBBY_CONFIG.sectionTitles.myGames);
       expect(html).not.toContain(LOBBY_CONFIG.sectionTitles.availableGames);
     });
+
+    it('displays targeted challenge in My Games for both challenger and challengee with names rendered', () => {
+      const targetedRoom: GameRoom = {
+        id: 'targeted_123',
+        isRanked: true,
+        isPrivate: false,
+        status: 'waiting',
+        timeControlMinutes: 5,
+        incrementSeconds: 3,
+        creatorColorPref: 'random',
+        currentTurn: 'blue',
+        createdAt: Date.now(),
+        blueTimeMs: 300000,
+        greenTimeMs: 300000,
+        lastTurnStartTimeMs: null,
+        bluePlayer: { id: 'usr_challenger', username: 'Challenger', elo: 1400, sessionToken: 'tok_chal' },
+        greenPlayer: null,
+        targetOpponent: { id: 'usr_challengee', username: 'Challengee', elo: 1350 },
+        boardState: {} as any,
+      };
+
+      // 1. For Challengee: room appears in "My Games" and renders "Challenger vs Challengee"
+      mockUseAuth.mockReturnValue({
+        user: { id: 'usr_challengee', username: 'Challengee', elo: 1350 },
+        isLoading: false,
+      });
+
+      const htmlChallengee = renderToStaticMarkup(
+        <LobbyTable
+          initialWaitingRooms={[targetedRoom]}
+          initialInProgressRooms={[]}
+        />
+      );
+
+      expect(htmlChallengee).toContain(LOBBY_CONFIG.sectionTitles.myGames);
+      expect(htmlChallengee).toContain('Challenger');
+      expect(htmlChallengee).toContain('Challengee');
+      expect(htmlChallengee).toContain('opponent-name');
+      expect(htmlChallengee).not.toContain('waiting-placeholder');
+
+      // 2. For an unrelated third player: targeted challenge is excluded from Available Games
+      mockUseAuth.mockReturnValue({
+        user: { id: 'usr_unrelated', username: 'ThirdPlayer', elo: 1200 },
+        isLoading: false,
+      });
+
+      const htmlThirdParty = renderToStaticMarkup(
+        <LobbyTable
+          initialWaitingRooms={[targetedRoom]}
+          initialInProgressRooms={[]}
+        />
+      );
+
+      // Unrelated player should see empty filter state (no matching available games) and no My Games
+      expect(htmlThirdParty).not.toContain(LOBBY_CONFIG.sectionTitles.myGames);
+      expect(htmlThirdParty).toContain(LOBBY_CONFIG.emptyFilterTitle);
+      expect(htmlThirdParty).not.toContain('Challenger');
+    });
   });
 });

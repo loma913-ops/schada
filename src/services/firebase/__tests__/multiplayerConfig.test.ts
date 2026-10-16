@@ -455,5 +455,16 @@ describe('MultiplayerScaleConfig validation', () => {
     expect(() =>
       validateMultiplayerScaleConfig(emptyDisconnectionTooltipCountdown as MultiplayerScaleConfig)
     ).toThrowError(/Invalid matchmaking.disconnectionTooltipCountdownPrefix/);
+
+    const emptyChallengeReservedErrorMessage = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        challengeReservedErrorMessage: '   ',
+      },
+    };
+    expect(() =>
+      validateMultiplayerScaleConfig(emptyChallengeReservedErrorMessage as MultiplayerScaleConfig)
+    ).toThrowError(/Invalid matchmaking.challengeReservedErrorMessage/);
   });
 });

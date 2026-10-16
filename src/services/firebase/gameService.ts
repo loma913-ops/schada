@@ -170,6 +170,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
       blueTimeMs: initialTimeMs,
       greenTimeMs: initialTimeMs,
       lastTurnStartTimeMs: null,
+      targetOpponent: params.targetOpponent || null,
     };
 
     if (isFirebaseConfigured() && db) {
@@ -254,6 +255,14 @@ export async function joinGame(
 
       // If game is waiting for an opponent, atomically claim the empty seat!
       if (game.status === 'waiting') {
+        if (game.targetOpponent && game.targetOpponent.id !== user.id) {
+          return {
+            success: false,
+            role: 'spectator',
+            error: MULTIPLAYER_SCALE_CONFIG.matchmaking.challengeReservedErrorMessage,
+          };
+        }
+
         const newToken = generateToken();
         setLocalSessionToken(gameId, newToken);
 
@@ -332,6 +341,14 @@ export async function joinGame(
   }
 
   if (game.status === 'waiting') {
+    if (game.targetOpponent && game.targetOpponent.id !== user.id) {
+      return {
+        success: false,
+        role: 'spectator',
+        error: MULTIPLAYER_SCALE_CONFIG.matchmaking.challengeReservedErrorMessage,
+      };
+    }
+
     const newToken = generateToken();
     setLocalSessionToken(gameId, newToken);
 
