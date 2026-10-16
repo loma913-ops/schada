@@ -175,6 +175,42 @@ let lastKnownRemoteActive: boolean | null = null;
 let lastThrottleRecord = 0;
 let lastNotifiedStats: LobbyStats | null = null;
 
+/**
+ * Marks remote presence as synchronized to eliminate redundant startup/auth writes.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant in-memory scalar updates and timestamp assignment.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ * - Growth Rate: O(1) invariant to user activity frequency, tab count, or session duration.
+ *
+ * @param status Presence status state ('online' | 'in-game' | 'offline').
+ * @param isActive Whether client is currently active.
+ */
+export function markRemotePresenceSynced(status: 'online' | 'in-game' | 'offline', isActive: boolean = true): void {
+  lastRemoteHeartbeatTime = Date.now();
+  lastKnownRemoteStatus = status;
+  lastKnownRemoteActive = isActive;
+}
+
+/**
+ * Returns true if remote presence was synchronized within HEARTBEAT_INTERVAL_MS and matches the expected status.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) constant in-memory scalar comparison.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ * - Growth Rate: O(1) invariant to elapsed session duration.
+ *
+ * @param expectedStatus Optional expected presence status.
+ * @returns boolean indicating whether the remote presence is fresh.
+ */
+export function isRemotePresenceFresh(expectedStatus?: 'online' | 'in-game' | 'offline'): boolean {
+  const now = Date.now();
+  const withinHeartbeat = now - lastRemoteHeartbeatTime < HEARTBEAT_INTERVAL_MS;
+  if (!withinHeartbeat) return false;
+  if (expectedStatus !== undefined && lastKnownRemoteStatus !== expectedStatus) return false;
+  return true;
+}
+
 export function resetPresenceStateForTesting(): void {
   lastUserActivityTime = Date.now();
   lastThrottleRecord = 0;
@@ -661,6 +697,8 @@ const STALE_GUEST_CUTOFF_MS = MULTIPLAYER_SCALE_CONFIG.presence.staleGuestCutoff
  */
 export async function pruneStaleGuestSessions(): Promise<void> {
   if (!db || !isFirebaseConfigured()) return;
+  // If the current tab/client is not active, or if it is already a registered user, skip pruning
+  if (!isCurrentClientActive() || isCurrentClientRegistered().isRegistered) return;
   const now = Date.now();
   if (now - lastStaleGuestPruneTime < STALE_GUEST_PRUNE_INTERVAL_MS) return;
   lastStaleGuestPruneTime = now;
@@ -734,6 +772,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
   let unsubscribeStatsDoc: (() => void) | null = null;
   let countPollTimer: ReturnType<typeof setInterval> | null = null;
   let fallbackInitTimeout: ReturnType<typeof setTimeout> | null = null;
+  let handleVisibilityChange: (() => void) | null = null;
 
   if (isFirebaseConfigured() && db) {
     try {
@@ -750,6 +789,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
       // Employs in-flight deduplication and 10s cooldown to eliminate redundant concurrent network reads.
       const refreshServerCounts = async (force: boolean = false): Promise<void> => {
         if (!db) return;
+        if (typeof document !== 'undefined' && document.hidden) return;
         const now = Date.now();
         if (!force && inFlightRefreshPromise) return inFlightRefreshPromise;
         if (!force && now - lastServerCountsRefreshTime < MULTIPLAYER_SCALE_CONFIG.presence.serverCountsCooldownMs) return;
@@ -809,6 +849,15 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
 
         return inFlightRefreshPromise;
       };
+
+      if (typeof document !== 'undefined') {
+        handleVisibilityChange = () => {
+          if (!document.hidden) {
+            refreshServerCounts();
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
 
       unsubscribeStatsDoc = onSnapshot(
         statsDocRef,
@@ -876,9 +925,12 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
 
   return () => {
     statsSubscribers.delete(callback);
+    if (typeof document !== 'undefined' && handleVisibilityChange) {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('schada_user_status_changed', handleCustomStatus);
+      window.removeEventListener(LOCAL_CONFIG.events.userStatusChanged, handleCustomStatus);
     }
     if (unsubscribeStatsDoc) unsubscribeStatsDoc();
     if (countPollTimer) clearInterval(countPollTimer);

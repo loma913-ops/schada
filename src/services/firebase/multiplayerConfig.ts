@@ -21,6 +21,7 @@ export interface PresenceStorageKeys {
   readonly cachedLeaderboard: string;
   readonly cachedLeaderboardTime: string;
   readonly legacyFriendsMigratedPrefix: string;
+  readonly reconcileLastRunPrefix: string;
 }
 
 export interface PresenceConfig {
@@ -67,6 +68,7 @@ export interface MatchmakingConfig {
   readonly minGamesPlayedForLeaderboard: number;
   readonly clockSyncJitterThresholdMs: number;
   readonly reconcileEloBatchLimit: number;
+  readonly reconcileCooldownMs: number;
   readonly guestRankedErrorMessage: string;
   readonly guestRankedNoticeTitle: string;
   readonly guestRankedNoticeMessage: string;
@@ -209,6 +211,18 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
+  if (presence.friendsCacheTtlMs >= presence.friendsPollIntervalMs) {
+    throw new MultiplayerConfigError(
+      `Invalid presence configuration: friendsCacheTtlMs (${presence.friendsCacheTtlMs}ms) must be strictly less than friendsPollIntervalMs (${presence.friendsPollIntervalMs}ms).`
+    );
+  }
+
+  if (presence.friendsPollIntervalMs > presence.friendFreshnessThresholdMs) {
+    throw new MultiplayerConfigError(
+      `Invalid presence configuration: friendsPollIntervalMs (${presence.friendsPollIntervalMs}ms) cannot exceed friendFreshnessThresholdMs (${presence.friendFreshnessThresholdMs}ms).`
+    );
+  }
+
   if (typeof presence.usernameSearchCacheTtlMs !== 'number' || presence.usernameSearchCacheTtlMs <= 0) {
     throw new MultiplayerConfigError(
       `Invalid presence.usernameSearchCacheTtlMs: expected positive number, received ${presence.usernameSearchCacheTtlMs}.`
@@ -240,6 +254,7 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     cachedLeaderboard,
     cachedLeaderboardTime,
     legacyFriendsMigratedPrefix,
+    reconcileLastRunPrefix,
   } = presence.storageKeys;
   const storageKeyEntries = {
     sessionStorageId,
@@ -256,6 +271,7 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     cachedLeaderboard,
     cachedLeaderboardTime,
     legacyFriendsMigratedPrefix,
+    reconcileLastRunPrefix,
   };
   for (const [keyName, val] of Object.entries(storageKeyEntries)) {
     if (typeof val !== 'string' || val.trim().length === 0) {
@@ -442,6 +458,15 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
   }
 
   if (
+    typeof matchmaking.reconcileCooldownMs !== 'number' ||
+    matchmaking.reconcileCooldownMs <= 0
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.reconcileCooldownMs: expected positive number, received ${matchmaking.reconcileCooldownMs}.`
+    );
+  }
+
+  if (
     typeof matchmaking.guestRankedErrorMessage !== 'string' ||
     matchmaking.guestRankedErrorMessage.trim().length === 0
   ) {
@@ -564,12 +589,12 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     statsPollIntervalMs: 12_000,
     statsPollJitterMs: 3_000,
     statsInitialFallbackDelayMs: 2_000,
-    statsFallbackPollIntervalMs: 60_000,
+    statsFallbackPollIntervalMs: 120_000,
     friendFreshnessThresholdMs: 45_000,
-    staleGuestPruneIntervalMs: 5 * 60 * 1000,
+    staleGuestPruneIntervalMs: 15 * 60 * 1000,
     staleGuestCutoffMs: 15 * 60 * 1000,
-    friendsPollIntervalMs: 12_000,
-    friendsCacheTtlMs: 10_000,
+    friendsPollIntervalMs: 30_000,
+    friendsCacheTtlMs: 25_000,
     usernameSearchCacheTtlMs: 60_000,
     serverCountsCooldownMs: 10_000,
     storageKeys: Object.freeze({
@@ -587,6 +612,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
       cachedLeaderboard: 'schada_cached_leaderboard',
       cachedLeaderboardTime: 'schada_cached_leaderboard_time',
       legacyFriendsMigratedPrefix: 'schada_friends_migrated_',
+      reconcileLastRunPrefix: 'schada_last_reconciled_',
     }),
   }),
   matchmaking: Object.freeze({
@@ -613,6 +639,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     minGamesPlayedForLeaderboard: 1,
     clockSyncJitterThresholdMs: 1500,
     reconcileEloBatchLimit: 5,
+    reconcileCooldownMs: 10 * 60 * 1000,
     guestRankedErrorMessage: 'Guests cannot play in ranked games. Please sign in to play ranked matches.',
     guestRankedNoticeTitle: 'Account Required',
     guestRankedNoticeMessage: 'Guests cannot play in ranked games. Please sign in or create an account to challenge the host, or watch as a spectator.',

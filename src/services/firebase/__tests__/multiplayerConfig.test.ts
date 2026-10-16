@@ -488,5 +488,55 @@ describe('MultiplayerScaleConfig validation', () => {
     expect(() =>
       validateMultiplayerScaleConfig(emptyChallengeReservedErrorMessage as MultiplayerScaleConfig)
     ).toThrowError(/Invalid matchmaking.challengeReservedErrorMessage/);
+
+    const emptyReconcilePrefix = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        storageKeys: {
+          ...MULTIPLAYER_SCALE_CONFIG.presence.storageKeys,
+          reconcileLastRunPrefix: '  ',
+        },
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(emptyReconcilePrefix as MultiplayerScaleConfig)).toThrowError(
+      /Invalid presence.storageKeys.reconcileLastRunPrefix/
+    );
+
+    const invalidReconcileCooldown = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      matchmaking: {
+        ...MULTIPLAYER_SCALE_CONFIG.matchmaking,
+        reconcileCooldownMs: 0,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidReconcileCooldown as MultiplayerScaleConfig)).toThrowError(
+      /Invalid matchmaking.reconcileCooldownMs/
+    );
+
+    const invertedFriendCache = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        friendsPollIntervalMs: 20_000,
+        friendsCacheTtlMs: 25_000,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invertedFriendCache as MultiplayerScaleConfig)).toThrowError(
+      /friendsCacheTtlMs .* must be strictly less than friendsPollIntervalMs/
+    );
+
+    const excessiveFriendPoll = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        friendFreshnessThresholdMs: 40_000,
+        friendsPollIntervalMs: 50_000,
+        friendsCacheTtlMs: 30_000,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(excessiveFriendPoll as MultiplayerScaleConfig)).toThrowError(
+      /friendsPollIntervalMs .* cannot exceed friendFreshnessThresholdMs/
+    );
   });
 });

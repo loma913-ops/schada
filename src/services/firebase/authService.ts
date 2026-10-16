@@ -35,6 +35,9 @@ import {
   isCurrentClientActive,
   syncPresenceHeartbeat,
   cleanupCurrentTabSession,
+  markRemotePresenceSynced,
+  isRemotePresenceFresh,
+  getCurrentActivityContext,
 } from './presenceService';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { LOCAL_CONFIG } from './localConfig';
@@ -413,6 +416,7 @@ export async function registerUser(
       });
     });
 
+    markRemotePresenceSynced('online', true);
     persistCachedProfile(userProfile);
     syncPresenceHeartbeat();
     return userProfile;
@@ -471,6 +475,7 @@ export async function logoutUser(): Promise<void> {
           status: 'offline',
           lastSeen: new Date(0),
         });
+        markRemotePresenceSynced('offline', false);
       } catch (e) {
         console.warn('Could not update status to offline on logout:', e);
       }
@@ -605,11 +610,18 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
         try {
           const userDocRef = doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, firebaseUser.uid);
           const active = isCurrentClientActive();
-          const status = active ? 'online' : 'offline';
-          await updateDoc(userDocRef, {
-            status,
-            lastSeen: active ? serverTimestamp() : new Date(0),
-          });
+          const activityContext = getCurrentActivityContext();
+          const targetStatus: 'online' | 'in-game' | 'offline' = active
+            ? (activityContext === 'in-game' ? 'in-game' : 'online')
+            : 'offline';
+
+          if (!isRemotePresenceFresh(targetStatus)) {
+            await updateDoc(userDocRef, {
+              status: targetStatus,
+              lastSeen: active ? serverTimestamp() : new Date(0),
+            });
+            markRemotePresenceSynced(targetStatus, active);
+          }
           syncPresenceHeartbeat();
 
           unsubscribeDoc = onSnapshot(

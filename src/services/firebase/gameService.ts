@@ -442,6 +442,7 @@ export async function makeGameMove(
   playerColor: PieceColor,
   currentGame?: GameRoom
 ): Promise<void> {
+  clearDisconnectState(gameId);
   const now = Date.now();
 
   if (isFirebaseConfigured() && db) {
@@ -556,6 +557,7 @@ export async function resignGameAction(
     }
     return null;
   } finally {
+    clearDisconnectState(gameId);
     pendingResolutionGameIds.delete(gameId);
   }
 }
@@ -669,12 +671,35 @@ export async function timeoutGameAction(
     }
     return null;
   } finally {
+    clearDisconnectState(gameId);
     pendingResolutionGameIds.delete(gameId);
+  }
+}
+
+const lastDispatchedDisconnectState = new Map<string, boolean>();
+
+/**
+ * Clears cached disconnect state for a specific game or all games.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) in-memory Map key deletion or Map.clear().
+ * - Auxiliary Space Complexity: O(1) constant scalar memory.
+ * - Growth Rate: O(1) flat execution cost, strictly avoiding network or storage operations.
+ *
+ * @param gameId Optional game identifier to clear specific player disconnect keys. If omitted, clears all entries.
+ */
+export function clearDisconnectState(gameId?: string): void {
+  if (gameId) {
+    lastDispatchedDisconnectState.delete(`${gameId}_blue`);
+    lastDispatchedDisconnectState.delete(`${gameId}_green`);
+  } else {
+    lastDispatchedDisconnectState.clear();
   }
 }
 
 /**
  * Updates a player's disconnected status timestamp in real time.
+ * Deduplicates redundant updates when the disconnect status has not transitioned.
  *
  * Algorithmic Complexity:
  * - Time Complexity: O(1) single-document write/update.
@@ -698,6 +723,12 @@ export async function setPlayerDisconnectedAction(
   if (color !== 'blue' && color !== 'green') {
     throw new RangeError(`Invalid color: expected "blue" or "green", received "${color}".`);
   }
+
+  const stateKey = `${gameId}_${color}`;
+  if (lastDispatchedDisconnectState.get(stateKey) === disconnected) {
+    return;
+  }
+  lastDispatchedDisconnectState.set(stateKey, disconnected);
 
   const updatePayload: Partial<GameRoom> = {
     [color === 'blue' ? 'blueDisconnectedAt' : 'greenDisconnectedAt']: disconnected ? Date.now() : null,
@@ -866,11 +897,13 @@ export async function abandonGameDueToDisconnectAction(
     }
     return null;
   } finally {
+    clearDisconnectState(gameId);
     pendingResolutionGameIds.delete(gameId);
   }
 }
 
 export async function abandonGame(gameId: string): Promise<void> {
+  clearDisconnectState(gameId);
   const now = Date.now();
   const updatePayload: Partial<GameRoom> = {
     status: 'abandoned',
@@ -894,6 +927,7 @@ export async function abandonGame(gameId: string): Promise<void> {
 }
 
 export async function deleteGame(gameId: string): Promise<void> {
+  clearDisconnectState(gameId);
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(SESSION_STORAGE_PREFIX + gameId);
   }

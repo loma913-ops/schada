@@ -70,6 +70,7 @@ export const GameRoomView: React.FC = () => {
   // Track if elo was updated for this game
   const eloUpdatedRef = useRef(false);
   const eloUpdatePromiseRef = useRef<Promise<void> | null>(null);
+  const disconnectReportedRef = useRef(false);
 
   // Redirect if game ID fails strict canonical validation
   useEffect(() => {
@@ -238,7 +239,7 @@ export const GameRoomView: React.FC = () => {
       }
       setHasJoined(true);
     });
-  }, [gameId, game, user, hasJoined, guestName, authLoading]);
+  }, [gameId, game, user, hasJoined, guestName, authLoading, isGuest]);
 
   const handleConfirmGuestName = (e: React.FormEvent) => {
     e.preventDefault();
@@ -362,6 +363,7 @@ export const GameRoomView: React.FC = () => {
     }
     const isDc = userColor === 'blue' ? Boolean(game.blueDisconnectedAt) : Boolean(game.greenDisconnectedAt);
     if (isDc) {
+      disconnectReportedRef.current = false;
       setPlayerDisconnectedAction(gameId, userColor, false);
     }
   }, [gameId, game?.blueDisconnectedAt, game?.greenDisconnectedAt, userColor, isSpectator, game?.status, game?.timeControlMinutes]);
@@ -386,7 +388,10 @@ export const GameRoomView: React.FC = () => {
         return;
       }
 
-      setPlayerDisconnectedAction(gameId, color, true);
+      if (!disconnectReportedRef.current) {
+        disconnectReportedRef.current = true;
+        setPlayerDisconnectedAction(gameId, color, true);
+      }
     };
 
     window.addEventListener('beforeunload', handleLeave);
@@ -711,7 +716,8 @@ export const GameRoomView: React.FC = () => {
             }
           } else if (game.status === 'in_progress' && userColor && !isSpectator && gameId) {
             const isCorrespondence = game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
-            if (!isCorrespondence) {
+            if (!isCorrespondence && !disconnectReportedRef.current) {
+              disconnectReportedRef.current = true;
               await setPlayerDisconnectedAction(gameId, userColor, true);
             }
           }

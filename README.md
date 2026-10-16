@@ -56,7 +56,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Per-Mode Elo & Performance Statistics**: Independent Elo ratings and match records for Bullet, Blitz, Rapid, Classical, and Correspondence modes across in-game play, profiles, and human-only leaderboards with instant stale-while-revalidate local caching.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
 - **Zero-Cache Deployment & Session Recovery**: Immediate cache bypass, background service worker updates, and seamless auto-recovery without hard reload.
-- **Optimized Firestore CRUD Architecture**: Composite index-aligned FIFO lobby/matchmaking queries, localStorage SWR leaderboard cache with immediate Elo-change invalidation, in-memory friends profile and username search caches, time-bounded cleanup queries, and self-healing ordered Elo reconciliation with automatic fallback.
+- **Optimized Firestore CRUD Architecture**: Minimal billable reads and writes via presence sync gating, in-flight deduplication, session reconciliation cooldowns, and cached subscriptions.
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 - **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
 - **Threat Detection Indicators**: Real-time visual attack badges on vulnerable pieces with toggleable player preferences.

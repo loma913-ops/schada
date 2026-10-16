@@ -28,10 +28,36 @@ interface CacheEntry<T> {
 }
 const friendsCache = new Map<string, CacheEntry<UserProfile[]>>();
 const friendsInflight = new Map<string, Promise<UserProfile[]>>();
+const pendingRequestsCache = new Map<string, CacheEntry<LocalFriendRequest[]>>();
+const pendingRequestsInflight = new Map<string, Promise<LocalFriendRequest[]>>();
 
-/** Evicts the cached friends list for a specific user. Call after any friendship mutation. */
-export function invalidateFriendsCache(userId: string): void {
-  friendsCache.delete(userId);
+/** Evicts the cached friends list and pending requests for a specific user. Call after any friendship mutation. */
+export function invalidateFriendsCache(userId?: string): void {
+  if (userId) {
+    friendsCache.delete(userId);
+    pendingRequestsCache.delete(userId);
+  } else {
+    friendsCache.clear();
+    pendingRequestsCache.clear();
+  }
+}
+
+/**
+ * Evicts the cached pending incoming requests for a specific user or all users.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) in-memory Map key deletion or Map.clear().
+ * - Auxiliary Space Complexity: O(1) constant scalar memory.
+ * - Growth Rate: O(1) constant, strictly zero network overhead.
+ *
+ * @param userId Optional user identifier to invalidate. If omitted, clears the entire pending requests cache.
+ */
+export function invalidatePendingRequestsCache(userId?: string): void {
+  if (userId) {
+    pendingRequestsCache.delete(userId);
+  } else {
+    pendingRequestsCache.clear();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,9 +139,11 @@ export async function sendFriendRequest(
       createdAt: serverTimestamp(),
     });
 
-    // Invalidate cached friends list for both parties since a request was sent
+    // Invalidate cached friends list and pending requests for both parties
     invalidateFriendsCache(currentUser.id);
     invalidateFriendsCache(targetUser.id);
+    invalidatePendingRequestsCache(currentUser.id);
+    invalidatePendingRequestsCache(targetUser.id);
     // Also evict the search cache entry so a fresh profile is read on next lookup
     searchCache.delete(targetUser.username.trim().toLowerCase());
 
@@ -146,6 +174,7 @@ export async function respondToFriendRequest(
     const reqSnap = await getDoc(reqRef);
     if (!reqSnap.exists()) return;
     const reqData = reqSnap.data();
+    const { fromUserId, toUserId } = reqData;
 
     if (accept) {
       const batch = writeBatch(db);
@@ -154,7 +183,6 @@ export async function respondToFriendRequest(
         respondedAt: serverTimestamp(),
       });
       // Atomically write both reciprocal friendship documents in a single round-trip commit
-      const { fromUserId, toUserId } = reqData;
       batch.set(
         doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, fromUserId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, toUserId),
         { since: serverTimestamp() }
@@ -166,11 +194,15 @@ export async function respondToFriendRequest(
       await batch.commit();
       invalidateFriendsCache(fromUserId);
       invalidateFriendsCache(toUserId);
+      invalidatePendingRequestsCache(fromUserId);
+      invalidatePendingRequestsCache(toUserId);
     } else {
       await updateDoc(reqRef, {
         status: 'declined',
         respondedAt: serverTimestamp(),
       });
+      invalidatePendingRequestsCache(fromUserId);
+      invalidatePendingRequestsCache(toUserId);
     }
     return;
   }
@@ -311,18 +343,53 @@ export async function removeFriend(userId: string, friendId: string): Promise<vo
   localBackend.removeFriend(userId, friendId);
 }
 
+/**
+ * Retrieves pending incoming friend requests for the authenticated user.
+ * Coalesces in-flight network requests and caches results for friendsCacheTtlMs.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(log N + R) where N is total friend requests and R <= 50 candidate pending requests.
+ *   Cache hits execute in O(1) in-memory lookup.
+ * - Auxiliary Space Complexity: O(R) where R is the number of pending requests returned.
+ * - Growth Rate: Sub-linear logarithmic search via composite Firestore index (`toUserId`, `status`),
+ *   strictly bounded by query limits.
+ *
+ * @param userId Unique user ID whose pending friend requests are requested.
+ * @returns Array of LocalFriendRequest objects.
+ */
 export async function getPendingIncomingRequests(
   userId: string
 ): Promise<LocalFriendRequest[]> {
   if (isFirebaseConfigured() && db) {
-    const q = query(
-      collection(db, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests),
-      where('toUserId', '==', userId),
-      where('status', '==', 'pending'),
-      limit(MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as LocalFriendRequest));
+    const now = Date.now();
+    const cacheHit = pendingRequestsCache.get(userId);
+    if (cacheHit && now < cacheHit.expiresAt) return cacheHit.value;
+
+    const existing = pendingRequestsInflight.get(userId);
+    if (existing) return existing;
+
+    const fetchPromise = (async () => {
+      try {
+        const q = query(
+          collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests),
+          where('toUserId', '==', userId),
+          where('status', '==', 'pending'),
+          limit(MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit)
+        );
+        const snap = await getDocs(q);
+        const requests = snap.docs.map((d) => ({ id: d.id, ...d.data() } as LocalFriendRequest));
+        pendingRequestsCache.set(userId, {
+          value: requests,
+          expiresAt: Date.now() + MULTIPLAYER_SCALE_CONFIG.presence.friendsCacheTtlMs,
+        });
+        return requests;
+      } finally {
+        pendingRequestsInflight.delete(userId);
+      }
+    })();
+
+    pendingRequestsInflight.set(userId, fetchPromise);
+    return fetchPromise;
   }
 
   return localBackend.getPendingIncomingRequests(userId);

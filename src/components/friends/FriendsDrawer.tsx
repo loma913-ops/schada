@@ -11,6 +11,7 @@ import {
 import { X, UserPlus, Check, Swords, Trash2 } from 'lucide-react';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { LOCAL_CONFIG } from '@/services/firebase/localConfig';
 
 interface FriendsDrawerProps {
   isOpen: boolean;
@@ -55,12 +56,12 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
     const handleStatusOrStorage = () => refreshData();
 
     window.addEventListener('storage', handleStatusOrStorage);
-    window.addEventListener('schada_user_status_changed', handleStatusOrStorage);
+    window.addEventListener(LOCAL_CONFIG.events.userStatusChanged, handleStatusOrStorage);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStatusOrStorage);
-      window.removeEventListener('schada_user_status_changed', handleStatusOrStorage);
+      window.removeEventListener(LOCAL_CONFIG.events.userStatusChanged, handleStatusOrStorage);
     };
   }, [isOpen, user]);
 

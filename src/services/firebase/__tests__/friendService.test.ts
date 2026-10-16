@@ -39,6 +39,8 @@ import {
   getFriendsList,
   removeFriend,
   getPendingIncomingRequests,
+  invalidateFriendsCache,
+  invalidatePendingRequestsCache,
 } from '../friendService';
 import { localBackend } from '../localProvider';
 
@@ -127,5 +129,12 @@ describe('friendService', () => {
 
     expect(await getFriendsList(alice.id)).toHaveLength(0);
     expect(await getFriendsList(bob.id)).toHaveLength(0);
+  });
+
+  it('provides safe invalidation of friends and pending requests caches', () => {
+    expect(() => invalidateFriendsCache()).not.toThrow();
+    expect(() => invalidateFriendsCache('user-123')).not.toThrow();
+    expect(() => invalidatePendingRequestsCache()).not.toThrow();
+    expect(() => invalidatePendingRequestsCache('user-123')).not.toThrow();
   });
 });

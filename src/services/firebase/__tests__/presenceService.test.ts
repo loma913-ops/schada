@@ -37,6 +37,10 @@ import {
   resetPresenceStateForTesting,
   getCachedLobbyStats,
   setCachedLobbyStats,
+  markRemotePresenceSynced,
+  isRemotePresenceFresh,
+  pruneStaleGuestSessions,
+  HEARTBEAT_INTERVAL_MS,
   ACTIVE_SESSIONS_STORAGE_KEY,
   AUTH_CACHED_UID_KEY,
   CACHED_LOBBY_STATS_STORAGE_KEY,
@@ -399,4 +403,23 @@ describe('User Online & Active Presence Service', () => {
     expect(stats.guestSessionsCount).toBe(1);
     expect(stats.registeredUsersCount).toBe(0);
   });
+
+  it('markRemotePresenceSynced and isRemotePresenceFresh correctly track sync recency', () => {
+    expect(isRemotePresenceFresh()).toBe(false);
+
+    markRemotePresenceSynced('online', true);
+    expect(isRemotePresenceFresh()).toBe(true);
+    expect(isRemotePresenceFresh('online')).toBe(true);
+    expect(isRemotePresenceFresh('in-game')).toBe(false);
+
+    // Advance time beyond HEARTBEAT_INTERVAL_MS
+    vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS + 1000);
+    expect(isRemotePresenceFresh('online')).toBe(false);
+  });
+
+  it('pruneStaleGuestSessions completes safely and respects early exit conditions', async () => {
+    // Should complete cleanly without error even if unconfigured or user is registered/idle
+    await expect(pruneStaleGuestSessions()).resolves.toBeUndefined();
+  });
 });
+

@@ -35,13 +35,16 @@ import {
   createGame,
   localGameStore,
   cleanupAbandonedGames,
+  clearDisconnectState,
   type GameRoom,
 } from '../gameService';
+import { MULTIPLAYER_SCALE_CONFIG } from '../multiplayerConfig';
 import { createInitialGameState } from '@/core/schada/engine';
 
 describe('Game Disconnection & Abandonment Logic', () => {
   beforeEach(() => {
     localStorage.clear();
+    clearDisconnectState();
   });
 
   const baseGame: GameRoom = {
@@ -368,7 +371,7 @@ describe('Game Disconnection & Abandonment Logic', () => {
         blueTimeMs: 86400000,
         blueDisconnectedAt: null,
       };
-      const key = 'schada_local_games';
+      const key = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.localGames;
       const games = JSON.parse(localStorage.getItem(key) || '{}');
       games[created.gameId] = activeCorr;
       localStorage.setItem(key, JSON.stringify(games));

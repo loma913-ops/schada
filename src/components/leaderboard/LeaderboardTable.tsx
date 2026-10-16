@@ -5,6 +5,7 @@ import { db, isFirebaseConfigured } from '@/services/firebase/config';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Trophy, Medal, RefreshCw } from 'lucide-react';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
+import { LOCAL_CONFIG } from '@/services/firebase/localConfig';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { safeGetItem, safeSetItem } from '@/services/storage/storageCleanup';
 import { TIME_CONTROL_CATEGORIES, type TimeControlCategory } from '@/components/lobby/lobbyConfig';
@@ -13,6 +14,8 @@ const CACHE_TTL_MS = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardCacheTtlMs;
 const LEADERBOARD_LIMIT = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit;
 const CACHE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.cachedLeaderboard;
 const CACHE_TIME_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.cachedLeaderboardTime;
+
+const leaderboardInflight = new Map<TimeControlCategory, Promise<UserProfile[]>>();
 
 const CATEGORY_TABS: { category: TimeControlCategory; label: string; icon: string }[] = [
   { category: 'bullet', label: 'Bullet', icon: '⚡' },
@@ -110,19 +113,43 @@ export const LeaderboardTable: React.FC = () => {
 
     try {
       if (isFirebaseConfigured() && db) {
-        const q = query(
-          collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
-          orderBy(`perModeStats.${category}.elo`, 'desc'),
-          orderBy(`perModeStats.${category}.gamesPlayed`, 'desc'),
-          limit(LEADERBOARD_LIMIT)
-        );
-        const snap = await getDocs(q);
-        const list = snap.docs
-          .map((d) => d.data() as UserProfile)
-          .filter((u) => isHumanLeaderboardEligible(u, category));
-        writeLocalCache(category, list);
-        setPlayers(list);
-        setCacheTime(Date.now());
+        // In-flight deduplication: reuse existing promise if one is already running for this category
+        const inFlight = leaderboardInflight.get(category);
+        if (inFlight) {
+          try {
+            const list = await inFlight;
+            setPlayers(list);
+            setCacheTime(Date.now());
+          } finally {
+            setLoading(false);
+            setIsRevalidating(false);
+          }
+          return;
+        }
+
+        const fetchPromise = (async () => {
+          try {
+            const q = query(
+              collection(db, MULTIPLAYER_SCALE_CONFIG.collections.users),
+              orderBy(`perModeStats.${category}.elo`, 'desc'),
+              orderBy(`perModeStats.${category}.gamesPlayed`, 'desc'),
+              limit(LEADERBOARD_LIMIT)
+            );
+            const snap = await getDocs(q);
+            const list = snap.docs
+              .map((d) => d.data() as UserProfile)
+              .filter((u) => isHumanLeaderboardEligible(u, category));
+            writeLocalCache(category, list);
+            setPlayers(list);
+            setCacheTime(Date.now());
+            return list;
+          } finally {
+            leaderboardInflight.delete(category);
+          }
+        })();
+
+        leaderboardInflight.set(category, fetchPromise);
+        await fetchPromise;
       } else {
         const mockList = localBackend.getLeaderboard(category);
         writeLocalCache(category, mockList);
@@ -143,21 +170,17 @@ export const LeaderboardTable: React.FC = () => {
 
   const handleCategorySelect = (category: TimeControlCategory) => {
     if (category === selectedCategory) return;
-    setSelectedCategory(category);
     const hit = readLocalCache(category);
     if (hit) {
       setPlayers(hit.players);
       setCacheTime(hit.time);
       setLoading(false);
-      if (Date.now() - hit.time >= CACHE_TTL_MS) {
-        fetchLeaderboard(category, false);
-      }
     } else {
       setPlayers([]);
       setCacheTime(null);
       setLoading(true);
-      fetchLeaderboard(category, true);
     }
+    setSelectedCategory(category);
   };
 
   const handleManualRefresh = () => {
@@ -175,9 +198,9 @@ export const LeaderboardTable: React.FC = () => {
       fetchLeaderboard(selectedCategory, true);
     };
 
-    window.addEventListener('schada_profile_updated', handleProfileUpdated);
+    window.addEventListener(LOCAL_CONFIG.events.profileUpdated, handleProfileUpdated);
     return () => {
-      window.removeEventListener('schada_profile_updated', handleProfileUpdated);
+      window.removeEventListener(LOCAL_CONFIG.events.profileUpdated, handleProfileUpdated);
     };
   }, [selectedCategory, fetchLeaderboard]);
 

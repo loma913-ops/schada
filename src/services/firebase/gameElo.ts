@@ -70,6 +70,34 @@ export function computeRankedGameEloResult(
   };
 }
 
+const RECONCILE_LAST_RUN_PREFIX = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.reconcileLastRunPrefix;
+const RECONCILE_COOLDOWN_MS = MULTIPLAYER_SCALE_CONFIG.matchmaking.reconcileCooldownMs;
+
+/**
+ * Clears the reconciliation cooldown timestamp so the next reconcile runs immediately.
+ *
+ * Algorithmic Complexity (Big O):
+ * - Time Complexity: O(1) for specific userId removal; O(S) where S is the small number of keys in sessionStorage when clearing all.
+ * - Auxiliary Space Complexity: O(1) scalar memory.
+ * - Growth Rate: O(1) constant in-memory session cleanup with zero database interactions.
+ *
+ * @param userId Optional user identifier to clear. If omitted, clears all reconcile cooldown keys.
+ */
+export function clearReconcileCooldown(userId?: string): void {
+  if (typeof sessionStorage !== 'undefined') {
+    if (userId) {
+      sessionStorage.removeItem(RECONCILE_LAST_RUN_PREFIX + userId);
+    } else {
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith(RECONCILE_LAST_RUN_PREFIX)) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    }
+  }
+}
+
 /**
  * Appends a user ID to a completed game's processedEloUserIds array to prevent duplicate rating updates.
  * Utilizes atomic arrayUnion to eliminate getDoc reads and guarantee race-condition-free updates.
@@ -80,6 +108,7 @@ export function computeRankedGameEloResult(
  * - Growth Rate: O(1) constant, invariant to room size or active player count.
  */
 export async function markGameEloProcessed(gameId: string, userId: string): Promise<void> {
+  clearReconcileCooldown(userId);
   if (isFirebaseConfigured() && db) {
     try {
       const gameRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
@@ -103,6 +132,7 @@ export async function markGameEloProcessed(gameId: string, userId: string): Prom
 /**
  * Scans recently completed ranked games for the authenticated user where Elo has not yet been processed.
  * Guarantees that ratings are never lost if a user exits early, closes the browser tab, or experiences network interruptions.
+ * Cooldown-gated to at most once per reconcileCooldownMs (10 mins) per session to eliminate redundant Firestore queries.
  *
  * Algorithmic Complexity (Big O):
  * - Time Complexity: O(K) where K <= reconcileEloBatchLimit recent completed games examined.
@@ -113,15 +143,32 @@ export async function markGameEloProcessed(gameId: string, userId: string): Prom
  */
 let inFlightReconcilePromise: Promise<UserProfile | null> | null = null;
 
-export async function reconcilePendingElo(userId: string): Promise<UserProfile | null> {
+export async function reconcilePendingElo(userId: string, force: boolean = false): Promise<UserProfile | null> {
   if (!userId || userId.startsWith('guest_') || userId === 'guest') return null;
+
+  if (!force && typeof sessionStorage !== 'undefined') {
+    const lastRunRaw = sessionStorage.getItem(RECONCILE_LAST_RUN_PREFIX + userId);
+    if (lastRunRaw) {
+      const lastRun = Number(lastRunRaw);
+      if (!isNaN(lastRun) && Date.now() - lastRun < RECONCILE_COOLDOWN_MS) {
+        return null;
+      }
+    }
+  }
 
   // In-flight deduplication: reuse existing promise if one is already running for this call stack
   if (inFlightReconcilePromise) return inFlightReconcilePromise;
 
-  inFlightReconcilePromise = _runReconcilePendingElo(userId).finally(() => {
-    inFlightReconcilePromise = null;
-  });
+  inFlightReconcilePromise = _runReconcilePendingElo(userId)
+    .then((profile) => {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(RECONCILE_LAST_RUN_PREFIX + userId, String(Date.now()));
+      }
+      return profile;
+    })
+    .finally(() => {
+      inFlightReconcilePromise = null;
+    });
   return inFlightReconcilePromise;
 }
 

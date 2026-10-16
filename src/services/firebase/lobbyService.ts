@@ -101,10 +101,13 @@ export async function getOpenRooms(
   }
 
   if (isFirebaseConfigured() && db) {
+    const statusConstraint: QueryConstraint = includeInProgress
+      ? where('status', 'in', ['waiting', 'in_progress'])
+      : where('status', '==', 'waiting');
     const q = query(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
-      where('status', 'in', includeInProgress ? ['waiting', 'in_progress'] : ['waiting']),
+      statusConstraint,
       orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
@@ -189,11 +192,13 @@ export function subscribeToOpenRooms(
   }
 
   if (isFirebaseConfigured() && db) {
-    const statuses = includeInProgress ? ['waiting', 'in_progress'] : ['waiting'];
+    const statusConstraint: QueryConstraint = includeInProgress
+      ? where('status', 'in', ['waiting', 'in_progress'])
+      : where('status', '==', 'waiting');
     const q = query(
       collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games),
       where('isPrivate', '==', false),
-      where('status', 'in', statuses),
+      statusConstraint,
       orderBy('createdAt', 'desc'),
       limit(maxRooms)
     );
