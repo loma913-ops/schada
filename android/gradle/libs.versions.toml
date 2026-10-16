@@ -1,0 +1,29 @@
+[versions]
+agp = "8.13.0"
+androidxActivity = "1.11.0"
+androidxAppCompat = "1.7.1"
+androidxCoordinatorLayout = "1.3.0"
+androidxCore = "1.17.0"
+androidxFragment = "1.8.9"
+androidxWebkit = "1.14.0"
+junit = "4.13.2"
+androidxJunit = "1.3.0"
+androidxEspressoCore = "3.7.0"
+cordovaAndroid = "14.0.1"
+json = "20250107"
+mockito = "5.16.0"
+
+[libraries]
+gradle = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+androidx-activity = { module = "androidx.activity:activity", version.ref = "androidxActivity" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidxAppCompat" }
+androidx-coordinatorlayout = { module = "androidx.coordinatorlayout:coordinatorlayout", version.ref = "androidxCoordinatorLayout" }
+androidx-core = { module = "androidx.core:core", version.ref = "androidxCore" }
+androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "androidxFragment" }
+androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "androidxWebkit" }
+junit = { module = "junit:junit", version.ref = "junit" }
+androidx-junit = { module = "androidx.test.ext:junit", version.ref = "androidxJunit" }
+androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidxEspressoCore" }
+cordova-framework = { module = "org.apache.cordova:framework", version.ref = "cordovaAndroid" }
+json = { module = "org.json:json", version.ref = "json" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
