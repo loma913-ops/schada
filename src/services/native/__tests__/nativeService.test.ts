@@ -11,6 +11,8 @@ import {
   getShareBaseUrl,
   copyToClipboard,
   applyNativeSystemBarStyle,
+  getDeviceColorScheme,
+  initDeviceSystemBarSync,
   initNativeMobileServices,
   mobileHaptics,
 } from '../mobileService';
@@ -111,6 +113,30 @@ describe('Native Configuration Validation', () => {
       systemBars: { ...NATIVE_CONFIG.systemBars, dark: 'INVALID' },
     } as unknown as NativeConfig;
     expect(() => validateNativeConfig(invalidDark)).toThrow(NativeConfigError);
+
+    const invalidLight = {
+      ...NATIVE_CONFIG,
+      systemBars: { ...NATIVE_CONFIG.systemBars, light: 'INVALID' },
+    } as unknown as NativeConfig;
+    expect(() => validateNativeConfig(invalidLight)).toThrow(NativeConfigError);
+
+    const invalidDefault = {
+      ...NATIVE_CONFIG,
+      systemBars: { ...NATIVE_CONFIG.systemBars, defaultStyle: 'INVALID' },
+    } as unknown as NativeConfig;
+    expect(() => validateNativeConfig(invalidDefault)).toThrow(NativeConfigError);
+
+    const invalidQuery = {
+      ...NATIVE_CONFIG,
+      systemBars: { ...NATIVE_CONFIG.systemBars, prefersDarkMediaQuery: '' },
+    } as unknown as NativeConfig;
+    expect(() => validateNativeConfig(invalidQuery)).toThrow(NativeConfigError);
+
+    const invalidFallback = {
+      ...NATIVE_CONFIG,
+      systemBars: { ...NATIVE_CONFIG.systemBars, fallbackTheme: 'sepia' },
+    } as unknown as NativeConfig;
+    expect(() => validateNativeConfig(invalidFallback)).toThrow(NativeConfigError);
   });
 
   it('throws NativeConfigError when forceUpdate is enabled with invalid semver or store URLs', () => {
@@ -225,6 +251,93 @@ describe('Mobile Service Abstraction & Fallbacks', () => {
 
     await applyNativeSystemBarStyle('light');
     expect(setStyleSpy).toHaveBeenCalledWith({ style: SystemBarsStyle.Light });
+  });
+
+  it('resolves device OS color scheme correctly via matchMedia', () => {
+    const origWindow = (globalThis as any).window;
+    try {
+      (globalThis as any).window = {
+        matchMedia: vi.fn().mockImplementation((query: string) => ({
+          matches: query.includes('dark'),
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      };
+
+      expect(getDeviceColorScheme()).toBe('dark');
+
+      (globalThis as any).window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }));
+
+      expect(getDeviceColorScheme()).toBe('light');
+    } finally {
+      (globalThis as any).window = origWindow;
+    }
+  });
+
+  it('falls back strictly to config.systemBars.fallbackTheme when matchMedia is unavailable or throws', () => {
+    const origWindow = (globalThis as any).window;
+    try {
+      (globalThis as any).window = undefined;
+      expect(getDeviceColorScheme()).toBe(NATIVE_CONFIG.systemBars.fallbackTheme);
+
+      (globalThis as any).window = {
+        matchMedia: vi.fn().mockImplementation(() => {
+          throw new Error('matchMedia unsupported');
+        }),
+      };
+      expect(getDeviceColorScheme()).toBe(NATIVE_CONFIG.systemBars.fallbackTheme);
+    } finally {
+      (globalThis as any).window = origWindow;
+    }
+  });
+
+  it('synchronizes native system bars on device OS theme change and cleans up', () => {
+    const origWindow = (globalThis as any).window;
+    const setStyleSpy = vi.spyOn(SystemBars, 'setStyle').mockResolvedValue(undefined);
+    let changeHandler: ((e: MediaQueryListEvent) => void) | undefined;
+    const addListenerMock = vi.fn().mockImplementation((_event, cb) => {
+      changeHandler = cb;
+    });
+    const removeListenerMock = vi.fn();
+
+    try {
+      (globalThis as any).window = {
+        matchMedia: vi.fn().mockReturnValue({
+          matches: true,
+          media: '(prefers-color-scheme: dark)',
+          addEventListener: addListenerMock,
+          removeEventListener: removeListenerMock,
+        }),
+      };
+
+      // On web (non-native): should be a no-op
+      vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(false);
+      const webCleanup = initDeviceSystemBarSync();
+      expect(setStyleSpy).not.toHaveBeenCalled();
+      webCleanup();
+
+      // On native platform: applies initial OS theme and listens for changes
+      vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true);
+      const nativeCleanup = initDeviceSystemBarSync();
+      expect(setStyleSpy).toHaveBeenCalledWith({ style: SystemBarsStyle.Dark });
+      expect(addListenerMock).toHaveBeenCalledWith('change', expect.any(Function));
+
+      // Simulate device switching to Light Mode at the OS level
+      changeHandler?.({ matches: false } as MediaQueryListEvent);
+      expect(setStyleSpy).toHaveBeenCalledWith({ style: SystemBarsStyle.Light });
+
+      // Cleanup removes listener
+      nativeCleanup();
+      expect(removeListenerMock).toHaveBeenCalledWith('change', expect.any(Function));
+    } finally {
+      (globalThis as any).window = origWindow;
+    }
   });
 
   it('returns empty cleanup function without adding listeners on web platform', () => {

@@ -1,6 +1,5 @@
 :root {
-  color-scheme: dark;
-  color-scheme: only dark;
+  color-scheme: dark light;
   /* Lichess-inspired Warm Graphite Dark Mode */
   --bg-primary: #161512;
   --bg-secondary: #262421;
@@ -65,8 +64,6 @@
 }
 
 [data-theme='light'] {
-  color-scheme: light;
-  color-scheme: only light;
   --bg-primary: #edebe8;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f4f2ef;
@@ -97,22 +94,26 @@
   --sq-vector-dot: #1f140a;
 }
 
-[data-theme='dark'] {
+[data-theme='dark'] body {
   color-scheme: dark;
-  color-scheme: only dark;
+}
+
+[data-theme='light'] body {
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme='light']) body {
     color-scheme: dark;
-    color-scheme: only dark;
   }
 }
 
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
+  :root:not([data-theme='dark']) body {
     color-scheme: light;
-    color-scheme: only light;
+  }
+
+  :root:not([data-theme='dark']) {
     --bg-primary: #edebe8;
     --bg-secondary: #ffffff;
     --bg-tertiary: #f4f2ef;

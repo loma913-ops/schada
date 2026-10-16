@@ -603,6 +603,7 @@ Schada provides first-class native mobile editions for **Android** and **iOS** p
 - **Hardware Haptic Feedback**: Native vibration patterns trigger on moves, captures, goal line entries, and game completions via `@capacitor/haptics`.
 - **Hardware Back Button Handling**: On Android devices, the native back button closes open modals, steps back through navigation, or safely minimizes the application during active matches without accidental forfeits.
 - **Portrait Lock**: The native container enforces portrait orientation across handheld devices for an optimal 64-square vector board aspect ratio.
+- **OS-Anchored System Status Bar**: The phone's native system status bar (time, Wi-Fi, battery, notifications) is decoupled from the in-app theme toggle and anchored strictly to the device's native OS color scheme across Web/PWA and Capacitor containers. Toggling between dark and light mode inside the app updates the UI only, preserving status bar visibility.
 - **Store Compliance**: 
   - **Apple Guideline 3.1.1 & Google Play Billing**: Web donation and patron links are conditionally hidden within native application shells (`isNativePlatform()`).
   - **Apple Guideline 5.1.1(v)**: In-app account deletion is built into the Player Profile settings (`ProfileModal.tsx`), allowing immediate and permanent self-service deletion of user profiles, ratings, and usernames with password re-authentication.

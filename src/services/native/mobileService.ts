@@ -114,10 +114,10 @@ export async function copyToClipboard(text: string): Promise<boolean> {
  *
  * Algorithmic Complexity:
  * - Time Complexity: O(1) constant time native bridge invocation.
- * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space with no memory allocations.
  *
  * Growth Rate:
- * - O(1) constant.
+ * - O(1) flat growth rate, perfectly sustainable regardless of invocation frequency.
  */
 export async function applyNativeSystemBarStyle(
   theme: 'dark' | 'light',
@@ -134,6 +134,66 @@ export async function applyNativeSystemBarStyle(
   } catch (err) {
     console.warn('SystemBars setStyle warning:', err);
   }
+}
+
+/**
+ * Resolves the device's native OS color scheme ('dark' | 'light') via media query.
+ * Falls back strictly to configuration-defined fallbackTheme if window.matchMedia is unavailable or throws.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time execution for window property lookup and media match test.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space with zero heap allocations.
+ *
+ * Growth Rate:
+ * - O(1) flat growth rate, maintaining deterministic constant-time viability regardless of application state or scale.
+ */
+export function getDeviceColorScheme(config: NativeConfig = NATIVE_CONFIG): 'dark' | 'light' {
+  validateNativeConfig(config);
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    try {
+      return window.matchMedia(config.systemBars.prefersDarkMediaQuery).matches ? 'dark' : 'light';
+    } catch {
+      return config.systemBars.fallbackTheme;
+    }
+  }
+  return config.systemBars.fallbackTheme;
+}
+
+/**
+ * Initializes synchronization between the phone's native system bars and the device OS theme.
+ * Runs on app startup and subscribes to OS-level theme changes (e.g. sunset/sunrise or manual phone toggle),
+ * strictly isolating the phone's status bar appearance from the in-app theme toggle.
+ *
+ * Algorithmic Complexity:
+ * - Time Complexity: O(1) constant time event listener registration and native bridge call.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space holding single listener closure reference.
+ *
+ * Growth Rate:
+ * - O(1) flat growth rate, ensuring zero memory growth or resource degradation over application lifecycle.
+ */
+export function initDeviceSystemBarSync(config: NativeConfig = NATIVE_CONFIG): () => void {
+  validateNativeConfig(config);
+  if (!isNativePlatform()) return () => {};
+
+  void applyNativeSystemBarStyle(getDeviceColorScheme(config), config);
+
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return () => {};
+  }
+
+  const mediaQuery = window.matchMedia(config.systemBars.prefersDarkMediaQuery);
+  const handleThemeChange = (event: MediaQueryListEvent) => {
+    void applyNativeSystemBarStyle(event.matches ? 'dark' : 'light', config);
+  };
+
+  if (typeof mediaQuery.addEventListener === 'function') {
+    mediaQuery.addEventListener('change', handleThemeChange);
+    return () => {
+      mediaQuery.removeEventListener('change', handleThemeChange);
+    };
+  }
+
+  return () => {};
 }
 
 export interface BackButtonContext {

@@ -27,6 +27,9 @@ export interface NativeHapticConfig {
 export interface NativeSystemBarsConfig {
   readonly dark: 'DARK';
   readonly light: 'LIGHT';
+  readonly defaultStyle: 'DEFAULT';
+  readonly prefersDarkMediaQuery: string;
+  readonly fallbackTheme: 'dark' | 'light';
 }
 
 export interface NativeForceUpdateConfig {
@@ -66,6 +69,9 @@ export const NATIVE_CONFIG: NativeConfig = Object.freeze({
   systemBars: Object.freeze({
     dark: 'DARK' as const,
     light: 'LIGHT' as const,
+    defaultStyle: 'DEFAULT' as const,
+    prefersDarkMediaQuery: '(prefers-color-scheme: dark)',
+    fallbackTheme: 'dark' as const,
   }),
   forceUpdate: Object.freeze({
     enabled: false,
@@ -152,6 +158,22 @@ export function validateNativeConfig(config: NativeConfig = NATIVE_CONFIG): void
   }
   if (config.systemBars.light !== 'LIGHT') {
     throw new NativeConfigError(`Invalid systemBars.light: expected 'LIGHT', received '${config.systemBars.light}'.`);
+  }
+  if (config.systemBars.defaultStyle !== 'DEFAULT') {
+    throw new NativeConfigError(
+      `Invalid systemBars.defaultStyle: expected 'DEFAULT', received '${config.systemBars.defaultStyle}'.`
+    );
+  }
+  if (
+    typeof config.systemBars.prefersDarkMediaQuery !== 'string' ||
+    !config.systemBars.prefersDarkMediaQuery.trim()
+  ) {
+    throw new NativeConfigError('Invalid systemBars.prefersDarkMediaQuery: expected non-empty string.');
+  }
+  if (config.systemBars.fallbackTheme !== 'dark' && config.systemBars.fallbackTheme !== 'light') {
+    throw new NativeConfigError(
+      `Invalid systemBars.fallbackTheme: expected 'dark' or 'light', received '${config.systemBars.fallbackTheme}'.`
+    );
   }
 
   if (!config.forceUpdate || typeof config.forceUpdate !== 'object') {
