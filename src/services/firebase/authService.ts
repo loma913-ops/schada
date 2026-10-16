@@ -263,8 +263,8 @@ export async function reloadUserProfile(): Promise<UserProfile | null> {
       const snap = await getDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, auth.currentUser.uid));
       if (snap.exists()) {
         const active = isCurrentClientActive();
-        const status = active ? 'online' : 'offline';
         const data = snap.data() as UserProfile;
+        const status = active ? (data.status === 'in-game' ? 'in-game' : 'online') : 'offline';
         const authEmail = auth.currentUser?.email ?? data.email ?? SECURITY_CONFIG.emptyEmailFallback;
         const profile: UserProfile = {
           ...data,
@@ -437,8 +437,8 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
     }
 
     const active = isCurrentClientActive();
-    const status = active ? 'online' : 'offline';
     const data = userDoc.data() as UserProfile;
+    const status = active ? (data.status === 'in-game' ? 'in-game' : 'online') : 'offline';
     const authEmail = auth.currentUser?.email ?? email;
     const createdAtStr = (data.createdAt as any)?.toDate?.()
       ? (data.createdAt as any).toDate().toISOString()
@@ -617,8 +617,8 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
             (userSnap) => {
               if (userSnap.exists()) {
                 const currentActive = isCurrentClientActive();
-                const currentStatus = currentActive ? 'online' : 'offline';
                 const data = userSnap.data() as UserProfile;
+                const currentStatus = currentActive ? (data.status === 'in-game' ? 'in-game' : 'online') : 'offline';
                 const authEmail = firebaseUser.email ?? data.email ?? SECURITY_CONFIG.emptyEmailFallback;
 
                 // Migration: if Firestore user doc still contains email, delete it to protect PII.

@@ -343,7 +343,7 @@ export const GameRoomView: React.FC = () => {
   // Clean up activity context on component unmount
   useEffect(() => {
     return () => {
-      setActivityContext('online');
+      setActivityContext('online', true);
     };
   }, []);
 
@@ -561,6 +561,7 @@ export const GameRoomView: React.FC = () => {
     if (gameId && isHost) {
       await abandonGame(gameId);
     }
+    setActivityContext('online', true);
     window.scrollTo(0, 0);
     navigate('/');
   };
@@ -714,6 +715,7 @@ export const GameRoomView: React.FC = () => {
               await setPlayerDisconnectedAction(gameId, userColor, true);
             }
           }
+          setActivityContext('online', true);
           navigate('/');
         }}
       />

@@ -222,11 +222,19 @@ export function recordUserActivity(): void {
 /**
  * Sets current activity context ('online' vs 'in-game')
  */
-export function setActivityContext(context: 'online' | 'in-game') {
-  if (currentActivityContext !== context) {
-    currentActivityContext = context;
+export function setActivityContext(context: 'online' | 'in-game', forceSync: boolean = false) {
+  const changed = currentActivityContext !== context;
+  currentActivityContext = context;
+  if (changed || forceSync) {
     syncPresenceHeartbeat(true);
   }
+}
+
+/**
+ * Returns the current tab's active presence context.
+ */
+export function getCurrentActivityContext(): 'online' | 'in-game' {
+  return currentActivityContext;
 }
 
 /**

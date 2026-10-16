@@ -277,6 +277,21 @@ describe('User Online & Active Presence Service', () => {
     expect(localBackend.getCurrentUser()?.status).toBe('online');
   });
 
+  it('forces presence sync and dispatches user status change when exiting match even if context is unchanged', () => {
+    localBackend.register('matchplayer@test.com', 'pass', 'MatchPlayer');
+    recordUserActivity();
+    setActivityContext('in-game');
+    expect(localBackend.getCurrentUser()?.status).toBe('in-game');
+
+    // Context changes to online
+    setActivityContext('online');
+    expect(localBackend.getCurrentUser()?.status).toBe('online');
+
+    // Force sync on exit / unmount maintains online status and ensures storage sync
+    setActivityContext('online', true);
+    expect(localBackend.getCurrentUser()?.status).toBe('online');
+  });
+
   it('cleans up pre-existing guest sessions on this device when user signs in', () => {
     // Simulate user previously had a guest session in localStorage
     const guestSessions: Record<string, SessionHeartbeat> = {

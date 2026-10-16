@@ -323,18 +323,46 @@ class LocalBackend {
    */
   public setUserStatus(userId: string, status: 'online' | 'in-game' | 'offline'): void {
     const users = this.getUsers();
+    let statusChanged = false;
+
     if (users[userId]) {
       if (users[userId].status !== status) {
         users[userId].status = status;
         users[userId].lastSeen = new Date().toISOString();
         this.saveUsers(users);
+        statusChanged = true;
+      }
+    } else {
+      statusChanged = true;
+    }
+
+    // Always synchronize authCachedProfile if stored in localStorage
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedProfile);
+      if (raw) {
         try {
-          window.dispatchEvent(
-            new CustomEvent(LOCAL_CONFIG.events.userStatusChanged, { detail: { userId, status } })
-          );
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object' && parsed.id === userId && parsed.status !== status) {
+            parsed.status = status;
+            safeSetItem(
+              MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.authCachedProfile,
+              JSON.stringify(parsed)
+            );
+            statusChanged = true;
+          }
         } catch {
-          // Ignore in non-browser environments
+          // Ignore storage parse errors
         }
+      }
+    }
+
+    if (statusChanged) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent(LOCAL_CONFIG.events.userStatusChanged, { detail: { userId, status } })
+        );
+      } catch {
+        // Ignore in non-browser environments
       }
     }
   }

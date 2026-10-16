@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { UserProfile } from '@/services/firebase/localProvider';
+import { localBackend, type UserProfile } from '@/services/firebase/localProvider';
 import {
   registerUser,
   loginUser,
@@ -8,6 +8,7 @@ import {
   subscribeToAuthState,
   setUserOnlineStatus,
   getInitialAuthState,
+  getCachedAuthProfile,
   reloadUserProfile,
   deleteUserAccount,
 } from '@/services/firebase/authService';
@@ -52,7 +53,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleProfileUpdate = (e: Event) => {
       const customEvent = e as CustomEvent<UserProfile>;
       if (customEvent.detail) {
-        setUser(customEvent.detail);
+        setUser((current) => {
+          if (!current) return customEvent.detail;
+          return {
+            ...customEvent.detail,
+            status: current.status,
+          };
+        });
       } else {
         reloadUserProfile().then((p) => {
           if (p) setUser(p);
@@ -68,21 +75,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Synchronize user status reactively when activity changes or multi-tab presence changes
   useEffect(() => {
-    const handleStatusSync = () => {
-      setUser((current) => {
-        if (!current) return null;
-        // In local mock mode, get latest computed profile with active status
-        subscribeToAuthState((latest) => {
-          if (latest) setUser(latest);
+    const handleStatusSync = (e: Event) => {
+      const customEvent = e as CustomEvent<{ userId?: string; status?: 'online' | 'in-game' | 'offline' }>;
+      const newStatus = customEvent?.detail?.status;
+      const targetUserId = customEvent?.detail?.userId;
+
+      if (newStatus) {
+        setUser((current) => {
+          if (!current) return null;
+          if (targetUserId && current.id !== targetUserId) return current;
+          if (current.status === newStatus) return current;
+          return { ...current, status: newStatus };
         });
-        return current;
-      });
+        return;
+      }
+
+      // Storage event or generic synchronization across browser tabs
+      const cached = getCachedAuthProfile() || localBackend.getCurrentUser();
+      if (cached) {
+        setUser((current) => {
+          if (!current || current.id !== cached.id) return current;
+          if (current.status === cached.status) return current;
+          return { ...current, status: cached.status };
+        });
+      }
     };
 
-    window.addEventListener('schada_user_status_changed', handleStatusSync);
+    window.addEventListener(LOCAL_CONFIG.events.userStatusChanged, handleStatusSync);
     window.addEventListener('storage', handleStatusSync);
     return () => {
-      window.removeEventListener('schada_user_status_changed', handleStatusSync);
+      window.removeEventListener(LOCAL_CONFIG.events.userStatusChanged, handleStatusSync);
       window.removeEventListener('storage', handleStatusSync);
     };
   }, []);
@@ -123,7 +145,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = React.useCallback(async (updatedProfile?: UserProfile | null) => {
     if (updatedProfile) {
-      setUser(updatedProfile);
+      setUser((current) => {
+        if (!current) return updatedProfile;
+        return {
+          ...updatedProfile,
+          status: current.status,
+        };
+      });
       return updatedProfile;
     }
     const fresh = await reloadUserProfile();
