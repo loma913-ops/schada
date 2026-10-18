@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Cpu, Users, Settings2, Share2, Mail } from 'lucide-react';
+import { Cpu, Users, Settings2, Mail } from 'lucide-react';
 import { OnlinePlayersCount } from './OnlinePlayersCount';
 
 import { FORMAT_CONFIG, type TimeControlPreset } from '@/core/schada/formatConfig';
+import { LOBBY_CONFIG } from './lobbyConfig';
 
 export type TimeControlOption = TimeControlPreset;
 
@@ -11,7 +12,6 @@ interface QuickPairingGridProps {
   onStartPassAndPlay: () => void;
   onOpenCustomModal: (initialTab?: 'realtime' | 'correspondence') => void;
   onOpenComputerModal: () => void;
-  onOpenCreateRoomModal: () => void;
 }
 
 export const TIME_CONTROL_PRESETS: readonly TimeControlOption[] = FORMAT_CONFIG.presets;
@@ -22,7 +22,6 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
   onStartPassAndPlay,
   onOpenCustomModal,
   onOpenComputerModal,
-  onOpenCreateRoomModal,
 }) => {
   const [pairingDisplay, setPairingDisplay] = useState<string | null>(null);
 
@@ -40,6 +39,11 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
     <div className="quick-pairing-container">
       {/* Real-time Players Online Indicator */}
       <OnlinePlayersCount />
+
+      {/* Quick Match Section Title */}
+      <div className="quick-match-header">
+        <h2 className="quick-match-title">{LOBBY_CONFIG.sectionTitles.quickMatch}</h2>
+      </div>
 
       {/* 3x4 Quick Pairing Grid */}
       <div className="pairing-grid">
@@ -67,25 +71,8 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
         </div>
       </div>
 
-      {/* Prominent Action Buttons: Play with a Friend & Play Computer */}
+      {/* Prominent Action Buttons: Play Computer & Correspondence */}
       <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
-        <button
-          type="button"
-          className="lichess-cta-btn"
-          onClick={onOpenCreateRoomModal}
-          style={{
-            width: '100%',
-            padding: '0.85rem 1.25rem',
-            fontSize: '1.05rem',
-            fontWeight: 600,
-            background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(34, 197, 94, 0.15))',
-            borderColor: 'rgba(56, 189, 248, 0.4)',
-            color: 'var(--text-primary)',
-          }}
-        >
-          <Share2 size={22} className="lichess-cta-icon" color="var(--accent-blue)" />
-          <span>Play with a Friend</span>
-        </button>
 
         <button
           type="button"

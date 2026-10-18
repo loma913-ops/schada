@@ -7,20 +7,24 @@ vi.mock('../OnlinePlayersCount', () => ({
 }));
 
 describe('QuickPairingGrid Component', () => {
-  it('renders Correspondence CTA button directly below Play Against Computer', () => {
+  it('renders Correspondence CTA button directly below Play Against Computer and does not render Play with a Friend', () => {
     const html = renderToStaticMarkup(
       <QuickPairingGrid
         onSelectTimeControl={vi.fn()}
         onStartPassAndPlay={vi.fn()}
         onOpenCustomModal={vi.fn()}
         onOpenComputerModal={vi.fn()}
-        onOpenCreateRoomModal={vi.fn()}
       />
     );
 
-    expect(html).toContain('Play with a Friend');
+    expect(html).not.toContain('Play with a Friend');
+    expect(html).toContain('Quick Match');
     expect(html).toContain('Play Against Computer');
     expect(html).toContain('Correspondence');
+
+    const quickMatchIndex = html.indexOf('Quick Match');
+    const firstPresetIndex = html.indexOf('1+0');
+    expect(quickMatchIndex).toBeLessThan(firstPresetIndex);
 
     const computerIndex = html.indexOf('Play Against Computer');
     const correspondenceIndex = html.indexOf('Correspondence');

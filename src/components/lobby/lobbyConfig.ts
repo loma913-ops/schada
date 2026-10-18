@@ -62,6 +62,7 @@ export interface LobbyConfig {
   readonly secondsPerMinute: number;
   readonly defaultFilters: LobbyFilterState;
   readonly sectionTitles: {
+    readonly quickMatch: string;
     readonly myGames: string;
     readonly availableGames: string;
   };
@@ -179,6 +180,8 @@ export function validateLobbyConfig(config: LobbyConfig): void {
 
   if (
     !config.sectionTitles ||
+    typeof config.sectionTitles.quickMatch !== 'string' ||
+    config.sectionTitles.quickMatch.trim().length === 0 ||
     typeof config.sectionTitles.myGames !== 'string' ||
     config.sectionTitles.myGames.trim().length === 0 ||
     typeof config.sectionTitles.availableGames !== 'string' ||
@@ -280,6 +283,7 @@ export const LOBBY_CONFIG: LobbyConfig = Object.freeze({
     }),
   }),
   sectionTitles: Object.freeze({
+    quickMatch: 'Quick Match',
     myGames: 'My Games',
     availableGames: 'Available Games',
   }),

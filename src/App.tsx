@@ -577,7 +577,6 @@ const MainApp: React.FC = () => {
                             setCustomGameOpen(true);
                           }}
                           onOpenComputerModal={() => setComputerModalOpen(true)}
-                          onOpenCreateRoomModal={() => setCreateRoomOpen(true)}
                         />
                       </div>
                       <div className="home-lobby-column">

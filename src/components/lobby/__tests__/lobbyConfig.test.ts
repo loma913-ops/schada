@@ -84,9 +84,25 @@ describe('LobbyConfig validation and helpers', () => {
 
     const emptyMyGames = {
       ...LOBBY_CONFIG,
-      sectionTitles: { myGames: '  ', availableGames: 'Available Games' },
+      sectionTitles: {
+        quickMatch: 'Quick Match',
+        myGames: '  ',
+        availableGames: 'Available Games',
+      },
     };
     expect(() => validateLobbyConfig(emptyMyGames)).toThrowError(
+      /Invalid sectionTitles configuration/
+    );
+
+    const emptyQuickMatch = {
+      ...LOBBY_CONFIG,
+      sectionTitles: {
+        quickMatch: '  ',
+        myGames: 'My Games',
+        availableGames: 'Available Games',
+      },
+    };
+    expect(() => validateLobbyConfig(emptyQuickMatch)).toThrowError(
       /Invalid sectionTitles configuration/
     );
 
