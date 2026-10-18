@@ -14,17 +14,22 @@ export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
   if (piece.type === 'field_officer') {
     return (
       <svg viewBox="0 0 100 100" className="piece-icon" width="100%" height="100%">
-        {/* Outer Ring */}
-        <circle
-          cx="50"
-          cy="50"
-          r="42"
+        {/* Outer Hexagon */}
+        <polygon
+          points="50,6 88.11,28 88.11,72 50,94 11.89,72 11.89,28"
           fill={primaryColor}
           stroke={secondaryColor}
           strokeWidth="4"
+          strokeLinejoin="round"
         />
-        {/* Inner Ring */}
-        <circle cx="50" cy="50" r="32" fill="none" stroke={highlightColor} strokeWidth="3.5" />
+        {/* Inner Hexagon Ring */}
+        <polygon
+          points="50,16 79.44,33 79.44,67 50,84 20.56,67 20.56,33"
+          fill="none"
+          stroke={highlightColor}
+          strokeWidth="3.5"
+          strokeLinejoin="round"
+        />
         {/* Central Crown / Star */}
         <path
           d="M 50 26 L 56 42 L 72 44 L 60 56 L 63 72 L 50 64 L 37 72 L 40 56 L 28 44 L 44 42 Z"
@@ -40,14 +45,13 @@ export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
   if (piece.type === 'officer') {
     return (
       <svg viewBox="0 0 100 100" className="piece-icon" width="100%" height="100%">
-        {/* Outer Circle */}
-        <circle
-          cx="50"
-          cy="50"
-          r="40"
+        {/* Outer Hexagon */}
+        <polygon
+          points="50,8 86.37,29 86.37,71 50,92 13.63,71 13.63,29"
           fill={primaryColor}
           stroke={secondaryColor}
           strokeWidth="4"
+          strokeLinejoin="round"
         />
         {/* Central Crest / Diamond */}
         <path

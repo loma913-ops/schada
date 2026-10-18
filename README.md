@@ -29,9 +29,9 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **8x8 Board**: Each square features directional lines and dots denoting allowable movement vectors.
 - **180° Rotational Symmetry**: The top half (ranks 5–8) is an exact 180° rotation of the bottom half (ranks 1–4).
 - **Three Piece Types**:
-  - **Field Officer (4 per side)**: High piece. Can leap over intermediate friendly pieces along straight movement vectors. Worth **2 points** in the goal line.
-  - **Officer (4 per side)**: High piece. Standard slider. Cannot leap. Worth **1 point** in the goal line.
-  - **Pawn (8 per side)**: Support blocker. Can capture and move according to square vectors, but cannot score goal points.
+  - **Field Officer (4 per side)**: High piece (hexagonal crest with star). Can leap over intermediate friendly pieces along straight movement vectors. Worth **2 points** in the goal line.
+  - **Officer (4 per side)**: High piece (hexagonal crest with diamond). Standard slider. Cannot leap. Worth **1 point** in the goal line.
+  - **Pawn (8 per side)**: Support blocker (circular shield). Can capture and move according to square vectors, but cannot score goal points.
 - **Base Line & Goal Line Restrictions**:
   - High pieces can shuffle along their base line, but once they leave it, they **cannot return**.
   - Once high pieces reach their goal line (Rank 8 for Blue, Rank 1 for Green), they **cannot leave**, and are **immune to enemy capture** (marked with a gold shield badge).
