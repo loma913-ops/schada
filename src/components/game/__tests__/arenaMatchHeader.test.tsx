@@ -34,14 +34,14 @@ vi.mock('@/core/bot/schadaBot', () => ({
 
 describe('Arena Match Header Time Limit Display', () => {
   const mockwhitePlayer: ArenaPlayer = {
-    id: 'user_blue',
-    username: 'BlueHero',
+    id: 'user_white',
+    username: 'WhiteHero',
     elo: 1500,
   };
 
   const mockblackPlayer: ArenaPlayer = {
-    id: 'user_green',
-    username: 'GreenRival',
+    id: 'user_black',
+    username: 'BlackRival',
     elo: 1480,
   };
 
