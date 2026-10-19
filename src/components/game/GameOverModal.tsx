@@ -48,10 +48,6 @@ export interface GameOverModalProps {
   readonly blackPlayer?: GameOverPlayerInfo;
   readonly whiteElo?: PlayerEloUpdate;
   readonly blackElo?: PlayerEloUpdate;
-  /** @deprecated Backwards compatibility alias for whiteElo */
-  readonly blueElo?: PlayerEloUpdate;
-  /** @deprecated Backwards compatibility alias for blackElo */
-  readonly greenElo?: PlayerEloUpdate;
   readonly eloDelta?: number;
   readonly config?: GameOverModalConfig;
   readonly triggerEffects?: boolean;
@@ -88,8 +84,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   blackPlayer,
   whiteElo,
   blackElo,
-  blueElo,
-  greenElo,
   eloDelta,
   config = GAME_OVER_MODAL_CONFIG,
   triggerEffects = true,
@@ -144,14 +138,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
   const eloInfo = useMemo(() => {
     if (!isRanked) return null;
-    const effectiveWhite = whiteElo ?? blueElo;
-    const effectiveBlack = blackElo ?? greenElo;
-    if (effectiveWhite && effectiveBlack) {
+    if (whiteElo && blackElo) {
       return {
-        white: effectiveWhite,
-        black: effectiveBlack,
-        blue: effectiveWhite,
-        green: effectiveBlack,
+        white: whiteElo,
+        black: blackElo,
       };
     }
     if (whitePlayer && blackPlayer && result.winner) {
@@ -172,12 +162,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       return {
         white: wUpdate,
         black: bUpdate,
-        blue: wUpdate,
-        green: bUpdate,
       };
     }
     return null;
-  }, [isRanked, whiteElo, blackElo, blueElo, greenElo, whitePlayer, blackPlayer, result.winner]);
+  }, [isRanked, whiteElo, blackElo, whitePlayer, blackPlayer, result.winner]);
 
   const effectsFiredRef = useRef(false);
 
@@ -214,11 +202,11 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     return config.copy.defaultGameCompletedText;
   };
 
-  const isWhiteWinner = result.winner === 'white' || (result.winner as string) === 'blue';
-  const isBlackWinner = result.winner === 'black' || (result.winner as string) === 'green';
+  const isWhiteWinner = result.winner === 'white';
+  const isBlackWinner = result.winner === 'black';
   const winnerPlayer = isWhiteWinner ? whitePlayer : isBlackWinner ? blackPlayer : null;
-  const defaultWhiteName = config.copy.defaultWhitePlayerName ?? config.copy.defaultwhitePlayerName ?? 'White';
-  const defaultBlackName = config.copy.defaultBlackPlayerName ?? config.copy.defaultblackPlayerName ?? 'Black';
+  const defaultWhiteName = config.copy.defaultWhitePlayerName;
+  const defaultBlackName = config.copy.defaultBlackPlayerName;
   const winnerDisplayName =
     winnerPlayer?.username ||
     (isWhiteWinner
@@ -431,8 +419,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               }}
             >
               <span style={{ color: 'var(--text-secondary)' }}>{config.copy.goalScoreLabel}</span>
-              <span>{(result.whiteScore ?? result.blueScore)?.goalScore ?? 0}</span>
-              <span>{(result.blackScore ?? result.greenScore)?.goalScore ?? 0}</span>
+              <span>{result.whiteScore?.goalScore ?? 0}</span>
+              <span>{result.blackScore?.goalScore ?? 0}</span>
             </div>
             <div
               style={{
@@ -443,8 +431,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               }}
             >
               <span style={{ color: 'var(--text-secondary)' }}>{config.copy.outsideHighPiecesLabel}</span>
-              <span>{(result.whiteScore ?? result.blueScore)?.outsideGoalHighPiecesScore ?? 0}</span>
-              <span>{(result.blackScore ?? result.greenScore)?.outsideGoalHighPiecesScore ?? 0}</span>
+              <span>{result.whiteScore?.outsideGoalHighPiecesScore ?? 0}</span>
+              <span>{result.blackScore?.outsideGoalHighPiecesScore ?? 0}</span>
             </div>
             <div
               style={{
@@ -455,8 +443,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               }}
             >
               <span style={{ color: 'var(--text-secondary)' }}>{config.copy.rankDistanceLabel}</span>
-              <span>{(result.whiteScore ?? result.blueScore)?.rankDistanceScore ?? 0}</span>
-              <span>{(result.blackScore ?? result.greenScore)?.rankDistanceScore ?? 0}</span>
+              <span>{result.whiteScore?.rankDistanceScore ?? 0}</span>
+              <span>{result.blackScore?.rankDistanceScore ?? 0}</span>
             </div>
           </div>
 
@@ -521,8 +509,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               <div style={{ padding: '0.2rem 0' }}>
                 {config.layout.distributionQualities.map((quality) => {
                   const badgeConfig = CANONICAL_ANALYSIS_CONFIG.badges[quality];
-                  const whiteCount = (effectiveReport?.whiteBreakdown ?? effectiveReport?.blueBreakdown)?.[quality] ?? 0;
-                  const blackCount = (effectiveReport?.blackBreakdown ?? effectiveReport?.greenBreakdown)?.[quality] ?? 0;
+                  const whiteCount = effectiveReport?.whiteBreakdown?.[quality] ?? 0;
+                  const blackCount = effectiveReport?.blackBreakdown?.[quality] ?? 0;
 
                   return (
                     <div
@@ -589,7 +577,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                   }}
                 >
                   {effectiveReport
-                    ? `${((effectiveReport.whiteAccuracy ?? effectiveReport.blueAccuracy) ?? CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy).toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`
+                    ? `${(effectiveReport.whiteAccuracy ?? CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy).toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`
                     : `${CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy.toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`}
                 </span>
                 <span
@@ -601,7 +589,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                   }}
                 >
                   {effectiveReport
-                    ? `${((effectiveReport.blackAccuracy ?? effectiveReport.greenAccuracy) ?? CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy).toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`
+                    ? `${(effectiveReport.blackAccuracy ?? CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy).toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`
                     : `${CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy.toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`}
                 </span>
               </>

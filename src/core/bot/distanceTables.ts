@@ -50,14 +50,6 @@ export interface DistanceTables {
   readonly blackSliding: Uint8Array;
   /** Black leaping (FO) distance to goal rank */
   readonly blackLeaping: Uint8Array;
-  /** @deprecated Backwards compatibility alias for whiteSliding */
-  readonly blueSliding?: Uint8Array;
-  /** @deprecated Backwards compatibility alias for whiteLeaping */
-  readonly blueLeaping?: Uint8Array;
-  /** @deprecated Backwards compatibility alias for blackSliding */
-  readonly greenSliding?: Uint8Array;
-  /** @deprecated Backwards compatibility alias for blackLeaping */
-  readonly greenLeaping?: Uint8Array;
   /** Out-degree of each square (reachable target count on empty board) */
   readonly outDegrees: Uint8Array;
   /** Square centrality score (higher towards center d4, e4, d5, e5) */
@@ -176,10 +168,6 @@ function buildDistanceTables(): DistanceTables {
     whiteLeaping,
     blackSliding,
     blackLeaping,
-    blueSliding: whiteSliding,
-    blueLeaping: whiteLeaping,
-    greenSliding: blackSliding,
-    greenLeaping: blackLeaping,
     outDegrees,
     centrality,
   };

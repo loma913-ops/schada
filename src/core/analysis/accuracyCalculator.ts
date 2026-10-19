@@ -195,9 +195,7 @@ export function calculatePlayerAccuracy(
       acc = config.accuracy.perfectAccuracy;
     } else {
       // Perspective-corrected scores:
-      // In evaluatedMoves, evalBefore and evalAfter are normalized to White POV.
-      // Active player's POV before the move:
-      const beforeCp = color === 'white' || (color as string) === 'blue' ? m.evalBefore : -m.evalBefore;
+      const beforeCp = color === 'white' ? m.evalBefore : -m.evalBefore;
       // Active player's POV after playing the move:
       const afterCp = beforeCp - m.evalDelta;
       acc = calculateMoveAccuracy(beforeCp, afterCp, config);
@@ -286,10 +284,6 @@ export function createEmptyAnalysisReport(
     blackAccuracy: config.accuracy.perfectAccuracy,
     whiteBreakdown: emptyBreakdown,
     blackBreakdown: emptyBreakdown,
-    blueAccuracy: config.accuracy.perfectAccuracy,
-    greenAccuracy: config.accuracy.perfectAccuracy,
-    blueBreakdown: emptyBreakdown,
-    greenBreakdown: emptyBreakdown,
     isComplete,
     totalPlies: 0,
     analyzedAt: new Date().toISOString(),

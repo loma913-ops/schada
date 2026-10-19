@@ -40,8 +40,8 @@ export function computeMoveTransition(
   if (game.status !== 'in_progress') {
     throw new Error('Game is not in progress.');
   }
-  const isWhiteTurn = game.currentTurn === 'white' || (game.currentTurn as string) === 'blue';
-  const isWhitePlayer = playerColor === 'white' || (playerColor as string) === 'blue';
+  const isWhiteTurn = game.currentTurn === 'white';
+  const isWhitePlayer = playerColor === 'white';
   if (isWhiteTurn !== isWhitePlayer) {
     throw new Error('It is not your turn.');
   }
@@ -56,8 +56,6 @@ export function computeMoveTransition(
     currentTurn: nextTurn,
     whiteTimeMs: nextWhiteTime,
     blackTimeMs: nextBlackTime,
-    blueTimeMs: nextWhiteTime,
-    greenTimeMs: nextBlackTime,
     lastTurnStartTimeMs: nextBoardState.isGameOver ? null : now,
   };
 
@@ -67,19 +65,18 @@ export function computeMoveTransition(
     updatePayload.winner = winner;
     updatePayload.winReason = nextBoardState.result?.winReason;
 
-    const effectiveWhitePlayer = game.whitePlayer ?? game.bluePlayer;
-    const effectiveBlackPlayer = game.blackPlayer ?? game.greenPlayer;
+    const { whitePlayer, blackPlayer } = game;
 
-    if (winner && game.isRanked && effectiveWhitePlayer && effectiveBlackPlayer) {
+    if (winner && game.isRanked && whitePlayer && blackPlayer) {
       const eloCalc = computeRankedGameEloResult(game, winner);
       if (eloCalc) {
         updatePayload.eloResult = eloCalc;
         updatePayload.whitePlayer = {
-          ...effectiveWhitePlayer,
+          ...whitePlayer,
           elo: eloCalc.newWhiteElo,
         };
         updatePayload.blackPlayer = {
-          ...effectiveBlackPlayer,
+          ...blackPlayer,
           elo: eloCalc.newBlackElo,
         };
       }
@@ -117,29 +114,28 @@ export function computeResignTransition(
   let winningPlayerId: string | null = null;
   let winningDelta = 0;
 
-  const effectiveWhitePlayer = game.whitePlayer ?? game.bluePlayer;
-  const effectiveBlackPlayer = game.blackPlayer ?? game.greenPlayer;
+  const { whitePlayer, blackPlayer } = game;
 
-  const isWhiteResigning = resigningColor === 'white' || (resigningColor as string) === 'blue';
-  const resigningPlayer = isWhiteResigning ? effectiveWhitePlayer : effectiveBlackPlayer;
+  const isWhiteResigning = resigningColor === 'white';
+  const resigningPlayer = isWhiteResigning ? whitePlayer : blackPlayer;
   if (resigningPlayer?.id) {
     resigningPlayerId = resigningPlayer.id;
   }
-  const winningPlayer = isWhiteResigning ? effectiveBlackPlayer : effectiveWhitePlayer;
+  const winningPlayer = isWhiteResigning ? blackPlayer : whitePlayer;
   if (winningPlayer?.id) {
     winningPlayerId = winningPlayer.id;
   }
 
-  if (winner && game.isRanked && effectiveWhitePlayer && effectiveBlackPlayer) {
+  if (winner && game.isRanked && whitePlayer && blackPlayer) {
     const eloCalc = computeRankedGameEloResult(game, winner);
     if (eloCalc) {
       updatePayload.eloResult = eloCalc;
       updatePayload.whitePlayer = {
-        ...effectiveWhitePlayer,
+        ...whitePlayer,
         elo: eloCalc.newWhiteElo,
       };
       updatePayload.blackPlayer = {
-        ...effectiveBlackPlayer,
+        ...blackPlayer,
         elo: eloCalc.newBlackElo,
       };
 
@@ -192,29 +188,28 @@ export function computeTimeoutTransition(
   let timeoutWinnerPlayerId: string | null = null;
   let timeoutWinnerDelta = 0;
 
-  const effectiveWhitePlayer = game.whitePlayer ?? game.bluePlayer;
-  const effectiveBlackPlayer = game.blackPlayer ?? game.greenPlayer;
+  const { whitePlayer, blackPlayer } = game;
 
-  const isWhiteTimeout = timedOutColor === 'white' || (timedOutColor as string) === 'blue';
-  const timedOutPlayer = isWhiteTimeout ? effectiveWhitePlayer : effectiveBlackPlayer;
+  const isWhiteTimeout = timedOutColor === 'white';
+  const timedOutPlayer = isWhiteTimeout ? whitePlayer : blackPlayer;
   if (timedOutPlayer?.id) {
     timedOutPlayerId = timedOutPlayer.id;
   }
-  const timeoutWinnerPlayer = isWhiteTimeout ? effectiveBlackPlayer : effectiveWhitePlayer;
+  const timeoutWinnerPlayer = isWhiteTimeout ? blackPlayer : whitePlayer;
   if (timeoutWinnerPlayer?.id) {
     timeoutWinnerPlayerId = timeoutWinnerPlayer.id;
   }
 
-  if (winner && game.isRanked && effectiveWhitePlayer && effectiveBlackPlayer) {
+  if (winner && game.isRanked && whitePlayer && blackPlayer) {
     const eloCalc = computeRankedGameEloResult(game, winner);
     if (eloCalc) {
       updatePayload.eloResult = eloCalc;
       updatePayload.whitePlayer = {
-        ...effectiveWhitePlayer,
+        ...whitePlayer,
         elo: eloCalc.newWhiteElo,
       };
       updatePayload.blackPlayer = {
-        ...effectiveBlackPlayer,
+        ...blackPlayer,
         elo: eloCalc.newBlackElo,
       };
 
@@ -269,7 +264,7 @@ export function computeAbandonmentTransition(
   if (!game || typeof game !== 'object') {
     throw new TypeError('Invalid game: GameRoom object is required.');
   }
-  if (abandonedColor !== 'white' && abandonedColor !== 'black' && (abandonedColor as string) !== 'blue' && (abandonedColor as string) !== 'green') {
+  if (abandonedColor !== 'white' && abandonedColor !== 'black') {
     throw new RangeError(`Invalid abandonedColor: expected "white" or "black", received "${abandonedColor}".`);
   }
   if (
@@ -282,7 +277,7 @@ export function computeAbandonmentTransition(
   }
 
   const isRankedGame = Boolean(game.isRanked);
-  const isWhiteAbandoned = abandonedColor === 'white' || (abandonedColor as string) === 'blue';
+  const isWhiteAbandoned = abandonedColor === 'white';
   const winner: PieceColor = isWhiteAbandoned ? 'black' : 'white';
 
   const updatePayload: Partial<GameRoom> = {
@@ -292,8 +287,6 @@ export function computeAbandonmentTransition(
     lastTurnStartTimeMs: null,
     whiteDisconnectedAt: null,
     blackDisconnectedAt: null,
-    blueDisconnectedAt: null,
-    greenDisconnectedAt: null,
   };
 
   let abandonedPlayerId: string | null = null;
@@ -301,28 +294,27 @@ export function computeAbandonmentTransition(
   let winnerPlayerId: string | null = null;
   let winnerDelta = 0;
 
-  const effectiveWhitePlayer = game.whitePlayer ?? game.bluePlayer;
-  const effectiveBlackPlayer = game.blackPlayer ?? game.greenPlayer;
+  const { whitePlayer, blackPlayer } = game;
 
-  const abandonedPlayer = isWhiteAbandoned ? effectiveWhitePlayer : effectiveBlackPlayer;
+  const abandonedPlayer = isWhiteAbandoned ? whitePlayer : blackPlayer;
   if (abandonedPlayer?.id) {
     abandonedPlayerId = abandonedPlayer.id;
   }
-  const winningPlayer = isWhiteAbandoned ? effectiveBlackPlayer : effectiveWhitePlayer;
+  const winningPlayer = isWhiteAbandoned ? blackPlayer : whitePlayer;
   if (winningPlayer?.id) {
     winnerPlayerId = winningPlayer.id;
   }
 
-  if (winner && game.isRanked && effectiveWhitePlayer && effectiveBlackPlayer) {
+  if (winner && game.isRanked && whitePlayer && blackPlayer) {
     const eloCalc = computeRankedGameEloResult(game, winner);
     if (eloCalc) {
       updatePayload.eloResult = eloCalc;
       updatePayload.whitePlayer = {
-        ...effectiveWhitePlayer,
+        ...whitePlayer,
         elo: eloCalc.newWhiteElo,
       };
       updatePayload.blackPlayer = {
-        ...effectiveBlackPlayer,
+        ...blackPlayer,
         elo: eloCalc.newBlackElo,
       };
 
@@ -397,13 +389,9 @@ export function evaluateGameAbandonment(
   }
 
   const currentTurn = game.currentTurn;
-  const isWhiteTurn = currentTurn === 'white' || (currentTurn as string) === 'blue';
-  const whiteDc =
-    (typeof game.whiteDisconnectedAt === 'number' && game.whiteDisconnectedAt > 0) ||
-    (typeof game.blueDisconnectedAt === 'number' && game.blueDisconnectedAt > 0);
-  const blackDc =
-    (typeof game.blackDisconnectedAt === 'number' && game.blackDisconnectedAt > 0) ||
-    (typeof game.greenDisconnectedAt === 'number' && game.greenDisconnectedAt > 0);
+  const isWhiteTurn = currentTurn === 'white';
+  const whiteDc = typeof game.whiteDisconnectedAt === 'number' && game.whiteDisconnectedAt > 0;
+  const blackDc = typeof game.blackDisconnectedAt === 'number' && game.blackDisconnectedAt > 0;
 
   if (!whiteDc && !blackDc) {
     return { isDisconnected: false, shouldAbandon: false };
@@ -411,8 +399,8 @@ export function evaluateGameAbandonment(
 
   const turnPlayerDc = isWhiteTurn ? whiteDc : blackDc;
   const turnPlayerDcTime = isWhiteTurn
-    ? (game.whiteDisconnectedAt ?? game.blueDisconnectedAt!)
-    : (game.blackDisconnectedAt ?? game.greenDisconnectedAt!);
+    ? game.whiteDisconnectedAt!
+    : game.blackDisconnectedAt!;
 
   // If the player currently on turn is NOT disconnected, but the other player is disconnected
   if (!turnPlayerDc) {
@@ -430,8 +418,8 @@ export function evaluateGameAbandonment(
     ? Math.max(0, now - game.lastTurnStartTimeMs)
     : 0;
   const currentClockMs = isWhiteTurn
-    ? (game.whiteTimeMs ?? game.blueTimeMs ?? 0)
-    : (game.blackTimeMs ?? game.greenTimeMs ?? 0);
+    ? (game.whiteTimeMs ?? 0)
+    : (game.blackTimeMs ?? 0);
   const remainingClockMs = currentClockMs - elapsedSinceTurnStart;
 
   // If clock <= gracePeriodMs (60s), player loses on time instead of abandoning

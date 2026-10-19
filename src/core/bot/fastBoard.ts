@@ -13,14 +13,6 @@ export const BLACK_FO = 4;
 export const BLACK_O = 5;
 export const BLACK_PAWN = 6;
 
-// Backward-compatibility aliases
-export const BLUE_FO = WHITE_FO;
-export const BLUE_O = WHITE_O;
-export const BLUE_PAWN = WHITE_PAWN;
-export const GREEN_FO = BLACK_FO;
-export const GREEN_O = BLACK_O;
-export const GREEN_PAWN = BLACK_PAWN;
-
 // Bitflags for squares
 export const FLAG_LEFT_BASE = 1;
 export const FLAG_REACHED_GOAL = 2;
@@ -99,10 +91,6 @@ export interface UndoRecord {
   readonly whiteHighInGoal: number;
   readonly blackHighTotal: number;
   readonly blackHighInGoal: number;
-  readonly blueHighTotal: number;
-  readonly blueHighInGoal: number;
-  readonly greenHighTotal: number;
-  readonly greenHighInGoal: number;
 }
 
 /**
@@ -117,15 +105,6 @@ export class FastBoard {
   whiteHighInGoal: number = 0;
   blackHighTotal: number = 0;
   blackHighInGoal: number = 0;
-
-  get blueHighTotal(): number { return this.whiteHighTotal; }
-  set blueHighTotal(v: number) { this.whiteHighTotal = v; }
-  get blueHighInGoal(): number { return this.whiteHighInGoal; }
-  set blueHighInGoal(v: number) { this.whiteHighInGoal = v; }
-  get greenHighTotal(): number { return this.blackHighTotal; }
-  set greenHighTotal(v: number) { this.blackHighTotal = v; }
-  get greenHighInGoal(): number { return this.blackHighInGoal; }
-  set greenHighInGoal(v: number) { this.blackHighInGoal = v; }
 
   private readonly undoStack: UndoRecord[] = [];
 
@@ -307,10 +286,6 @@ export class FastBoard {
       whiteHighInGoal: this.whiteHighInGoal,
       blackHighTotal: this.blackHighTotal,
       blackHighInGoal: this.blackHighInGoal,
-      blueHighTotal: this.whiteHighTotal,
-      blueHighInGoal: this.whiteHighInGoal,
-      greenHighTotal: this.blackHighTotal,
-      greenHighInGoal: this.blackHighInGoal,
     });
 
     if (captured === WHITE_FO || captured === WHITE_O) {

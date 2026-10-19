@@ -13,18 +13,6 @@ export interface GameEloResult {
   newBlackElo: number;
   initialWhiteElo?: number;
   initialBlackElo?: number;
-  /** @deprecated Backwards compatibility alias for whiteDelta */
-  blueDelta?: number;
-  /** @deprecated Backwards compatibility alias for blackDelta */
-  greenDelta?: number;
-  /** @deprecated Backwards compatibility alias for newWhiteElo */
-  newBlueElo?: number;
-  /** @deprecated Backwards compatibility alias for newBlackElo */
-  newGreenElo?: number;
-  /** @deprecated Backwards compatibility alias for initialWhiteElo */
-  initialBlueElo?: number;
-  /** @deprecated Backwards compatibility alias for initialBlackElo */
-  initialGreenElo?: number;
 }
 
 export interface GameRoom {
@@ -38,10 +26,6 @@ export interface GameRoom {
   creatorColorPref: PieceColor | 'random';
   whitePlayer: GamePlayer | null;
   blackPlayer: GamePlayer | null;
-  /** @deprecated Backwards compatibility alias for whitePlayer */
-  bluePlayer?: GamePlayer | null;
-  /** @deprecated Backwards compatibility alias for blackPlayer */
-  greenPlayer?: GamePlayer | null;
   boardState: BoardState;
   currentTurn: PieceColor;
   whiteTimeMs: number;
@@ -55,14 +39,6 @@ export interface GameRoom {
   whiteDisconnectedAt?: number | null;
   blackDisconnectedAt?: number | null;
   targetOpponent?: ArenaPlayer | null;
-  /** @deprecated Backwards compatibility alias for whiteTimeMs */
-  blueTimeMs?: number;
-  /** @deprecated Backwards compatibility alias for blackTimeMs */
-  greenTimeMs?: number;
-  /** @deprecated Backwards compatibility alias for whiteDisconnectedAt */
-  blueDisconnectedAt?: number | null;
-  /** @deprecated Backwards compatibility alias for blackDisconnectedAt */
-  greenDisconnectedAt?: number | null;
 }
 
 export interface GameTimeoutResult {

@@ -32,10 +32,10 @@ import { ELO_CONFIG, validateEloConfig } from '@/core/elo/eloConfig';
  */
 export function computeRankedGameEloResult(
   game: GameRoom,
-  outcome: PieceColor | 'draw' | 'blue' | 'green'
+  outcome: PieceColor | 'draw'
 ): GameEloResult | null {
-  const whitePlayer = game.whitePlayer ?? game.bluePlayer;
-  const blackPlayer = game.blackPlayer ?? game.greenPlayer;
+  const whitePlayer = game.whitePlayer;
+  const blackPlayer = game.blackPlayer;
   if (!game.isRanked || !whitePlayer || !blackPlayer) {
     return null;
   }
@@ -71,12 +71,6 @@ export function computeRankedGameEloResult(
     blackDelta: calc.blackDelta,
     newWhiteElo: calc.newWhiteRating,
     newBlackElo: calc.newBlackRating,
-    initialBlueElo: initialWhiteElo,
-    initialGreenElo: initialBlackElo,
-    blueDelta: calc.whiteDelta,
-    greenDelta: calc.blackDelta,
-    newBlueElo: calc.newWhiteRating,
-    newGreenElo: calc.newBlackRating,
   };
 }
 
@@ -235,10 +229,9 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
 
       for (const game of candidateGames) {
         if (!game.processedEloUserIds?.includes(userId) && game.winner) {
-          const rawWinner = game.winner as string;
-          const winner: PieceColor | 'draw' = (rawWinner === 'blue' ? 'white' : rawWinner === 'green' ? 'black' : game.winner) as PieceColor | 'draw';
-          const isWhite = (game.whitePlayer?.id ?? game.bluePlayer?.id) === userId;
-          const isBlack = (game.blackPlayer?.id ?? game.greenPlayer?.id) === userId;
+          const winner: PieceColor | 'draw' = game.winner as PieceColor | 'draw';
+          const isWhite = game.whitePlayer?.id === userId;
+          const isBlack = game.blackPlayer?.id === userId;
           if (!isWhite && !isBlack) continue;
 
           const myColor: PieceColor = isWhite ? 'white' : 'black';
@@ -248,8 +241,8 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
           const eloRes = game.eloResult || computeRankedGameEloResult(game, winner);
           const delta = eloRes
             ? myColor === 'white'
-              ? (eloRes.whiteDelta ?? eloRes.blueDelta ?? 0)
-              : (eloRes.blackDelta ?? eloRes.greenDelta ?? 0)
+              ? (eloRes.whiteDelta ?? 0)
+              : (eloRes.blackDelta ?? 0)
             : 0;
           const category = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
 
@@ -274,8 +267,7 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
       (g) =>
         g.status === 'completed' &&
         g.isRanked &&
-        ((g.whitePlayer?.id ?? g.bluePlayer?.id) === userId ||
-          (g.blackPlayer?.id ?? g.greenPlayer?.id) === userId) &&
+        (g.whitePlayer?.id === userId || g.blackPlayer?.id === userId) &&
         !g.processedEloUserIds?.includes(userId) &&
         g.winner
     );
@@ -283,8 +275,8 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
     for (const game of candidateGames) {
       const rawWinner = game.winner as string;
       if (!rawWinner) continue;
-      const winner: PieceColor | 'draw' = (rawWinner === 'blue' ? 'white' : rawWinner === 'green' ? 'black' : game.winner) as PieceColor | 'draw';
-      const isWhite = (game.whitePlayer?.id ?? game.bluePlayer?.id) === userId;
+      const winner: PieceColor | 'draw' = game.winner as PieceColor | 'draw';
+      const isWhite = game.whitePlayer?.id === userId;
       const myColor: PieceColor = isWhite ? 'white' : 'black';
       const won = winner === myColor;
       const isDraw = winner === 'draw';
@@ -292,8 +284,8 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
       const eloRes = game.eloResult || computeRankedGameEloResult(game, winner);
       const delta = eloRes
         ? myColor === 'white'
-          ? (eloRes.whiteDelta ?? eloRes.blueDelta ?? 0)
-          : (eloRes.blackDelta ?? eloRes.greenDelta ?? 0)
+          ? (eloRes.whiteDelta ?? 0)
+          : (eloRes.blackDelta ?? 0)
         : 0;
       const category = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
 

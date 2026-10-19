@@ -50,7 +50,7 @@ export function isGameTimedOut(game: GameRoom | null | undefined): GameTimeoutRe
   if (game.status !== 'in_progress' || typeof game.timeControlMinutes !== 'number' || game.timeControlMinutes <= 0) {
     return { timedOut: false };
   }
-  if (game.currentTurn !== 'white' && game.currentTurn !== 'black' && (game.currentTurn as string) !== 'blue' && (game.currentTurn as string) !== 'green') {
+  if (game.currentTurn !== 'white' && game.currentTurn !== 'black') {
     return { timedOut: false };
   }
   const now = Date.now();
@@ -58,10 +58,10 @@ export function isGameTimedOut(game: GameRoom | null | undefined): GameTimeoutRe
     ? Math.max(0, now - game.lastTurnStartTimeMs)
     : 0;
   const currentTurn = game.currentTurn;
-  const isWhiteTurn = currentTurn === 'white' || (currentTurn as string) === 'blue';
+  const isWhiteTurn = currentTurn === 'white';
   const currentClockMs = isWhiteTurn
-    ? (game.whiteTimeMs ?? game.blueTimeMs)
-    : (game.blackTimeMs ?? game.greenTimeMs);
+    ? game.whiteTimeMs
+    : game.blackTimeMs;
   if (typeof currentClockMs !== 'number' || isNaN(currentClockMs)) {
     return { timedOut: false };
   }
@@ -93,15 +93,11 @@ export function calculateMoveClocks(
 ): {
   nextWhiteTime: number;
   nextBlackTime: number;
-  /** @deprecated Compatibility alias */
-  nextBlueTime?: number;
-  /** @deprecated Compatibility alias */
-  nextGreenTime?: number;
 } {
   validateClockDependencies();
 
-  let nextWhiteTime = game.whiteTimeMs ?? game.blueTimeMs ?? 0;
-  let nextBlackTime = game.blackTimeMs ?? game.greenTimeMs ?? 0;
+  let nextWhiteTime = game.whiteTimeMs ?? 0;
+  let nextBlackTime = game.blackTimeMs ?? 0;
 
   const isCorrespondence =
     typeof game.timeControlMinutes === 'number' &&
@@ -115,8 +111,6 @@ export function calculateMoveClocks(
     return {
       nextWhiteTime: moveLimitMs,
       nextBlackTime: moveLimitMs,
-      nextBlueTime: moveLimitMs,
-      nextGreenTime: moveLimitMs,
     };
   }
 
@@ -124,17 +118,15 @@ export function calculateMoveClocks(
     const elapsed = Math.max(0, now - game.lastTurnStartTimeMs);
     const incrementMs = (game.incrementSeconds || 0) * msPerSecond;
 
-    if (playerColor === 'white' || (playerColor as string) === 'blue') {
-      nextWhiteTime = Math.max(0, (game.whiteTimeMs ?? game.blueTimeMs ?? 0) - elapsed + incrementMs);
+    if (playerColor === 'white') {
+      nextWhiteTime = Math.max(0, (game.whiteTimeMs ?? 0) - elapsed + incrementMs);
     } else {
-      nextBlackTime = Math.max(0, (game.blackTimeMs ?? game.greenTimeMs ?? 0) - elapsed + incrementMs);
+      nextBlackTime = Math.max(0, (game.blackTimeMs ?? 0) - elapsed + incrementMs);
     }
   }
 
   return {
     nextWhiteTime,
     nextBlackTime,
-    nextBlueTime: nextWhiteTime,
-    nextGreenTime: nextBlackTime,
   };
 }

@@ -43,18 +43,6 @@ describe('GameOverModal - Rated Games Elo Display', () => {
       rankDistanceScore: 0.5714,
       totalScore: 12.5714,
     },
-    blueScore: {
-      goalScore: 0,
-      outsideGoalHighPiecesScore: 12,
-      rankDistanceScore: 0,
-      totalScore: 12,
-    },
-    greenScore: {
-      goalScore: 0,
-      outsideGoalHighPiecesScore: 12,
-      rankDistanceScore: 0.5714,
-      totalScore: 12.5714,
-    },
   };
 
   describe('formatEloWithDelta', () => {
@@ -100,8 +88,8 @@ describe('GameOverModal - Rated Games Elo Display', () => {
         React.createElement(GameOverModal, {
           result: mockResult,
           isRanked: true,
-          blueElo: { newElo: 1256, delta: 12 },
-          greenElo: { newElo: 1142, delta: -11 },
+          whiteElo: { newElo: 1256, delta: 12 },
+          blackElo: { newElo: 1142, delta: -11 },
           onHome: vi.fn(),
         })
       );
@@ -112,17 +100,17 @@ describe('GameOverModal - Rated Games Elo Display', () => {
       expect(html).toContain('(-11)');
     });
 
-    it('prioritizes authoritative blueElo and greenElo without recalculating from player cards', () => {
+    it('prioritizes authoritative whiteElo and blackElo without recalculating from player cards', () => {
       // Even if whitePlayer and blackPlayer reflect already-updated ratings or differing provisional games,
-      // blueElo and greenElo must be rendered directly and authoritatively.
+      // whiteElo and blackElo must be rendered directly and authoritatively.
       const html = renderToStaticMarkup(
         React.createElement(GameOverModal, {
           result: mockResult,
           isRanked: true,
           whitePlayer: { elo: 1230, gamesPlayed: 0 },
           blackPlayer: { elo: 1170, gamesPlayed: 20 },
-          blueElo: { newElo: 1216, delta: 16 },
-          greenElo: { newElo: 1184, delta: -16 },
+          whiteElo: { newElo: 1216, delta: 16 },
+          blackElo: { newElo: 1184, delta: -16 },
           onHome: vi.fn(),
         })
       );
@@ -260,8 +248,6 @@ describe('GameOverModal - Rated Games Elo Display', () => {
         moves: [],
         whiteAccuracy: 77.7,
         blackAccuracy: 85.8,
-        blueAccuracy: 77.7,
-        greenAccuracy: 85.8,
         whiteBreakdown: {
           brilliant: 0,
           great: 0,
@@ -275,30 +261,6 @@ describe('GameOverModal - Rated Games Elo Display', () => {
           blunder: 0,
         },
         blackBreakdown: {
-          brilliant: 0,
-          great: 0,
-          best: 5,
-          excellent: 2,
-          good: 1,
-          book: 2,
-          inaccuracy: 1,
-          mistake: 3,
-          miss: 0,
-          blunder: 0,
-        },
-        blueBreakdown: {
-          brilliant: 0,
-          great: 0,
-          best: 7,
-          excellent: 2,
-          good: 1,
-          book: 2,
-          inaccuracy: 1,
-          mistake: 0,
-          miss: 2,
-          blunder: 0,
-        },
-        greenBreakdown: {
           brilliant: 0,
           great: 0,
           best: 5,

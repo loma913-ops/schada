@@ -177,8 +177,7 @@
 }
 
 .rules-score-val.silver,
-.rules-score-val.white,
-.rules-score-val.blue {
+.rules-score-val.white {
   color: var(--text-primary);
 }
 
@@ -499,8 +498,7 @@
 }
 
 .piece-score-pill.silver,
-.piece-score-pill.white,
-.piece-score-pill.blue {
+.piece-score-pill.white {
   background: var(--bg-surface);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
@@ -576,8 +574,7 @@
 }
 
 .zone-row-tag.silver,
-.zone-row-tag.white,
-.zone-row-tag.blue {
+.zone-row-tag.white {
   color: var(--text-primary);
   border-color: var(--border-color);
 }

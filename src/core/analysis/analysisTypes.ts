@@ -54,14 +54,6 @@ export interface GameAnalysisReport {
   readonly blackAccuracy: number;
   readonly whiteBreakdown: Readonly<Record<MoveQuality, number>>;
   readonly blackBreakdown: Readonly<Record<MoveQuality, number>>;
-  /** @deprecated Backwards compatibility alias for whiteAccuracy */
-  readonly blueAccuracy?: number;
-  /** @deprecated Backwards compatibility alias for blackAccuracy */
-  readonly greenAccuracy?: number;
-  /** @deprecated Backwards compatibility alias for whiteBreakdown */
-  readonly blueBreakdown?: Readonly<Record<MoveQuality, number>>;
-  /** @deprecated Backwards compatibility alias for blackBreakdown */
-  readonly greenBreakdown?: Readonly<Record<MoveQuality, number>>;
   readonly nextMove?: NextMovePrediction;
   readonly isComplete: boolean;
   readonly totalPlies: number;

@@ -120,13 +120,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
   const initialTimeMs = params.timeControlMinutes > 0 ? params.timeControlMinutes * 60 * 1000 : 0;
 
   // Determine initial color assignment
-  const rawPref = params.colorPref || 'random';
-  const colorPref: PieceColor | 'random' =
-    (rawPref as string) === 'blue'
-      ? 'white'
-      : (rawPref as string) === 'green'
-        ? 'black'
-        : rawPref;
+  const colorPref: PieceColor | 'random' = params.colorPref || 'random';
   let creatorColor: PieceColor;
   if (colorPref === 'random') {
     creatorColor = getSecureRandomChoice(['white', 'black'] as const);
@@ -169,14 +163,12 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
       incrementSeconds: params.incrementSeconds || 0,
       isRanked,
       creatorColorPref: colorPref,
-      whitePlayer: (creatorColor === 'white' || (creatorColor as string) === 'blue') ? creatorPlayer : null,
-      blackPlayer: (creatorColor === 'black' || (creatorColor as string) === 'green') ? creatorPlayer : null,
+      whitePlayer: creatorColor === 'white' ? creatorPlayer : null,
+      blackPlayer: creatorColor === 'black' ? creatorPlayer : null,
       boardState: initialBoard,
       currentTurn: 'white',
       whiteTimeMs: initialTimeMs,
       blackTimeMs: initialTimeMs,
-      blueTimeMs: initialTimeMs,
-      greenTimeMs: initialTimeMs,
       lastTurnStartTimeMs: null,
       targetOpponent: params.targetOpponent || null,
     };
@@ -700,8 +692,6 @@ export function clearDisconnectState(gameId?: string): void {
   if (gameId) {
     lastDispatchedDisconnectState.delete(`${gameId}_white`);
     lastDispatchedDisconnectState.delete(`${gameId}_black`);
-    lastDispatchedDisconnectState.delete(`${gameId}_blue`);
-    lastDispatchedDisconnectState.delete(`${gameId}_green`);
   } else {
     lastDispatchedDisconnectState.clear();
   }
@@ -730,13 +720,12 @@ export async function setPlayerDisconnectedAction(
   if (typeof gameId !== 'string' || gameId.trim().length === 0) {
     throw new TypeError(`Invalid gameId: expected non-empty string, received "${gameId}".`);
   }
-  const isWhite = color === 'white' || (color as string) === 'blue';
-  const isBlack = color === 'black' || (color as string) === 'green';
-  if (!isWhite && !isBlack) {
+  if (color !== 'white' && color !== 'black') {
     throw new RangeError(`Invalid color: expected "white" or "black", received "${color}".`);
   }
+  const isWhite = color === 'white';
 
-  const normalizedColor: PieceColor = isWhite ? 'white' : 'black';
+  const normalizedColor: PieceColor = color;
   const stateKey = `${gameId}_${normalizedColor}`;
   if (lastDispatchedDisconnectState.get(stateKey) === disconnected) {
     return;
@@ -745,8 +734,8 @@ export async function setPlayerDisconnectedAction(
 
   const timestamp = disconnected ? Date.now() : null;
   const updatePayload: Partial<GameRoom> = isWhite
-    ? { whiteDisconnectedAt: timestamp, blueDisconnectedAt: timestamp }
-    : { blackDisconnectedAt: timestamp, greenDisconnectedAt: timestamp };
+    ? { whiteDisconnectedAt: timestamp }
+    : { blackDisconnectedAt: timestamp };
 
   if (isFirebaseConfigured() && db) {
     try {
@@ -789,12 +778,10 @@ export async function abandonGameDueToDisconnectAction(
   if (typeof gameId !== 'string' || gameId.trim().length === 0) {
     throw new TypeError(`Invalid gameId: expected non-empty string, received "${gameId}".`);
   }
-  const isWhite = abandonedColor === 'white' || (abandonedColor as string) === 'blue';
-  const isBlack = abandonedColor === 'black' || (abandonedColor as string) === 'green';
-  if (!isWhite && !isBlack) {
+  if (abandonedColor !== 'white' && abandonedColor !== 'black') {
     throw new RangeError(`Invalid abandonedColor: expected "white" or "black", received "${abandonedColor}".`);
   }
-  const normalizedColor: PieceColor = isWhite ? 'white' : 'black';
+  const normalizedColor: PieceColor = abandonedColor;
 
   if (pendingResolutionGameIds.has(gameId)) return null;
   pendingResolutionGameIds.add(gameId);

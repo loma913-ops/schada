@@ -10,14 +10,6 @@ export interface EloCalculationResult {
   readonly blackDelta: number;
   readonly newWhiteRating: number;
   readonly newBlackRating: number;
-  /** @deprecated Backwards compatibility alias for whiteDelta */
-  readonly blueDelta?: number;
-  /** @deprecated Backwards compatibility alias for blackDelta */
-  readonly greenDelta?: number;
-  /** @deprecated Backwards compatibility alias for newWhiteRating */
-  readonly newBlueRating?: number;
-  /** @deprecated Backwards compatibility alias for newBlackRating */
-  readonly newGreenRating?: number;
 }
 
 /**
@@ -71,7 +63,7 @@ export function calculateExpectedScore(
 export function calculateEloUpdate(
   white: PlayerEloData,
   black: PlayerEloData,
-  outcome: 'white' | 'black' | 'draw' | 'blue' | 'green',
+  outcome: 'white' | 'black' | 'draw',
   config: EloConfig = ELO_CONFIG
 ): EloCalculationResult {
   validateEloConfig(config);
@@ -82,10 +74,10 @@ export function calculateEloUpdate(
   let actualWhite = 0.5;
   let actualBlack = 0.5;
 
-  if (outcome === 'white' || (outcome as string) === 'blue') {
+  if (outcome === 'white') {
     actualWhite = 1.0;
     actualBlack = 0.0;
-  } else if (outcome === 'black' || (outcome as string) === 'green') {
+  } else if (outcome === 'black') {
     actualWhite = 0.0;
     actualBlack = 1.0;
   }
@@ -104,10 +96,6 @@ export function calculateEloUpdate(
     blackDelta,
     newWhiteRating,
     newBlackRating,
-    blueDelta: whiteDelta,
-    greenDelta: blackDelta,
-    newBlueRating: newWhiteRating,
-    newGreenRating: newBlackRating,
   };
 }
 

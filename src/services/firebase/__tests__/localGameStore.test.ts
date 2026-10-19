@@ -116,8 +116,6 @@ describe('LocalGameStore multi-tab synchronization and memory storage', () => {
     currentTurn: 'white',
     whiteTimeMs: 300000,
     blackTimeMs: 300000,
-    blueTimeMs: 300000,
-    greenTimeMs: 300000,
     lastTurnStartTimeMs: Date.now(),
   };
 

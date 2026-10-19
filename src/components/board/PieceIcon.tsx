@@ -6,7 +6,7 @@ interface PieceIconProps {
 }
 
 export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
-  const isWhite = piece.color === 'white' || (piece.color as string) === 'blue';
+  const isWhite = piece.color === 'white';
   const primaryColor = isWhite ? '#F1EFE7' : '#18181B';
   const secondaryColor = isWhite ? '#27272a' : '#09090b';
   const highlightColor = isWhite ? '#71717a' : '#a1a1aa';

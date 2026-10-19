@@ -54,10 +54,6 @@ export interface MatchmakingConfig {
   readonly defaultGuestHostName: string;
   readonly passAndPlayWhiteName: string;
   readonly passAndPlayBlackName: string;
-  /** @deprecated Backwards compatibility alias for passAndPlayWhiteName */
-  readonly passAndPlayBlueName?: string;
-  /** @deprecated Backwards compatibility alias for passAndPlayBlackName */
-  readonly passAndPlayGreenName?: string;
   readonly botBaseElo: number;
   readonly botEloStepPerLevel: number;
   readonly defaultCleanupIntervalMs: number;
@@ -337,14 +333,14 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
-  const whiteName = matchmaking.passAndPlayWhiteName ?? matchmaking.passAndPlayBlueName;
+  const whiteName = matchmaking.passAndPlayWhiteName;
   if (typeof whiteName !== 'string' || whiteName.trim().length === 0) {
     throw new MultiplayerConfigError(
       `Invalid matchmaking.passAndPlayWhiteName: expected non-empty string, received "${whiteName}".`
     );
   }
 
-  const blackName = matchmaking.passAndPlayBlackName ?? matchmaking.passAndPlayGreenName;
+  const blackName = matchmaking.passAndPlayBlackName;
   if (typeof blackName !== 'string' || blackName.trim().length === 0) {
     throw new MultiplayerConfigError(
       `Invalid matchmaking.passAndPlayBlackName: expected non-empty string, received "${blackName}".`
@@ -631,8 +627,6 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     defaultGuestHostName: 'Guest Host',
     passAndPlayWhiteName: 'Player 1 (White)',
     passAndPlayBlackName: 'Player 2 (Black)',
-    passAndPlayBlueName: 'Player 1 (White)',
-    passAndPlayGreenName: 'Player 2 (Black)',
     botBaseElo: 1000,
     botEloStepPerLevel: 80,
     defaultCleanupIntervalMs: 60_000,

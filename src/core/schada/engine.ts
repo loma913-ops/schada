@@ -688,7 +688,7 @@ export function executeMove(state: BoardState, move: Move): BoardState {
 
 export function resignGame(state: BoardState, resigningColor: PieceColor): BoardState {
   if (state.isGameOver) return state;
-  const isWhite = resigningColor === 'white' || (resigningColor as string) === 'blue';
+  const isWhite = resigningColor === 'white';
   const winner = isWhite ? 'black' : 'white';
   const whiteScore = evaluateGameResult(state.board, 'resignation').whiteScore;
   const blackScore = evaluateGameResult(state.board, 'resignation').blackScore;
@@ -701,15 +701,13 @@ export function resignGame(state: BoardState, resigningColor: PieceColor): Board
       winReason: 'resignation',
       whiteScore,
       blackScore,
-      blueScore: whiteScore,
-      greenScore: blackScore,
     },
   };
 }
 
 export function timeoutGame(state: BoardState, timedOutColor: PieceColor): BoardState {
   if (state.isGameOver) return state;
-  const isWhite = timedOutColor === 'white' || (timedOutColor as string) === 'blue';
+  const isWhite = timedOutColor === 'white';
   const winner = isWhite ? 'black' : 'white';
   const whiteScore = evaluateGameResult(state.board, 'timeout').whiteScore;
   const blackScore = evaluateGameResult(state.board, 'timeout').blackScore;
@@ -722,8 +720,6 @@ export function timeoutGame(state: BoardState, timedOutColor: PieceColor): Board
       winReason: 'timeout',
       whiteScore,
       blackScore,
-      blueScore: whiteScore,
-      greenScore: blackScore,
     },
   };
 }

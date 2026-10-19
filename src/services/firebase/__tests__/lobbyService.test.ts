@@ -34,8 +34,6 @@ function createMockRoom(overrides: Partial<GameRoom> = {}): GameRoom {
     blackPlayer: null,
     whiteTimeMs: 300000,
     blackTimeMs: 300000,
-    blueTimeMs: 300000,
-    greenTimeMs: 300000,
     lastTurnStartTimeMs: null,
     ...overrides,
   };

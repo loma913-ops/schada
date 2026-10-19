@@ -59,10 +59,6 @@ interface ArenaProps {
   blackPlayer: ArenaPlayer;
   whiteElo?: PlayerEloUpdate;
   blackElo?: PlayerEloUpdate;
-  /** @deprecated Backwards compatibility alias for whiteElo */
-  blueElo?: PlayerEloUpdate;
-  /** @deprecated Backwards compatibility alias for blackElo */
-  greenElo?: PlayerEloUpdate;
   timeControlMinutes?: number; // 0 for unlimited
   incrementSeconds?: number; // Fischer increment
   isRanked?: boolean;
@@ -74,10 +70,6 @@ interface ArenaProps {
   syncedGameState?: BoardState;
   syncedWhiteTimeMs?: number;
   syncedBlackTimeMs?: number;
-  /** @deprecated Backwards compatibility alias for syncedWhiteTimeMs */
-  syncedBlueTimeMs?: number;
-  /** @deprecated Backwards compatibility alias for syncedBlackTimeMs */
-  syncedGreenTimeMs?: number;
   onMakeMove?: (move: Move) => Promise<void> | void;
   onResign?: () => void;
   onTimeout?: (timedOutColor: PieceColor) => void;
@@ -91,10 +83,6 @@ interface ArenaProps {
   onExit: () => void;
   whiteDisconnected?: boolean;
   blackDisconnected?: boolean;
-  /** @deprecated Backwards compatibility alias for whiteDisconnected */
-  blueDisconnected?: boolean;
-  /** @deprecated Backwards compatibility alias for blackDisconnected */
-  greenDisconnected?: boolean;
   abandonCountdownSeconds?: number | null;
   initialReviewMode?: boolean;
 }
@@ -105,8 +93,6 @@ export const Arena: React.FC<ArenaProps> = ({
   blackPlayer,
   whiteElo,
   blackElo,
-  blueElo,
-  greenElo,
   timeControlMinutes = BOT_ENGINE_CONFIG.timeManagement.defaultMatchMinutes,
   incrementSeconds =
     BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs /
@@ -120,8 +106,6 @@ export const Arena: React.FC<ArenaProps> = ({
   syncedGameState,
   syncedWhiteTimeMs,
   syncedBlackTimeMs,
-  syncedBlueTimeMs,
-  syncedGreenTimeMs,
   onMakeMove: customMakeMove,
   onResign: customResign,
   onTimeout: customTimeout,
@@ -131,18 +115,9 @@ export const Arena: React.FC<ArenaProps> = ({
   onExit,
   whiteDisconnected,
   blackDisconnected,
-  blueDisconnected,
-  greenDisconnected,
   abandonCountdownSeconds,
   initialReviewMode = false,
 }) => {
-  const effectiveWhiteElo = whiteElo ?? blueElo;
-  const effectiveBlackElo = blackElo ?? greenElo;
-  const effectiveWhiteTimeMs = syncedWhiteTimeMs ?? syncedBlueTimeMs;
-  const effectiveBlackTimeMs = syncedBlackTimeMs ?? syncedGreenTimeMs;
-  const effectiveWhiteDisconnected = whiteDisconnected ?? blueDisconnected;
-  const effectiveBlackDisconnected = blackDisconnected ?? greenDisconnected;
-
   const [gameState, setGameState] = useState<BoardState>(syncedGameState || initialState);
   const [viewMoveIndex, setViewMoveIndex] = useState<number>(() => {
     const historyLen = (syncedGameState || initialState).moveHistory.length;
@@ -154,7 +129,7 @@ export const Arena: React.FC<ArenaProps> = ({
   const [orientation, setOrientation] = useState<PieceColor>(() => {
     if (userColor) return userColor;
     if (!isSpectator) return (syncedGameState || initialState).currentTurn;
-    return 'white';
+    return SCHADA_RULES_CONFIG.board.defaultOrientation;
   });
 
   // Ensure board is oriented so that the Player's pieces are at the bottom and their opponents are at the top
@@ -321,7 +296,7 @@ export const Arena: React.FC<ArenaProps> = ({
         if (latestMove.piece.type !== 'pawn') {
           const destRow = parseInt(latestMove.to[1], 10) - 1;
           const goalRow =
-            latestMove.piece.color === 'white' || (latestMove.piece.color as string) === 'blue'
+            latestMove.piece.color === 'white'
               ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
               : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
           if (destRow === goalRow) {
@@ -443,7 +418,7 @@ export const Arena: React.FC<ArenaProps> = ({
 
   const computerColor: PieceColor | undefined =
     isComputer && userColor
-      ? userColor === 'white' || (userColor as string) === 'blue'
+      ? userColor === 'white'
         ? 'black'
         : 'white'
       : undefined;
@@ -462,8 +437,8 @@ export const Arena: React.FC<ArenaProps> = ({
     typeof timeControlMinutes === 'number' &&
     timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes;
 
-  const [whiteTime, setWhiteTime] = useState<number>(effectiveWhiteTimeMs ?? initialMs);
-  const [blackTime, setBlackTime] = useState<number>(effectiveBlackTimeMs ?? initialMs);
+  const [whiteTime, setWhiteTime] = useState<number>(syncedWhiteTimeMs ?? initialMs);
+  const [blackTime, setBlackTime] = useState<number>(syncedBlackTimeMs ?? initialMs);
 
   const whiteTimeRef = useRef<number>(whiteTime);
   const blackTimeRef = useRef<number>(blackTime);
@@ -475,18 +450,18 @@ export const Arena: React.FC<ArenaProps> = ({
   }, [blackTime]);
 
   useEffect(() => {
-    if (typeof effectiveWhiteTimeMs === 'number') {
+    if (typeof syncedWhiteTimeMs === 'number') {
       const threshold = MULTIPLAYER_SCALE_CONFIG.matchmaking.clockSyncJitterThresholdMs;
-      setWhiteTime((prev) => (Math.abs(prev - effectiveWhiteTimeMs) > threshold ? effectiveWhiteTimeMs : prev));
+      setWhiteTime((prev) => (Math.abs(prev - syncedWhiteTimeMs) > threshold ? syncedWhiteTimeMs : prev));
     }
-  }, [effectiveWhiteTimeMs]);
+  }, [syncedWhiteTimeMs]);
 
   useEffect(() => {
-    if (typeof effectiveBlackTimeMs === 'number') {
+    if (typeof syncedBlackTimeMs === 'number') {
       const threshold = MULTIPLAYER_SCALE_CONFIG.matchmaking.clockSyncJitterThresholdMs;
-      setBlackTime((prev) => (Math.abs(prev - effectiveBlackTimeMs) > threshold ? effectiveBlackTimeMs : prev));
+      setBlackTime((prev) => (Math.abs(prev - syncedBlackTimeMs) > threshold ? syncedBlackTimeMs : prev));
     }
-  }, [effectiveBlackTimeMs]);
+  }, [syncedBlackTimeMs]);
 
   const lastTickRef = useRef<number>(Date.now());
 
@@ -504,8 +479,8 @@ export const Arena: React.FC<ArenaProps> = ({
   // Immediate timeout check if time has already run out
   useEffect(() => {
     if (isWaiting || gameState.isGameOver || timeControlMinutes <= 0) return;
-    const isWhiteTurn = gameState.currentTurn === 'white' || (gameState.currentTurn as string) === 'blue';
-    const isBlackTurn = gameState.currentTurn === 'black' || (gameState.currentTurn as string) === 'green';
+    const isWhiteTurn = gameState.currentTurn === 'white';
+    const isBlackTurn = gameState.currentTurn === 'black';
     if (isWhiteTurn && whiteTime <= 0) {
       handleTimeout('white');
     } else if (isBlackTurn && blackTime <= 0) {
@@ -524,7 +499,7 @@ export const Arena: React.FC<ArenaProps> = ({
       const delta = now - lastTickRef.current;
       lastTickRef.current = now;
 
-      const isWhiteTurn = gameState.currentTurn === 'white' || (gameState.currentTurn as string) === 'blue';
+      const isWhiteTurn = gameState.currentTurn === 'white';
       if (isWhiteTurn) {
         setWhiteTime((prev) => {
           if (prev <= 0) return 0;
@@ -579,7 +554,7 @@ export const Arena: React.FC<ArenaProps> = ({
     if (move.piece.type !== 'pawn') {
       const destRow = parseInt(move.to[1], 10) - 1;
       const goalRow =
-        move.piece.color === 'white' || (move.piece.color as string) === 'blue'
+        move.piece.color === 'white'
           ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
           : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
       if (destRow === goalRow) {
@@ -601,7 +576,7 @@ export const Arena: React.FC<ArenaProps> = ({
       setBlackTime(initialMs);
     } else if (!customMakeMove && incrementSeconds > 0 && timeControlMinutes > 0) {
       const addMs = incrementSeconds * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond;
-      const isWhiteTurn = currentState.currentTurn === 'white' || (currentState.currentTurn as string) === 'blue';
+      const isWhiteTurn = currentState.currentTurn === 'white';
       if (isWhiteTurn) {
         setWhiteTime((prev) => prev + addMs);
       } else {
@@ -628,7 +603,7 @@ export const Arena: React.FC<ArenaProps> = ({
     const delay = getBotThinkingDelayMs(botLevel, gameStateRef.current.moveHistory);
     const timer = setTimeout(async () => {
       const remainingTimeMs =
-        computerColor === 'white' || (computerColor as string) === 'blue'
+        computerColor === 'white'
           ? whiteTimeRef.current
           : blackTimeRef.current;
       const botMove = await botWorkerClient.requestBotMove(
@@ -674,7 +649,7 @@ export const Arena: React.FC<ArenaProps> = ({
   };
 
   const handleFlipBoard = () => {
-    setOrientation((prev) => ((prev === 'white' || (prev as string) === 'blue') ? 'black' : 'white'));
+    setOrientation((prev) => (prev === 'white' ? 'black' : 'white'));
   };
 
   // Algorithmic Complexity:
@@ -699,12 +674,10 @@ export const Arena: React.FC<ArenaProps> = ({
   }, [gameState.moveHistory, viewMoveIndex]);
 
   const computedElo = useMemo(() => {
-    if (effectiveWhiteElo && effectiveBlackElo) {
+    if (whiteElo && blackElo) {
       return {
-        white: effectiveWhiteElo,
-        black: effectiveBlackElo,
-        blue: effectiveWhiteElo,
-        green: effectiveBlackElo,
+        white: whiteElo,
+        black: blackElo,
       };
     }
     if (isRanked && whitePlayer && blackPlayer && gameState.result?.winner) {
@@ -725,14 +698,12 @@ export const Arena: React.FC<ArenaProps> = ({
       return {
         white: wUpdate,
         black: bUpdate,
-        blue: wUpdate,
-        green: bUpdate,
       };
     }
     return null;
-  }, [effectiveWhiteElo, effectiveBlackElo, isRanked, whitePlayer, blackPlayer, gameState.result?.winner]);
+  }, [whiteElo, blackElo, isRanked, whitePlayer, blackPlayer, gameState.result?.winner]);
 
-  const isWhiteOrientation = orientation === 'white' || (orientation as string) === 'blue';
+  const isWhiteOrientation = orientation === 'white';
   const topColor: PieceColor = isWhiteOrientation ? 'black' : 'white';
   const bottomColor: PieceColor = isWhiteOrientation ? 'white' : 'black';
 
@@ -791,8 +762,8 @@ export const Arena: React.FC<ArenaProps> = ({
           isUser={userColor === topColor}
           isThinking={isBotThinking && displayedGameState.currentTurn === topColor}
           isPatron={isPatronUser(topPlayer)}
-          isDisconnected={!isCorrespondence && (topColor === 'white' ? effectiveWhiteDisconnected : effectiveBlackDisconnected)}
-          abandonCountdownSeconds={!isCorrespondence && (topColor === 'white' ? effectiveWhiteDisconnected : effectiveBlackDisconnected) ? abandonCountdownSeconds : undefined}
+          isDisconnected={!isCorrespondence && (topColor === 'white' ? whiteDisconnected : blackDisconnected)}
+          abandonCountdownSeconds={!isCorrespondence && (topColor === 'white' ? whiteDisconnected : blackDisconnected) ? abandonCountdownSeconds : undefined}
         />
 
         {/* Board Component */}
@@ -825,8 +796,8 @@ export const Arena: React.FC<ArenaProps> = ({
           isUser={userColor === bottomColor}
           isThinking={isBotThinking && displayedGameState.currentTurn === bottomColor}
           isPatron={isPatronUser(bottomPlayer)}
-          isDisconnected={!isCorrespondence && (bottomColor === 'white' ? effectiveWhiteDisconnected : effectiveBlackDisconnected)}
-          abandonCountdownSeconds={!isCorrespondence && (bottomColor === 'white' ? effectiveWhiteDisconnected : effectiveBlackDisconnected) ? abandonCountdownSeconds : undefined}
+          isDisconnected={!isCorrespondence && (bottomColor === 'white' ? whiteDisconnected : blackDisconnected)}
+          abandonCountdownSeconds={!isCorrespondence && (bottomColor === 'white' ? whiteDisconnected : blackDisconnected) ? abandonCountdownSeconds : undefined}
         />
 
         {/* Mobile In-Game Action Bar */}
@@ -913,7 +884,7 @@ export const Arena: React.FC<ArenaProps> = ({
             {gameState.isGameOver ? (
               <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>GAME OVER</span>
             ) : (
-              <>Turn: <strong style={{ color: (displayedGameState.currentTurn === 'white' || (displayedGameState.currentTurn as string) === 'blue') ? 'var(--piece-white)' : 'var(--piece-black)' }}>{(displayedGameState.currentTurn === 'white' || (displayedGameState.currentTurn as string) === 'blue') ? 'WHITE' : 'BLACK'}</strong></>
+              <>Turn: <strong style={{ color: displayedGameState.currentTurn === 'white' ? 'var(--piece-white)' : 'var(--piece-black)' }}>{displayedGameState.currentTurn === 'white' ? 'WHITE' : 'BLACK'}</strong></>
             )}
           </div>
         </div>
@@ -973,7 +944,7 @@ export const Arena: React.FC<ArenaProps> = ({
                 {gameState.isGameOver ? (
                   <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>GAME OVER</span>
                 ) : (
-                  <>Turn: <strong style={{ color: (displayedGameState.currentTurn === 'white' || (displayedGameState.currentTurn as string) === 'blue') ? 'var(--piece-white)' : 'var(--piece-black)' }}>{(displayedGameState.currentTurn === 'white' || (displayedGameState.currentTurn as string) === 'blue') ? 'WHITE' : 'BLACK'}</strong></>
+                  <>Turn: <strong style={{ color: displayedGameState.currentTurn === 'white' ? 'var(--piece-white)' : 'var(--piece-black)' }}>{displayedGameState.currentTurn === 'white' ? 'WHITE' : 'BLACK'}</strong></>
                 )}
               </div>
             </div>
@@ -1003,10 +974,8 @@ export const Arena: React.FC<ArenaProps> = ({
           isRanked={isRanked}
           whitePlayer={whitePlayer}
           blackPlayer={blackPlayer}
-          whiteElo={computedElo?.white || effectiveWhiteElo}
-          blackElo={computedElo?.black || effectiveBlackElo}
-          blueElo={computedElo?.blue || blueElo}
-          greenElo={computedElo?.green || greenElo}
+          whiteElo={computedElo?.white || whiteElo}
+          blackElo={computedElo?.black || blackElo}
           triggerEffects={!gameOverEffectsPlayed}
           onEffectsPlayed={handleGameOverEffectsPlayed}
           onHome={onExit}

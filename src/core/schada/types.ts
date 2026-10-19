@@ -57,10 +57,6 @@ export interface GameResult {
   winReason: WinReason | null;
   whiteScore: ScoreBreakdown;
   blackScore: ScoreBreakdown;
-  /** @deprecated Backwards compatibility alias for whiteScore */
-  blueScore?: ScoreBreakdown;
-  /** @deprecated Backwards compatibility alias for blackScore */
-  greenScore?: ScoreBreakdown;
 }
 
 export type BoardMatrix = Record<Square, Piece | null>;

@@ -45,14 +45,6 @@ export interface GameOverModalConfig {
     readonly rankDistanceLabel: string;
     readonly defaultWhitePlayerName: string;
     readonly defaultBlackPlayerName: string;
-    /** @deprecated Backwards compatibility alias for defaultWhitePlayerName */
-    readonly defaultwhitePlayerName?: string;
-    /** @deprecated Backwards compatibility alias for defaultBlackPlayerName */
-    readonly defaultblackPlayerName?: string;
-    /** @deprecated Backwards compatibility alias for defaultWhitePlayerName */
-    readonly defaultBluePlayerName?: string;
-    /** @deprecated Backwards compatibility alias for defaultBlackPlayerName */
-    readonly defaultGreenPlayerName?: string;
     readonly winnerTitleSuffix: string;
     readonly winReasons: Record<WinReason, string>;
   };
@@ -155,13 +147,17 @@ export function validateGameOverModalConfig(config: GameOverModalConfig): void {
     }
   }
 
-  const whitePlayerName = config.copy.defaultWhitePlayerName ?? config.copy.defaultwhitePlayerName;
-  if (typeof whitePlayerName !== 'string' || whitePlayerName.trim().length === 0) {
+  if (
+    typeof config.copy.defaultWhitePlayerName !== 'string' ||
+    config.copy.defaultWhitePlayerName.trim().length === 0
+  ) {
     throw new GameOverModalConfigError('Invalid copy.defaultWhitePlayerName: expected non-empty string.');
   }
 
-  const blackPlayerName = config.copy.defaultBlackPlayerName ?? config.copy.defaultblackPlayerName;
-  if (typeof blackPlayerName !== 'string' || blackPlayerName.trim().length === 0) {
+  if (
+    typeof config.copy.defaultBlackPlayerName !== 'string' ||
+    config.copy.defaultBlackPlayerName.trim().length === 0
+  ) {
     throw new GameOverModalConfigError('Invalid copy.defaultBlackPlayerName: expected non-empty string.');
   }
 
@@ -231,10 +227,6 @@ export const GAME_OVER_MODAL_CONFIG: GameOverModalConfig = {
     rankDistanceLabel: 'Rank Distance',
     defaultWhitePlayerName: 'White',
     defaultBlackPlayerName: 'Black',
-    defaultwhitePlayerName: 'White',
-    defaultblackPlayerName: 'Black',
-    defaultBluePlayerName: 'White',
-    defaultGreenPlayerName: 'Black',
     winnerTitleSuffix: 'Won',
     winReasons: {
       goal_reached: 'All remaining high pieces reached the goal line',

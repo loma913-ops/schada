@@ -456,8 +456,8 @@ export function isUserGameRoom(
 ): boolean {
   if (!room) return false;
 
-  const whitePlayer = room.whitePlayer ?? room.bluePlayer;
-  const blackPlayer = room.blackPlayer ?? room.greenPlayer;
+  const whitePlayer = room.whitePlayer;
+  const blackPlayer = room.blackPlayer;
 
   if (userId) {
     if (

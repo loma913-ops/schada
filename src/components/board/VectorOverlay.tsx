@@ -6,7 +6,7 @@ import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 interface VectorOverlayProps {
   square: Square;
   isSelected?: boolean;
-  orientation?: PieceColor | 'blue' | 'green';
+  orientation?: PieceColor;
 }
 
 export const VectorOverlay: React.FC<VectorOverlayProps> = memo(({
@@ -22,7 +22,7 @@ export const VectorOverlay: React.FC<VectorOverlayProps> = memo(({
   const centerFill = isSelected ? '#10b981' : 'var(--sq-vector-dot)';
   const strokeW = isSelected ? 2.4 : 1.8;
 
-  const isFlipped = orientation === 'black' || (orientation as string) === 'green';
+  const isFlipped = orientation === 'black';
 
   return (
     <svg viewBox="0 0 100 100" className="square-vector-svg">

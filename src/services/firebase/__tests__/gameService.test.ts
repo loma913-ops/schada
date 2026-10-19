@@ -596,8 +596,6 @@ describe('GameService Multiplayer Sync', () => {
       currentTurn: 'white',
       whiteTimeMs: 300000,
       blackTimeMs: 300000,
-      blueTimeMs: 300000,
-      greenTimeMs: 300000,
       lastTurnStartTimeMs: Date.now() - 400000,
     } as GameRoom;
     expect(isGameTimedOut(waitingGame)).toEqual({ timedOut: false });
@@ -609,8 +607,6 @@ describe('GameService Multiplayer Sync', () => {
       currentTurn: 'white',
       whiteTimeMs: 0,
       blackTimeMs: 0,
-      blueTimeMs: 0,
-      greenTimeMs: 0,
       lastTurnStartTimeMs: Date.now() - 400000,
     } as GameRoom;
     expect(isGameTimedOut(untimedGame)).toEqual({ timedOut: false });
@@ -622,8 +618,6 @@ describe('GameService Multiplayer Sync', () => {
       currentTurn: 'white',
       whiteTimeMs: 300000,
       blackTimeMs: 300000,
-      blueTimeMs: 300000,
-      greenTimeMs: 300000,
       lastTurnStartTimeMs: Date.now() - 10000, // 10s elapsed out of 300s
     } as GameRoom;
     expect(isGameTimedOut(liveGame)).toEqual({ timedOut: false });
@@ -635,8 +629,6 @@ describe('GameService Multiplayer Sync', () => {
       currentTurn: 'white',
       whiteTimeMs: 120000,
       blackTimeMs: 120000,
-      blueTimeMs: 120000,
-      greenTimeMs: 120000,
       lastTurnStartTimeMs: Date.now() - 130000, // 130s elapsed out of 120s
     } as GameRoom;
     expect(isGameTimedOut(expiredWhiteGame)).toEqual({ timedOut: true, timedOutColor: 'white' });
@@ -647,8 +639,6 @@ describe('GameService Multiplayer Sync', () => {
       currentTurn: 'black',
       whiteTimeMs: 60000,
       blackTimeMs: 40000,
-      blueTimeMs: 60000,
-      greenTimeMs: 40000,
       lastTurnStartTimeMs: Date.now() - 50000, // 50s elapsed out of 40s
     } as GameRoom;
     expect(isGameTimedOut(expiredBlackGame)).toEqual({ timedOut: true, timedOutColor: 'black' });

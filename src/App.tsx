@@ -317,7 +317,7 @@ const MainApp: React.FC = () => {
         hasDonated: false,
       };
 
-    const isWhiteUser = userColor === 'white' || (userColor as string) === 'blue';
+    const isWhiteUser = userColor === 'white';
     const whitePlayer = isWhiteUser ? currentUserPlayer : botOpponent;
     const blackPlayer = isWhiteUser ? botOpponent : currentUserPlayer;
 
@@ -452,8 +452,8 @@ const MainApp: React.FC = () => {
       outcome
     );
 
-    const whiteWon = outcome === 'white' || (outcome as string) === 'blue';
-    const blackWon = outcome === 'black' || (outcome as string) === 'green';
+    const whiteWon = outcome === 'white';
+    const blackWon = outcome === 'black';
     const isDraw = outcome === 'draw';
 
     // Update White Player (e.g. host user)

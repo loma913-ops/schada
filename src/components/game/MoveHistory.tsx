@@ -38,18 +38,6 @@ interface MoveRowPair {
   readonly black?: Move;
   readonly whiteQuality?: MoveQuality;
   readonly blackQuality?: MoveQuality;
-  /** @deprecated Backwards compatibility alias for whiteIndex */
-  readonly blueIndex?: number;
-  /** @deprecated Backwards compatibility alias for blackIndex */
-  readonly greenIndex?: number;
-  /** @deprecated Backwards compatibility alias for white */
-  readonly blue?: Move;
-  /** @deprecated Backwards compatibility alias for black */
-  readonly green?: Move;
-  /** @deprecated Backwards compatibility alias for whiteQuality */
-  readonly blueQuality?: MoveQuality;
-  /** @deprecated Backwards compatibility alias for blackQuality */
-  readonly greenQuality?: MoveQuality;
 }
 
 export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory({
@@ -90,12 +78,6 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
         black: blackMove,
         whiteQuality: whiteQ,
         blackQuality: blackQ,
-        blueIndex: whiteIdx,
-        greenIndex: blackIdx,
-        blue: whiteMove,
-        green: blackMove,
-        blueQuality: whiteQ,
-        greenQuality: blackQ,
       });
     }
     return pairs;

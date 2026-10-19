@@ -105,7 +105,5 @@ export function evaluateGameResult(
     winReason,
     whiteScore,
     blackScore,
-    blueScore: whiteScore,
-    greenScore: blackScore,
   };
 }

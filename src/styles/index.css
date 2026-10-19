@@ -427,15 +427,13 @@ body {
   flex-shrink: 0;
 }
 
-.player-avatar.white,
-.player-avatar.blue {
+.player-avatar.white {
   background: var(--piece-white);
   color: #18181B;
   border: 1px solid #71717a;
 }
 
-.player-avatar.black,
-.player-avatar.green {
+.player-avatar.black {
   background: var(--piece-black);
   color: #F1EFE7;
   border: 1px solid #3f3f46;
@@ -981,20 +979,16 @@ body {
   font-weight: 700;
 }
 
-.action-btn.pref-white,
-.action-btn.pref-blue {
+.action-btn.pref-white {
   color: var(--text-primary);
 }
 
-.action-btn.pref-black,
-.action-btn.pref-green {
+.action-btn.pref-black {
   color: var(--text-primary);
 }
 
 .action-btn.active.pref-white,
-.action-btn.active.pref-black,
-.action-btn.active.pref-blue,
-.action-btn.active.pref-green {
+.action-btn.active.pref-black {
   background-color: var(--accent-gold);
   color: var(--accent-gold-text);
   border-color: var(--accent-gold);

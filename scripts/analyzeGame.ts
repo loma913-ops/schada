@@ -297,7 +297,7 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
 
   for (const m of report.moves) {
     const badge = badges[m.quality];
-    const isWhiteMove = m.turn === 'white' || (m.turn as string) === 'blue';
+    const isWhiteMove = m.turn === 'white';
     const plyLabel = isWhiteMove ? `${m.moveNumber}.` : `${m.moveNumber}...`;
     const sym = padEndVisual(badge.symbol, 2);
     const qualityLabel = `${badge.ansiColor}${sym} ${badge.label}${RESET_COLOR}`;
@@ -349,8 +349,8 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
   console.log(`\n${BOLD}════════════════════════════════════════════════════════════════════════════${RESET_COLOR}`);
   console.log(`${BOLD}                        ACCURACY & SUMMARY STATS                            ${RESET_COLOR}`);
   console.log(`${BOLD}════════════════════════════════════════════════════════════════════════════${RESET_COLOR}`);
-  const whiteAcc = report.whiteAccuracy ?? report.blueAccuracy ?? 0;
-  const blackAcc = report.blackAccuracy ?? report.greenAccuracy ?? 0;
+  const whiteAcc = report.whiteAccuracy ?? 0;
+  const blackAcc = report.blackAccuracy ?? 0;
   console.log(`  ${BOLD}White Accuracy:${RESET_COLOR} ${whiteAcc.toFixed(config.accuracy.accuracyDecimals)}%`);
   console.log(`  ${BOLD}Black Accuracy:${RESET_COLOR} ${blackAcc.toFixed(config.accuracy.accuracyDecimals)}%`);
   console.log(`\n${DIM}Move Quality Distribution:${RESET_COLOR}`);
@@ -379,8 +379,8 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
   console.log(distDivider);
   for (const q of qualities) {
     const badge = badges[q];
-    const whiteCount = (report.whiteBreakdown ?? report.blueBreakdown)?.[q] ?? 0;
-    const blackCount = (report.blackBreakdown ?? report.greenBreakdown)?.[q] ?? 0;
+    const whiteCount = report.whiteBreakdown?.[q] ?? 0;
+    const blackCount = report.blackBreakdown?.[q] ?? 0;
     const sym = padEndVisual(badge.symbol, 2);
     const classText = `${badge.ansiColor}${sym}  ${badge.label}${RESET_COLOR}`;
     console.log(

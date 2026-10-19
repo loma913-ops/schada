@@ -11,7 +11,7 @@ interface SchadaBoardProps {
   board: BoardMatrix;
   currentTurn: PieceColor;
   playerColor?: PieceColor; // User's assigned color (or undefined if local/spectator)
-  orientation?: PieceColor | 'blue' | 'green';
+  orientation?: PieceColor;
   lastMove?: Move | null;
   onMakeMove: (move: Move) => void;
   disabled?: boolean;
@@ -21,7 +21,7 @@ export function getBoardSquaresForOrientation(
   orientation: PieceColor = SCHADA_RULES_CONFIG.board.defaultOrientation
 ): Square[] {
   const result: Square[] = [];
-  const isWhite = orientation === 'white' || (orientation as string) === 'blue';
+  const isWhite = orientation === 'white';
   const rows = isWhite ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
   const cols = isWhite ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
 
@@ -43,13 +43,7 @@ export const SchadaBoard: React.FC<SchadaBoardProps> = memo(({
   disabled = false,
 }) => {
   // Ensure board orientation defaults to player's pieces at bottom
-  const resolvedPropOrientation: PieceColor | undefined =
-    propOrientation === 'blue'
-      ? 'white'
-      : propOrientation === 'green'
-      ? 'black'
-      : (propOrientation as PieceColor | undefined);
-  const orientation: PieceColor = resolvedPropOrientation ?? playerColor ?? SCHADA_RULES_CONFIG.board.defaultOrientation;
+  const orientation: PieceColor = propOrientation ?? playerColor ?? SCHADA_RULES_CONFIG.board.defaultOrientation;
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
 
   // Compute legal moves for currently selected square

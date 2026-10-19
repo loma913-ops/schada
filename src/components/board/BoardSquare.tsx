@@ -43,7 +43,7 @@ export const BoardSquare: React.FC<BoardSquareProps> = memo(({
   const isLight = (col + row) % 2 === 1;
 
   // Determine if coordinate labels should show on this square based on perspective
-  const isWhiteOrientation = orientation === 'white' || (orientation as string) === 'blue';
+  const isWhiteOrientation = orientation === 'white';
   const showFile = isWhiteOrientation
     ? row === SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
     : row === SCHADA_RULES_CONFIG.board.whiteGoalRankIndex;
@@ -53,7 +53,7 @@ export const BoardSquare: React.FC<BoardSquareProps> = memo(({
 
   // Check if high piece is in goal line (immune to capture)
   const isHighPiece = piece && (piece.type === 'field_officer' || piece.type === 'officer');
-  const isPieceWhite = piece?.color === 'white' || (piece?.color as string) === 'blue';
+  const isPieceWhite = piece?.color === 'white';
   const goalRank = isPieceWhite
     ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
     : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
