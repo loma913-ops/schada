@@ -27,6 +27,7 @@ export interface DeploymentRecoveryConfig {
   readonly activeGamePathPrefix: string;
   readonly nonActiveMatchReloadDelayMs: number;
   readonly initialBuildTimeFallback: number;
+  readonly enableInDevMode: boolean;
 }
 
 /**
@@ -155,6 +156,12 @@ export function validateDeploymentRecoveryConfig(config: DeploymentRecoveryConfi
       `Invalid initialBuildTimeFallback: expected non-negative number, received ${config.initialBuildTimeFallback}.`
     );
   }
+
+  if (typeof config.enableInDevMode !== 'boolean') {
+    throw new DeploymentRecoveryConfigError(
+      `Invalid enableInDevMode: expected boolean, received ${String(config.enableInDevMode)}.`
+    );
+  }
 }
 
 export const DEPLOYMENT_RECOVERY_CONFIG: DeploymentRecoveryConfig = Object.freeze({
@@ -178,6 +185,7 @@ export const DEPLOYMENT_RECOVERY_CONFIG: DeploymentRecoveryConfig = Object.freez
   activeGamePathPrefix: '/game/',
   nonActiveMatchReloadDelayMs: 500,
   initialBuildTimeFallback: 0,
+  enableInDevMode: false,
 });
 
 // Immediately validate deployment recovery configuration at module load time

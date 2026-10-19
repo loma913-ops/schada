@@ -1,15 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import rulesContent from '../../../../firestore.rules?raw';
+import indexesConfig from '../../../../firestore.indexes.json';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { AUTH_CONFIG } from '@/services/firebase/authConfig';
+import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { SECURITY_CONFIG } from '../securityConfig';
+
+interface FirestoreFieldOverrideIndex {
+  readonly order?: string;
+  readonly queryScope?: string;
+}
+
+interface FirestoreFieldOverride {
+  readonly collectionGroup?: string;
+  readonly fieldPath?: string;
+  readonly ttl?: boolean;
+  readonly indexes?: readonly FirestoreFieldOverrideIndex[];
+}
 
 describe('Firestore Rules ↔ TypeScript Configuration Synchronization', () => {
   it('synchronizes starting Elo rating between rules and SECURITY_CONFIG / ELO_CONFIG', () => {
     const expectedStartingElo = SECURITY_CONFIG.startingEloRating;
     expect(rulesContent).toContain(`stats.elo == ${expectedStartingElo}`);
     expect(expectedStartingElo).toBe(ELO_CONFIG.defaultStartingRating);
-    expect(expectedStartingElo).toBe(1200);
+    expect(expectedStartingElo).toBe(MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating);
   });
 
   it('synchronizes username length constraints between rules, AUTH_CONFIG, and SECURITY_CONFIG', () => {
@@ -75,5 +89,23 @@ describe('Firestore Rules ↔ TypeScript Configuration Synchronization', () => {
 
   it('permits user profile deletion strictly to authenticated account owners', () => {
     expect(rulesContent).toContain('allow delete: if isOwner(userId);');
+  });
+
+  it('guarantees guest_sessions.lastSeen retains single-field indexes for inequality queries and aggregation', () => {
+    const fieldOverrides: readonly FirestoreFieldOverride[] = indexesConfig.fieldOverrides;
+    const guestOverride = fieldOverrides.find(
+      (override) =>
+        override.collectionGroup === MULTIPLAYER_SCALE_CONFIG.collections.guestSessions &&
+        override.fieldPath === SECURITY_CONFIG.guestSessionAllowedKeys[0]
+    );
+    expect(guestOverride).toBeDefined();
+    expect(guestOverride?.indexes).toBeDefined();
+    expect(guestOverride?.indexes?.length).toBeGreaterThanOrEqual(2);
+    expect(guestOverride?.indexes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ order: 'ASCENDING', queryScope: 'COLLECTION' }),
+        expect.objectContaining({ order: 'DESCENDING', queryScope: 'COLLECTION' }),
+      ])
+    );
   });
 });

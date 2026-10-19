@@ -321,80 +321,94 @@ export function initDeploymentRecovery(
   let activeRegistration: ServiceWorkerRegistration | null = null;
   let cleanSwListeners: (() => void) | null = null;
 
+  const skipInDevMode =
+    !config.enableInDevMode &&
+    typeof import.meta !== 'undefined' &&
+    import.meta.env?.MODE === 'development';
+
   // 1. Service Worker Update Detection & Controller Takeover
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const hadPriorController = Boolean(navigator.serviceWorker.controller);
+    if (skipInDevMode) {
+      navigator.serviceWorker.getRegistrations?.().then((registrations) => {
+        registrations.forEach((registration) => {
+          registration.unregister().catch(() => {});
+        });
+      }).catch(() => {});
+    } else {
+      const hadPriorController = Boolean(navigator.serviceWorker.controller);
 
-    const handleControllerChange = () => {
-      // A new service worker has activated and claimed this client.
-      // If a previous controller existed, this is an update deployment:
-      if (hadPriorController) {
-        if (isInMatch()) {
-          setUpdateAvailable(true);
-        } else {
-          executeDebouncedReload(config);
+      const handleControllerChange = () => {
+        // A new service worker has activated and claimed this client.
+        // If a previous controller existed, this is an update deployment:
+        if (hadPriorController) {
+          if (isInMatch()) {
+            setUpdateAvailable(true);
+          } else {
+            executeDebouncedReload(config);
+          }
         }
-      }
-    };
+      };
 
-    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
 
-    const triggerSwUpdate = async () => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-      if (activeRegistration) {
-        try {
-          await activeRegistration.update();
-        } catch {
-          // Offline or network error
+      const triggerSwUpdate = async () => {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+        if (activeRegistration) {
+          try {
+            await activeRegistration.update();
+          } catch {
+            // Offline or network error
+          }
         }
-      }
-    };
+      };
 
-    const handleVisibilityChange = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      const handleVisibilityChange = () => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          triggerSwUpdate();
+        }
+      };
+
+      const handleWindowFocus = () => {
         triggerSwUpdate();
-      }
-    };
+      };
 
-    const handleWindowFocus = () => {
-      triggerSwUpdate();
-    };
-
-    const handleOnline = () => {
-      triggerSwUpdate();
-    };
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-    window.addEventListener('focus', handleWindowFocus);
-    window.addEventListener('online', handleOnline);
-
-    navigator.serviceWorker
-      .register(config.swRegistrationUrl, { scope: config.swScope })
-      .then((registration) => {
-        activeRegistration = registration;
+      const handleOnline = () => {
         triggerSwUpdate();
-      })
-      .catch(() => {
-        // Non-HTTPS or restricted context
-      });
+      };
 
-    swIntervalId = setInterval(triggerSwUpdate, config.swUpdateCheckIntervalMs);
-
-    cleanSwListeners = () => {
-      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
       if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
       }
-      window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('online', handleOnline);
-    };
+      window.addEventListener('focus', handleWindowFocus);
+      window.addEventListener('online', handleOnline);
+
+      navigator.serviceWorker
+        .register(config.swRegistrationUrl, { scope: config.swScope })
+        .then((registration) => {
+          activeRegistration = registration;
+          triggerSwUpdate();
+        })
+        .catch(() => {
+          // Non-HTTPS or restricted context
+        });
+
+      swIntervalId = setInterval(triggerSwUpdate, config.swUpdateCheckIntervalMs);
+
+      cleanSwListeners = () => {
+        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        }
+        window.removeEventListener('focus', handleWindowFocus);
+        window.removeEventListener('online', handleOnline);
+      };
+    }
   }
 
   // 2. Periodic Remote Version Manifest Polling (Resilient fallback)
   const clientBuildTime = getClientBuildTime(config);
   const triggerVersionCheck = async () => {
+    if (skipInDevMode) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     if (clientBuildTime <= config.initialBuildTimeFallback) return; // Untracked or dev build
 
@@ -415,7 +429,9 @@ export function initDeploymentRecovery(
     }
   };
 
-  versionIntervalId = setInterval(triggerVersionCheck, config.versionCheckIntervalMs);
+  if (!skipInDevMode) {
+    versionIntervalId = setInterval(triggerVersionCheck, config.versionCheckIntervalMs);
+  }
 
   return () => {
     window.removeEventListener('vite:preloadError', handleVitePreloadError);

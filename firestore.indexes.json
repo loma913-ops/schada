@@ -147,7 +147,16 @@
       "collectionGroup": "guest_sessions",
       "fieldPath": "lastSeen",
       "ttl": true,
-      "indexes": []
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
     }
   ]
 }

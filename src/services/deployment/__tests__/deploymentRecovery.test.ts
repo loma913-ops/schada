@@ -59,6 +59,7 @@ describe('deploymentRecoveryConfig', () => {
     expect(DEPLOYMENT_RECOVERY_CONFIG.activeGamePathPrefix.startsWith('/')).toBe(true);
     expect(DEPLOYMENT_RECOVERY_CONFIG.nonActiveMatchReloadDelayMs).toBeGreaterThanOrEqual(0);
     expect(DEPLOYMENT_RECOVERY_CONFIG.initialBuildTimeFallback).toBeGreaterThanOrEqual(0);
+    expect(typeof DEPLOYMENT_RECOVERY_CONFIG.enableInDevMode).toBe('boolean');
   });
 
   it('throws when config is null or undefined', () => {
@@ -183,6 +184,13 @@ describe('deploymentRecoveryConfig', () => {
         initialBuildTimeFallback: -5,
       })
     ).toThrow('Invalid initialBuildTimeFallback: expected non-negative number');
+
+    expect(() =>
+      validateDeploymentRecoveryConfig({
+        ...DEPLOYMENT_RECOVERY_CONFIG,
+        enableInDevMode: 'false' as unknown as boolean,
+      })
+    ).toThrow('Invalid enableInDevMode: expected boolean');
   });
 });
 
