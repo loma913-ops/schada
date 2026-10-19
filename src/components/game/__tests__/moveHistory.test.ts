@@ -184,7 +184,7 @@ describe('MoveHistory Component', () => {
 
     expect(html).toContain('has-unread-live-move');
     expect(html).toContain('move-navigator-unread-dot');
-    expect(html).toContain('Live move played — Jump to latest position');
+    expect(html).toContain('Live move played - Jump to latest position');
   });
 
   it('does not render unread live move indicator when hasUnreadLiveMove is false or undefined', () => {
@@ -206,6 +206,6 @@ describe('MoveHistory Component', () => {
 
     expect(html).not.toContain('has-unread-live-move');
     expect(html).not.toContain('move-navigator-unread-dot');
-    expect(html).not.toContain('Live move played — Jump to latest position');
+    expect(html).not.toContain('Live move played - Jump to latest position');
   });
 });

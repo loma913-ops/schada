@@ -198,7 +198,7 @@ export const RulesGuide: React.FC = () => {
 
         <div className="rules-mechanic-list">
           <div className="rules-mechanic-item">
-            <strong>Reading Squares:</strong> Every square shows directional lines originating from a center point. Count the dots along a path — each dot represents 1 square of travel.
+            <strong>Reading Squares:</strong> Every square shows directional lines originating from a center point. Count the dots along a path; each dot represents 1 square of travel.
           </div>
           <div className="rules-mechanic-item">
             <strong>Full Distance Required:</strong> You must travel the <strong>entire designated distance</strong>. If a vector shows 2 or 3 dots, you cannot stop early on an intermediate square.
