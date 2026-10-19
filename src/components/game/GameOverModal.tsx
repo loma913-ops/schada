@@ -355,7 +355,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               <span>{config.copy.categoryHeader}</span>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', maxWidth: '100%' }}>
-                  <span style={{ color: 'var(--piece-white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {whitePlayer?.username || defaultWhiteName}
                   </span>
                   {isPatronUser(whitePlayer) && <PatronBadge size={12} style={{ flexShrink: 0 }} />}
@@ -389,7 +389,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', maxWidth: '100%' }}>
-                  <span style={{ color: 'var(--piece-black)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {blackPlayer?.username || defaultBlackName}
                   </span>
                   {isPatronUser(blackPlayer) && <PatronBadge size={12} style={{ flexShrink: 0 }} />}
@@ -482,10 +482,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               }}
             >
               <span style={{ textAlign: 'left' }}>{config.copy.classificationHeader}</span>
-              <span style={{ color: 'var(--piece-white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {whitePlayer?.username || defaultWhiteName}
               </span>
-              <span style={{ color: 'var(--piece-black)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {blackPlayer?.username || defaultBlackName}
               </span>
             </div>
@@ -582,7 +582,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               <>
                 <span
                   style={{
-                    color: 'var(--piece-white)',
+                    color: 'var(--text-primary)',
                     fontFamily: 'var(--font-mono)',
                     fontSize: '0.9rem',
                     fontWeight: 800,
@@ -594,7 +594,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                 </span>
                 <span
                   style={{
-                    color: 'var(--piece-black)',
+                    color: 'var(--text-primary)',
                     fontFamily: 'var(--font-mono)',
                     fontSize: '0.9rem',
                     fontWeight: 800,

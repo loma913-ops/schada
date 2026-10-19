@@ -203,12 +203,10 @@ describe('GameOverModal - Rated Games Elo Display', () => {
         })
       );
 
-      // Verify semantic CSS variables are applied
-      expect(html).toContain('var(--piece-white)');
-      expect(html).toContain('var(--piece-black)');
+      // Verify semantic CSS variables are applied for theme-adaptive light and dark mode support
+      expect(html).toContain('var(--text-primary)');
       expect(html).toContain('var(--accent-green)');
       expect(html).toContain('var(--accent-red)');
-      expect(html).toContain('var(--text-primary)');
       expect(html).toContain('var(--font-mono)');
     });
 
