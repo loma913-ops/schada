@@ -395,6 +395,20 @@ body {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.arena-turn-indicator {
+  color: var(--piece-white);
+}
+
+[data-theme='light'] .arena-turn-indicator {
+  color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .arena-turn-indicator {
+    color: var(--text-primary);
+  }
+}
+
 /* Player Bar Card */
 .player-bar {
   display: flex;

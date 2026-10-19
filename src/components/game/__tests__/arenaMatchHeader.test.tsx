@@ -166,4 +166,45 @@ describe('Arena Match Header Time Limit Display', () => {
     expect(htmlFinished).toContain('move-history-analyze-btn');
     expect(htmlFinished).toContain('Analyze');
   });
+
+  it('renders turn indicator with arena-turn-indicator class on white turn', () => {
+    const html = renderToStaticMarkup(
+      <GamePreferencesProvider>
+        <Arena
+          initialState={initialBoard}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
+          timeControlMinutes={5}
+          incrementSeconds={0}
+          isRanked={false}
+          onExit={vi.fn()}
+        />
+      </GamePreferencesProvider>
+    );
+
+    expect(html).toContain('Turn: <strong class="arena-turn-indicator">WHITE</strong>');
+  });
+
+  it('renders turn indicator with arena-turn-indicator class on black turn', () => {
+    const blackTurnState = {
+      ...initialBoard,
+      currentTurn: 'black' as const,
+    };
+
+    const html = renderToStaticMarkup(
+      <GamePreferencesProvider>
+        <Arena
+          initialState={blackTurnState}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
+          timeControlMinutes={5}
+          incrementSeconds={0}
+          isRanked={false}
+          onExit={vi.fn()}
+        />
+      </GamePreferencesProvider>
+    );
+
+    expect(html).toContain('Turn: <strong class="arena-turn-indicator">BLACK</strong>');
+  });
 });

@@ -884,7 +884,7 @@ export const Arena: React.FC<ArenaProps> = ({
             {gameState.isGameOver ? (
               <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>GAME OVER</span>
             ) : (
-              <>Turn: <strong style={{ color: displayedGameState.currentTurn === 'white' ? 'var(--piece-white)' : 'var(--piece-black)' }}>{displayedGameState.currentTurn === 'white' ? 'WHITE' : 'BLACK'}</strong></>
+              <>Turn: <strong className="arena-turn-indicator">{displayedGameState.currentTurn === 'white' ? 'WHITE' : 'BLACK'}</strong></>
             )}
           </div>
         </div>
@@ -944,7 +944,7 @@ export const Arena: React.FC<ArenaProps> = ({
                 {gameState.isGameOver ? (
                   <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>GAME OVER</span>
                 ) : (
-                  <>Turn: <strong style={{ color: displayedGameState.currentTurn === 'white' ? 'var(--piece-white)' : 'var(--piece-black)' }}>{displayedGameState.currentTurn === 'white' ? 'WHITE' : 'BLACK'}</strong></>
+                  <>Turn: <strong className="arena-turn-indicator">{displayedGameState.currentTurn === 'white' ? 'WHITE' : 'BLACK'}</strong></>
                 )}
               </div>
             </div>
