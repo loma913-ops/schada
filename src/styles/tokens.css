@@ -6,7 +6,7 @@
   --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
   --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
 
-  /* Lichess-inspired Warm Graphite Dark Mode */
+  /* Schada-inspired Warm Graphite Dark Mode */
   --bg-primary: #161512;
   --bg-secondary: #262421;
   --bg-tertiary: #302e2b;

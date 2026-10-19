@@ -360,7 +360,7 @@ export function validateAnalysisConfig(config: AnalysisConfig): void {
     }
   }
 
-  // Validate Accuracy Config (Lichess empirical model)
+  // Validate Accuracy Config (Schada empirical model)
   const a = config.accuracy;
   if (!a || typeof a !== 'object') {
     throw new AnalysisConfigError('Accuracy configuration section is missing.');

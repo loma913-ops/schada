@@ -9,7 +9,7 @@ import type { PieceColor } from '../schada/types';
 
 /**
  * Computes subjective winning chances [-1, +1] from centipoint evaluation.
- * Clamped to configured evalCeiling with empirical multiplier (Lichess model).
+ * Clamped to configured evalCeiling with empirical multiplier (Schada model).
  *
  * Algorithmic Complexity:
  * - Time Complexity: O(1) constant time mathematical operation.
@@ -67,7 +67,7 @@ export function evaluationToWinPercent(
 
 /**
  * Calculates accuracy percentage [0, 100] for an individual move based on
- * win percentage lost relative to the best engine move, using Lichess's
+ * win percentage lost relative to the best engine move, using Schada's
  * calibrated exponential model:
  * Accuracy% = a * exp(-k * winDiff) + b + uncertaintyBonus
  *
@@ -127,7 +127,7 @@ function calculateStandardDeviation(values: readonly number[]): number {
 
 /**
  * Computes overall accuracy and move classification breakdown for a specific player color
- * using Lichess's game accuracy algorithm:
+ * using Schada's game accuracy algorithm:
  * 1. Compute sliding-window volatility weights from position Win% values.
  * 2. Calculate the volatility-weighted mean of per-move accuracies.
  * 3. Calculate the harmonic mean of per-move accuracies to penalize blunders appropriately.
