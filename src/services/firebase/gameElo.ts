@@ -18,6 +18,7 @@ import type { PieceColor } from '@/core/schada/types';
 import { type GameRoom, type GameEloResult, isGuestUser } from './gameTypes';
 import { localGameStore } from './localGameStore';
 import { determineTimeCategory } from '@/components/lobby/lobbyConfig';
+import { ELO_CONFIG, validateEloConfig } from '@/core/elo/eloConfig';
 
 /**
  * Computes ranked Elo update for both players upon game completion.
@@ -31,42 +32,51 @@ import { determineTimeCategory } from '@/components/lobby/lobbyConfig';
  */
 export function computeRankedGameEloResult(
   game: GameRoom,
-  outcome: 'blue' | 'green' | 'draw'
+  outcome: PieceColor | 'draw' | 'blue' | 'green'
 ): GameEloResult | null {
-  if (!game.isRanked || !game.bluePlayer || !game.greenPlayer) {
+  const whitePlayer = game.whitePlayer ?? game.bluePlayer;
+  const blackPlayer = game.blackPlayer ?? game.greenPlayer;
+  if (!game.isRanked || !whitePlayer || !blackPlayer) {
     return null;
   }
-  if (isGuestUser(game.bluePlayer) || isGuestUser(game.greenPlayer)) {
+  if (isGuestUser(whitePlayer) || isGuestUser(blackPlayer)) {
     return null;
   }
-  const blueGames = typeof game.bluePlayer.gamesPlayed === 'number'
-    ? game.bluePlayer.gamesPlayed
-    : 0;
-  const greenGames = typeof game.greenPlayer.gamesPlayed === 'number'
-    ? game.greenPlayer.gamesPlayed
-    : 0;
+  validateEloConfig(ELO_CONFIG);
+  const whiteGames = typeof whitePlayer.gamesPlayed === 'number'
+    ? whitePlayer.gamesPlayed
+    : ELO_CONFIG.defaultAssumedGamesPlayed;
+  const blackGames = typeof blackPlayer.gamesPlayed === 'number'
+    ? blackPlayer.gamesPlayed
+    : ELO_CONFIG.defaultAssumedGamesPlayed;
 
-  const initialBlueElo = game.bluePlayer.elo;
-  const initialGreenElo = game.greenPlayer.elo;
+  const initialWhiteElo = whitePlayer.elo;
+  const initialBlackElo = blackPlayer.elo;
 
   const calc = calculateEloUpdate(
     {
-      rating: initialBlueElo,
-      gamesPlayed: blueGames,
+      rating: initialWhiteElo,
+      gamesPlayed: whiteGames,
     },
     {
-      rating: initialGreenElo,
-      gamesPlayed: greenGames,
+      rating: initialBlackElo,
+      gamesPlayed: blackGames,
     },
     outcome
   );
   return {
-    initialBlueElo,
-    initialGreenElo,
-    blueDelta: calc.blueDelta,
-    greenDelta: calc.greenDelta,
-    newBlueElo: calc.newBlueRating,
-    newGreenElo: calc.newGreenRating,
+    initialWhiteElo,
+    initialBlackElo,
+    whiteDelta: calc.whiteDelta,
+    blackDelta: calc.blackDelta,
+    newWhiteElo: calc.newWhiteRating,
+    newBlackElo: calc.newBlackRating,
+    initialBlueElo: initialWhiteElo,
+    initialGreenElo: initialBlackElo,
+    blueDelta: calc.whiteDelta,
+    greenDelta: calc.blackDelta,
+    newBlueElo: calc.newWhiteRating,
+    newGreenElo: calc.newBlackRating,
   };
 }
 
@@ -183,7 +193,7 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
 
       // Attempt ordered query (most recent games first) for efficient reconciliation.
       // Falls back to unordered query if the composite index is not yet built.
-      async function runQuery(field: 'bluePlayer.id' | 'greenPlayer.id') {
+      async function runQuery(field: 'whitePlayer.id' | 'blackPlayer.id') {
         try {
           return await getDocs(query(
             gamesCol,
@@ -208,15 +218,15 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
         }
       }
 
-      const [blueSnap, greenSnap] = await Promise.all([
-        runQuery('bluePlayer.id'),
-        runQuery('greenPlayer.id'),
+      const [whiteSnap, blackSnap] = await Promise.all([
+        runQuery('whitePlayer.id'),
+        runQuery('blackPlayer.id'),
       ]);
 
       const candidateGames: GameRoom[] = [];
       const seenIds = new Set<string>();
 
-      [...blueSnap.docs, ...greenSnap.docs].forEach((docSnap) => {
+      [...whiteSnap.docs, ...blackSnap.docs].forEach((docSnap) => {
         if (!seenIds.has(docSnap.id)) {
           seenIds.add(docSnap.id);
           candidateGames.push(docSnap.data() as GameRoom);
@@ -225,17 +235,22 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
 
       for (const game of candidateGames) {
         if (!game.processedEloUserIds?.includes(userId) && game.winner) {
-          const winner = game.winner;
-          const isBlue = game.bluePlayer?.id === userId;
-          const isGreen = game.greenPlayer?.id === userId;
-          if (!isBlue && !isGreen) continue;
+          const rawWinner = game.winner as string;
+          const winner: PieceColor | 'draw' = (rawWinner === 'blue' ? 'white' : rawWinner === 'green' ? 'black' : game.winner) as PieceColor | 'draw';
+          const isWhite = (game.whitePlayer?.id ?? game.bluePlayer?.id) === userId;
+          const isBlack = (game.blackPlayer?.id ?? game.greenPlayer?.id) === userId;
+          if (!isWhite && !isBlack) continue;
 
-          const myColor: PieceColor = isBlue ? 'blue' : 'green';
+          const myColor: PieceColor = isWhite ? 'white' : 'black';
           const won = winner === myColor;
           const isDraw = winner === 'draw';
 
           const eloRes = game.eloResult || computeRankedGameEloResult(game, winner);
-          const delta = eloRes ? (myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta) : 0;
+          const delta = eloRes
+            ? myColor === 'white'
+              ? (eloRes.whiteDelta ?? eloRes.blueDelta ?? 0)
+              : (eloRes.blackDelta ?? eloRes.greenDelta ?? 0)
+            : 0;
           const category = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
 
           try {
@@ -259,21 +274,27 @@ async function _runReconcilePendingElo(userId: string): Promise<UserProfile | nu
       (g) =>
         g.status === 'completed' &&
         g.isRanked &&
-        (g.bluePlayer?.id === userId || g.greenPlayer?.id === userId) &&
+        ((g.whitePlayer?.id ?? g.bluePlayer?.id) === userId ||
+          (g.blackPlayer?.id ?? g.greenPlayer?.id) === userId) &&
         !g.processedEloUserIds?.includes(userId) &&
         g.winner
     );
 
     for (const game of candidateGames) {
-      const winner = game.winner;
-      if (!winner) continue;
-      const isBlue = game.bluePlayer?.id === userId;
-      const myColor: PieceColor = isBlue ? 'blue' : 'green';
+      const rawWinner = game.winner as string;
+      if (!rawWinner) continue;
+      const winner: PieceColor | 'draw' = (rawWinner === 'blue' ? 'white' : rawWinner === 'green' ? 'black' : game.winner) as PieceColor | 'draw';
+      const isWhite = (game.whitePlayer?.id ?? game.bluePlayer?.id) === userId;
+      const myColor: PieceColor = isWhite ? 'white' : 'black';
       const won = winner === myColor;
       const isDraw = winner === 'draw';
 
       const eloRes = game.eloResult || computeRankedGameEloResult(game, winner);
-      const delta = eloRes ? (myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta) : 0;
+      const delta = eloRes
+        ? myColor === 'white'
+          ? (eloRes.whiteDelta ?? eloRes.blueDelta ?? 0)
+          : (eloRes.blackDelta ?? eloRes.greenDelta ?? 0)
+        : 0;
       const category = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
 
       try {

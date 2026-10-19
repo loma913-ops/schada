@@ -18,7 +18,7 @@ interface PlayAgainstComputerModalProps {
   }) => void;
   initialTimeControlMinutes?: number;
   initialIncrementSeconds?: number;
-  initialColorPref?: 'random' | 'blue' | 'green';
+  initialColorPref?: 'random' | 'white' | 'black';
 }
 
 export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> = ({
@@ -36,7 +36,7 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
     initialIncrementSeconds ?? (BOT_ENGINE_CONFIG.timeManagement.defaultIncrementMs / 1000)
   );
   const [strength, setStrength] = useState<number>(BOT_ENGINE_CONFIG.defaultLevel);
-  const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>(initialColorPref ?? 'random');
+  const [colorPref, setColorPref] = useState<'random' | 'white' | 'black'>(initialColorPref ?? 'random');
 
   React.useEffect(() => {
     if (isOpen) {
@@ -58,7 +58,7 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
     // Resolve random side
     const resolvedColor: PieceColor =
       colorPref === 'random'
-        ? getSecureRandomChoice(['blue', 'green'] as const)
+        ? getSecureRandomChoice(['white', 'black'] as const)
         : colorPref;
 
     onStartGame({
@@ -201,19 +201,19 @@ export const PlayAgainstComputerModal: React.FC<PlayAgainstComputerModalProps> =
             </button>
             <button
               type="button"
-              className={`action-btn ${colorPref === 'blue' ? 'active' : ''} pref-blue`}
+              className={`action-btn ${colorPref === 'white' ? 'active' : ''} pref-white`}
               style={{ flex: 1 }}
-              onClick={() => setColorPref('blue')}
+              onClick={() => setColorPref('white')}
             >
-              Blue
+              White
             </button>
             <button
               type="button"
-              className={`action-btn ${colorPref === 'green' ? 'active' : ''} pref-green`}
+              className={`action-btn ${colorPref === 'black' ? 'active' : ''} pref-black`}
               style={{ flex: 1 }}
-              onClick={() => setColorPref('green')}
+              onClick={() => setColorPref('black')}
             >
-              Green
+              Black
             </button>
           </div>
         </div>

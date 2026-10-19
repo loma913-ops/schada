@@ -25,11 +25,11 @@ const cand = (from: Square, to: Square, weight: number, lineName: string): Openi
  * vector safety checks to eliminate hung officers and blunders.
  *
  * Keys represent the canonical sequence of moves played:
- * e.g. "" (Turn 1 Blue), "c1-c3" (Turn 1 Green response), etc.
+ * e.g. "" (Turn 1 White), "c1-c3" (Turn 1 Black response), etc.
  */
 export const OPENING_BOOK: Readonly<Record<string, readonly OpeningMoveCandidate[]>> = Object.freeze({
 
-  // Ply 0: Initial Board (All 14 Blue Opening Moves)
+  // Ply 0: Initial Board (All 14 White Opening Moves)
   "": Object.freeze([
     cand('a1', 'a3', 15, "Western Flank Flow"),
     cand('c1', 'c3', 15, "Western Center Flow"),
@@ -47,7 +47,7 @@ export const OPENING_BOOK: Readonly<Record<string, readonly OpeningMoveCandidate
     cand('a2', 'c4', 2, "Extended Flank Advance"),
   ]),
 
-  // Ply 1: Green response to Blue Move 1
+  // Ply 1: Black response to White Move 1
   "a1-a3": Object.freeze([
     cand('h8', 'h6', 27, "Eastern Flank Outpost Defense"),
     cand('b8', 'b6', 28, "Wing Outpost Variation"),
@@ -147,7 +147,7 @@ export const OPENING_BOOK: Readonly<Record<string, readonly OpeningMoveCandidate
     cand('d7', 'e6', 11, "Central Redoubt Defense"),
   ]),
 
-  // Ply 2: Blue Move 2
+  // Ply 2: White Move 2
   "a1-a3 h8-h6": Object.freeze([
     cand('c1', 'c3', 40, "Twin Pillars Attack"),
     cand('g1', 'g3', 40, "Eastern Wing Thrust"),
@@ -498,7 +498,7 @@ export const OPENING_BOOK: Readonly<Record<string, readonly OpeningMoveCandidate
     cand('g1', 'g3', 33, "Eastern Wing Thrust"),
   ]),
 
-  // Ply 3: Green Move 2
+  // Ply 3: Black Move 2
   "a1-a3 h8-h6 c1-c3": Object.freeze([
     cand('b8', 'b6', 40, "Wing Outpost Variation"),
     cand('f8', 'f6', 40, "Twin Pillars Defense"),

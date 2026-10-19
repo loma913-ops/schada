@@ -125,7 +125,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
               <div
-                className="player-avatar blue"
+                className="player-avatar white"
                 style={{ width: '48px', height: '48px', fontSize: '1.25rem', flexShrink: 0 }}
               >
                 {user.username.charAt(0).toUpperCase()}

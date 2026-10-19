@@ -43,8 +43,16 @@ export interface GameOverModalConfig {
     readonly goalScoreLabel: string;
     readonly outsideHighPiecesLabel: string;
     readonly rankDistanceLabel: string;
-    readonly defaultBluePlayerName: string;
-    readonly defaultGreenPlayerName: string;
+    readonly defaultWhitePlayerName: string;
+    readonly defaultBlackPlayerName: string;
+    /** @deprecated Backwards compatibility alias for defaultWhitePlayerName */
+    readonly defaultwhitePlayerName?: string;
+    /** @deprecated Backwards compatibility alias for defaultBlackPlayerName */
+    readonly defaultblackPlayerName?: string;
+    /** @deprecated Backwards compatibility alias for defaultWhitePlayerName */
+    readonly defaultBluePlayerName?: string;
+    /** @deprecated Backwards compatibility alias for defaultBlackPlayerName */
+    readonly defaultGreenPlayerName?: string;
     readonly winnerTitleSuffix: string;
     readonly winReasons: Record<WinReason, string>;
   };
@@ -137,8 +145,6 @@ export function validateGameOverModalConfig(config: GameOverModalConfig): void {
     'goalScoreLabel',
     'outsideHighPiecesLabel',
     'rankDistanceLabel',
-    'defaultBluePlayerName',
-    'defaultGreenPlayerName',
     'winnerTitleSuffix',
   ];
 
@@ -147,6 +153,16 @@ export function validateGameOverModalConfig(config: GameOverModalConfig): void {
     if (typeof val !== 'string' || val.trim().length === 0) {
       throw new GameOverModalConfigError(`Invalid copy.${key}: expected non-empty string.`);
     }
+  }
+
+  const whitePlayerName = config.copy.defaultWhitePlayerName ?? config.copy.defaultwhitePlayerName;
+  if (typeof whitePlayerName !== 'string' || whitePlayerName.trim().length === 0) {
+    throw new GameOverModalConfigError('Invalid copy.defaultWhitePlayerName: expected non-empty string.');
+  }
+
+  const blackPlayerName = config.copy.defaultBlackPlayerName ?? config.copy.defaultblackPlayerName;
+  if (typeof blackPlayerName !== 'string' || blackPlayerName.trim().length === 0) {
+    throw new GameOverModalConfigError('Invalid copy.defaultBlackPlayerName: expected non-empty string.');
   }
 
   if (!config.copy.winReasons || typeof config.copy.winReasons !== 'object') {
@@ -213,8 +229,12 @@ export const GAME_OVER_MODAL_CONFIG: GameOverModalConfig = {
     goalScoreLabel: 'Goal Line Points',
     outsideHighPiecesLabel: 'Outside High Pieces',
     rankDistanceLabel: 'Rank Distance',
-    defaultBluePlayerName: 'Blue',
-    defaultGreenPlayerName: 'Green',
+    defaultWhitePlayerName: 'White',
+    defaultBlackPlayerName: 'Black',
+    defaultwhitePlayerName: 'White',
+    defaultblackPlayerName: 'Black',
+    defaultBluePlayerName: 'White',
+    defaultGreenPlayerName: 'Black',
     winnerTitleSuffix: 'Won',
     winReasons: {
       goal_reached: 'All remaining high pieces reached the goal line',

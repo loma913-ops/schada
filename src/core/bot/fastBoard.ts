@@ -2,15 +2,24 @@ import type { BoardMatrix, Move, PieceColor, PieceType, Square } from '../schada
 import { SCHADA_VECTORS, squareToColRow } from '../schada/vectors';
 import { formatMoveNotation } from '../schada/notation';
 import { indexToSquare } from './distanceTables';
+import { SCHADA_RULES_CONFIG } from '../schada/rulesConfig';
 
 // Piece numeric constants
 export const EMPTY = 0;
-export const BLUE_FO = 1;
-export const BLUE_O = 2;
-export const BLUE_PAWN = 3;
-export const GREEN_FO = 4;
-export const GREEN_O = 5;
-export const GREEN_PAWN = 6;
+export const WHITE_FO = 1;
+export const WHITE_O = 2;
+export const WHITE_PAWN = 3;
+export const BLACK_FO = 4;
+export const BLACK_O = 5;
+export const BLACK_PAWN = 6;
+
+// Backward-compatibility aliases
+export const BLUE_FO = WHITE_FO;
+export const BLUE_O = WHITE_O;
+export const BLUE_PAWN = WHITE_PAWN;
+export const GREEN_FO = BLACK_FO;
+export const GREEN_O = BLACK_O;
+export const GREEN_PAWN = BLACK_PAWN;
 
 // Bitflags for squares
 export const FLAG_LEFT_BASE = 1;
@@ -86,6 +95,10 @@ export interface UndoRecord {
   readonly captured: number;
   readonly prevFromFlags: number;
   readonly prevToFlags: number;
+  readonly whiteHighTotal: number;
+  readonly whiteHighInGoal: number;
+  readonly blackHighTotal: number;
+  readonly blackHighInGoal: number;
   readonly blueHighTotal: number;
   readonly blueHighInGoal: number;
   readonly greenHighTotal: number;
@@ -100,17 +113,26 @@ export class FastBoard {
   readonly squares: Int8Array;
   readonly flags: Uint8Array;
   currentTurn: PieceColor;
-  blueHighTotal: number = 0;
-  blueHighInGoal: number = 0;
-  greenHighTotal: number = 0;
-  greenHighInGoal: number = 0;
+  whiteHighTotal: number = 0;
+  whiteHighInGoal: number = 0;
+  blackHighTotal: number = 0;
+  blackHighInGoal: number = 0;
+
+  get blueHighTotal(): number { return this.whiteHighTotal; }
+  set blueHighTotal(v: number) { this.whiteHighTotal = v; }
+  get blueHighInGoal(): number { return this.whiteHighInGoal; }
+  set blueHighInGoal(v: number) { this.whiteHighInGoal = v; }
+  get greenHighTotal(): number { return this.blackHighTotal; }
+  set greenHighTotal(v: number) { this.blackHighTotal = v; }
+  get greenHighInGoal(): number { return this.blackHighInGoal; }
+  set greenHighInGoal(v: number) { this.blackHighInGoal = v; }
 
   private readonly undoStack: UndoRecord[] = [];
 
   constructor() {
     this.squares = new Int8Array(64);
     this.flags = new Uint8Array(64);
-    this.currentTurn = 'blue';
+    this.currentTurn = 'white';
   }
 
   /**
@@ -134,14 +156,14 @@ export class FastBoard {
       }
 
       let val = EMPTY;
-      if (piece.color === 'blue') {
-        if (piece.type === 'field_officer') val = BLUE_FO;
-        else if (piece.type === 'officer') val = BLUE_O;
-        else val = BLUE_PAWN;
+      if (piece.color === 'white') {
+        if (piece.type === 'field_officer') val = WHITE_FO;
+        else if (piece.type === 'officer') val = WHITE_O;
+        else val = WHITE_PAWN;
       } else {
-        if (piece.type === 'field_officer') val = GREEN_FO;
-        else if (piece.type === 'officer') val = GREEN_O;
-        else val = GREEN_PAWN;
+        if (piece.type === 'field_officer') val = BLACK_FO;
+        else if (piece.type === 'officer') val = BLACK_O;
+        else val = BLACK_PAWN;
       }
       fb.squares[idx] = val;
 
@@ -151,12 +173,12 @@ export class FastBoard {
       fb.flags[idx] = flag;
 
       // Incrementally track high pieces
-      if (val === BLUE_FO || val === BLUE_O) {
-        fb.blueHighTotal++;
-        if (flag & FLAG_REACHED_GOAL) fb.blueHighInGoal++;
-      } else if (val === GREEN_FO || val === GREEN_O) {
-        fb.greenHighTotal++;
-        if (flag & FLAG_REACHED_GOAL) fb.greenHighInGoal++;
+      if (val === WHITE_FO || val === WHITE_O) {
+        fb.whiteHighTotal++;
+        if (flag & FLAG_REACHED_GOAL) fb.whiteHighInGoal++;
+      } else if (val === BLACK_FO || val === BLACK_O) {
+        fb.blackHighTotal++;
+        if (flag & FLAG_REACHED_GOAL) fb.blackHighInGoal++;
       }
     }
 
@@ -180,10 +202,10 @@ export class FastBoard {
         continue;
       }
 
-      const color: PieceColor = val <= 3 ? 'blue' : 'green';
+      const color: PieceColor = val <= 3 ? 'white' : 'black';
       let type: PieceType = 'pawn';
-      if (val === BLUE_FO || val === GREEN_FO) type = 'field_officer';
-      else if (val === BLUE_O || val === GREEN_O) type = 'officer';
+      if (val === WHITE_FO || val === BLACK_FO) type = 'field_officer';
+      else if (val === WHITE_O || val === BLACK_O) type = 'officer';
 
       const flag = this.flags[idx];
       matrix[sq] = {
@@ -207,10 +229,10 @@ export class FastBoard {
   toStandardMove(fastMove: FastMove): Move {
     const fromSq = indexToSquare(fastMove.from);
     const toSq = indexToSquare(fastMove.to);
-    const color: PieceColor = fastMove.piece <= 3 ? 'blue' : 'green';
+    const color: PieceColor = fastMove.piece <= 3 ? 'white' : 'black';
     let type: PieceType = 'pawn';
-    if (fastMove.piece === BLUE_FO || fastMove.piece === GREEN_FO) type = 'field_officer';
-    else if (fastMove.piece === BLUE_O || fastMove.piece === GREEN_O) type = 'officer';
+    if (fastMove.piece === WHITE_FO || fastMove.piece === BLACK_FO) type = 'field_officer';
+    else if (fastMove.piece === WHITE_O || fastMove.piece === BLACK_O) type = 'officer';
 
     const piece = {
       id: `${color}_${type}_${fromSq}`,
@@ -222,10 +244,10 @@ export class FastBoard {
 
     let capturedPiece = undefined;
     if (fastMove.captured !== EMPTY) {
-      const capColor: PieceColor = fastMove.captured <= 3 ? 'blue' : 'green';
+      const capColor: PieceColor = fastMove.captured <= 3 ? 'white' : 'black';
       let capType: PieceType = 'pawn';
-      if (fastMove.captured === BLUE_FO || fastMove.captured === GREEN_FO) capType = 'field_officer';
-      else if (fastMove.captured === BLUE_O || fastMove.captured === GREEN_O) capType = 'officer';
+      if (fastMove.captured === WHITE_FO || fastMove.captured === BLACK_FO) capType = 'field_officer';
+      else if (fastMove.captured === WHITE_O || fastMove.captured === BLACK_O) capType = 'officer';
       capturedPiece = {
         id: `${capColor}_${capType}_${toSq}`,
         type: capType,
@@ -255,10 +277,10 @@ export class FastBoard {
    * - Auxiliary Space Complexity: O(1).
    */
   haveAllRemainingHighPiecesReachedGoal(color: PieceColor): boolean {
-    if (color === 'blue') {
-      return this.blueHighTotal > 0 && this.blueHighTotal === this.blueHighInGoal;
+    if (color === 'white') {
+      return this.whiteHighTotal > 0 && this.whiteHighTotal === this.whiteHighInGoal;
     } else {
-      return this.greenHighTotal > 0 && this.greenHighTotal === this.greenHighInGoal;
+      return this.blackHighTotal > 0 && this.blackHighTotal === this.blackHighInGoal;
     }
   }
 
@@ -281,18 +303,22 @@ export class FastBoard {
       captured,
       prevFromFlags,
       prevToFlags,
-      blueHighTotal: this.blueHighTotal,
-      blueHighInGoal: this.blueHighInGoal,
-      greenHighTotal: this.greenHighTotal,
-      greenHighInGoal: this.greenHighInGoal,
+      whiteHighTotal: this.whiteHighTotal,
+      whiteHighInGoal: this.whiteHighInGoal,
+      blackHighTotal: this.blackHighTotal,
+      blackHighInGoal: this.blackHighInGoal,
+      blueHighTotal: this.whiteHighTotal,
+      blueHighInGoal: this.whiteHighInGoal,
+      greenHighTotal: this.blackHighTotal,
+      greenHighInGoal: this.blackHighInGoal,
     });
 
-    if (captured === BLUE_FO || captured === BLUE_O) {
-      this.blueHighTotal--;
-      if (prevToFlags & FLAG_REACHED_GOAL) this.blueHighInGoal--;
-    } else if (captured === GREEN_FO || captured === GREEN_O) {
-      this.greenHighTotal--;
-      if (prevToFlags & FLAG_REACHED_GOAL) this.greenHighInGoal--;
+    if (captured === WHITE_FO || captured === WHITE_O) {
+      this.whiteHighTotal--;
+      if (prevToFlags & FLAG_REACHED_GOAL) this.whiteHighInGoal--;
+    } else if (captured === BLACK_FO || captured === BLACK_O) {
+      this.blackHighTotal--;
+      if (prevToFlags & FLAG_REACHED_GOAL) this.blackHighInGoal--;
     }
 
     this.squares[from] = EMPTY;
@@ -300,9 +326,13 @@ export class FastBoard {
 
     this.squares[to] = piece;
 
-    const isBlue = piece <= 3;
-    const baseRank = isBlue ? 0 : 7;
-    const goalRank = isBlue ? 7 : 0;
+    const isWhite = piece <= 3;
+    const baseRank = isWhite
+      ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
+    const goalRank = isWhite
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
     const destRow = Math.floor(to / 8);
 
     let nextFlags = prevFromFlags;
@@ -310,21 +340,21 @@ export class FastBoard {
       nextFlags |= FLAG_LEFT_BASE;
     }
 
-    const isHighPiece = piece === BLUE_FO || piece === BLUE_O || piece === GREEN_FO || piece === GREEN_O;
+    const isHighPiece = piece === WHITE_FO || piece === WHITE_O || piece === BLACK_FO || piece === BLACK_O;
     if (isHighPiece) {
       const wasInGoal = (prevFromFlags & FLAG_REACHED_GOAL) !== 0;
       const nowInGoal = destRow === goalRank;
       if (nowInGoal) {
         nextFlags |= FLAG_REACHED_GOAL;
         if (!wasInGoal) {
-          if (isBlue) this.blueHighInGoal++;
-          else this.greenHighInGoal++;
+          if (isWhite) this.whiteHighInGoal++;
+          else this.blackHighInGoal++;
         }
       }
     }
 
     this.flags[to] = nextFlags;
-    this.currentTurn = this.currentTurn === 'blue' ? 'green' : 'blue';
+    this.currentTurn = this.currentTurn === 'white' ? 'black' : 'white';
   }
 
   /**
@@ -346,12 +376,12 @@ export class FastBoard {
     this.squares[to] = captured;
     this.flags[to] = prevToFlags;
 
-    this.blueHighTotal = record.blueHighTotal;
-    this.blueHighInGoal = record.blueHighInGoal;
-    this.greenHighTotal = record.greenHighTotal;
-    this.greenHighInGoal = record.greenHighInGoal;
+    this.whiteHighTotal = record.whiteHighTotal;
+    this.whiteHighInGoal = record.whiteHighInGoal;
+    this.blackHighTotal = record.blackHighTotal;
+    this.blackHighInGoal = record.blackHighInGoal;
 
-    this.currentTurn = this.currentTurn === 'blue' ? 'green' : 'blue';
+    this.currentTurn = this.currentTurn === 'white' ? 'black' : 'white';
   }
 
   /**
@@ -363,20 +393,26 @@ export class FastBoard {
    */
   generateLegalMoves(color: PieceColor = this.currentTurn): FastMove[] {
     const moves: FastMove[] = [];
-    const isBlue = color === 'blue';
-    const baseRank = isBlue ? 0 : 7;
-    const goalRank = isBlue ? 7 : 0;
-    const enemyGoalRank = isBlue ? 0 : 7;
+    const isWhite = color === 'white';
+    const baseRank = isWhite
+      ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
+    const goalRank = isWhite
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
+    const enemyGoalRank = isWhite
+      ? SCHADA_RULES_CONFIG.board.blackGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.whiteGoalRankIndex;
 
     for (let from = 0; from < 64; from++) {
       const piece = this.squares[from];
       if (piece === EMPTY) continue;
 
-      const pieceIsBlue = piece <= 3;
-      if (pieceIsBlue !== isBlue) continue;
+      const pieceIsWhite = piece <= 3;
+      if (pieceIsWhite !== isWhite) continue;
 
-      const isHighPiece = piece === BLUE_FO || piece === BLUE_O || piece === GREEN_FO || piece === GREEN_O;
-      const isFO = piece === BLUE_FO || piece === GREEN_FO;
+      const isHighPiece = piece === WHITE_FO || piece === WHITE_O || piece === BLACK_FO || piece === BLACK_O;
+      const isFO = piece === WHITE_FO || piece === BLACK_FO;
       const fromFlags = this.flags[from];
       const hasLeftBase = (fromFlags & FLAG_LEFT_BASE) !== 0;
       const hasReachedGoal = (fromFlags & FLAG_REACHED_GOAL) !== 0;
@@ -390,11 +426,11 @@ export class FastBoard {
 
         // 1. Friendly occupant collision
         if (occupant !== EMPTY) {
-          const occupantIsBlue = occupant <= 3;
-          if (occupantIsBlue === isBlue) continue;
+          const occupantIsWhite = occupant <= 3;
+          if (occupantIsWhite === isWhite) continue;
 
           // 2. High pieces in their goal line are IMMUNE to capture
-          const occupantIsHigh = occupant === BLUE_FO || occupant === BLUE_O || occupant === GREEN_FO || occupant === GREEN_O;
+          const occupantIsHigh = occupant === WHITE_FO || occupant === WHITE_O || occupant === BLACK_FO || occupant === BLACK_O;
           if (occupantIsHigh && destRow === enemyGoalRank) {
             continue;
           }
@@ -418,22 +454,22 @@ export class FastBoard {
           const stepOcc = this.squares[stepIdx];
           if (stepOcc !== EMPTY) {
             // Field Officer can leap over friendly pieces
-            if (isFO && (stepOcc <= 3) === isBlue) {
+            if (isFO && (stepOcc <= 3) === isWhite) {
               continue;
             }
             blocked = true;
             break;
           }
         }
-        if (blocked) continue;
-
-        moves.push({
-          from,
-          to: dest,
-          piece,
-          captured: occupant,
-          intermediate: path,
-        });
+        if (!blocked) {
+          moves.push({
+            from,
+            to: dest,
+            piece,
+            captured: occupant,
+            intermediate: path,
+          });
+        }
       }
     }
 
@@ -448,18 +484,22 @@ export class FastBoard {
    * - Auxiliary Space Complexity: O(1).
    */
   isSquareAttacked(targetIndex: number, attackerColor: PieceColor): boolean {
-    const isAttackerBlue = attackerColor === 'blue';
-    const baseRank = isAttackerBlue ? 0 : 7;
-    const goalRank = isAttackerBlue ? 7 : 0;
+    const isAttackerWhite = attackerColor === 'white';
+    const baseRank = isAttackerWhite
+      ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
+    const goalRank = isAttackerWhite
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
     const targetRow = Math.floor(targetIndex / 8);
 
     for (let from = 0; from < 64; from++) {
       const piece = this.squares[from];
       if (piece === EMPTY) continue;
-      if ((piece <= 3) !== isAttackerBlue) continue;
+      if ((piece <= 3) !== isAttackerWhite) continue;
 
-      const isHighPiece = piece === BLUE_FO || piece === BLUE_O || piece === GREEN_FO || piece === GREEN_O;
-      const isFO = piece === BLUE_FO || piece === GREEN_FO;
+      const isHighPiece = piece === WHITE_FO || piece === WHITE_O || piece === BLACK_FO || piece === BLACK_O;
+      const isFO = piece === WHITE_FO || piece === BLACK_FO;
       const fromFlags = this.flags[from];
 
       if (isHighPiece && (fromFlags & FLAG_LEFT_BASE) && targetRow === baseRank) continue;
@@ -475,7 +515,7 @@ export class FastBoard {
           const stepIdx = vec.pathIndices[p];
           const stepOcc = this.squares[stepIdx];
           if (stepOcc !== EMPTY) {
-            if (isFO && (stepOcc <= 3) === isAttackerBlue) {
+            if (isFO && (stepOcc <= 3) === isAttackerWhite) {
               continue;
             }
             blocked = true;

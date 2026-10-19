@@ -274,47 +274,49 @@ describe('LobbyConfig validation and helpers', () => {
       incrementSeconds: 0,
       isRanked: false,
       creatorColorPref: 'random',
-      bluePlayer: { id: 'user_blue', username: 'BluePlayer', elo: 1200, sessionToken: 'tok_blue' },
-      greenPlayer: { id: 'user_green', username: 'GreenPlayer', elo: 1250, sessionToken: 'tok_green' },
+      whitePlayer: { id: 'user_white', username: 'whitePlayer', elo: 1200, sessionToken: 'tok_white' },
+      blackPlayer: { id: 'user_black', username: 'blackPlayer', elo: 1250, sessionToken: 'tok_black' },
       boardState: {} as any,
-      currentTurn: 'blue',
+      currentTurn: 'white',
+      whiteTimeMs: 300000,
+      blackTimeMs: 300000,
       blueTimeMs: 300000,
       greenTimeMs: 300000,
       lastTurnStartTimeMs: null,
     };
 
     it('returns false when room is null or undefined', () => {
-      expect(isUserGameRoom(null as any, 'user_blue')).toBe(false);
-      expect(isUserGameRoom(undefined as any, 'user_blue')).toBe(false);
+      expect(isUserGameRoom(null as any, 'user_white')).toBe(false);
+      expect(isUserGameRoom(undefined as any, 'user_white')).toBe(false);
     });
 
     it('identifies room ownership by authenticated userId', () => {
-      expect(isUserGameRoom(baseRoom, 'user_blue')).toBe(true);
-      expect(isUserGameRoom(baseRoom, 'user_green')).toBe(true);
+      expect(isUserGameRoom(baseRoom, 'user_white')).toBe(true);
+      expect(isUserGameRoom(baseRoom, 'user_black')).toBe(true);
       expect(isUserGameRoom(baseRoom, 'other_user')).toBe(false);
     });
 
     it('identifies room ownership by guestId', () => {
       const guestRoom: GameRoom = {
         ...baseRoom,
-        bluePlayer: { id: 'guest_abc', username: 'Guest 1', elo: 1200, sessionToken: 'tok_guest' },
-        greenPlayer: null,
+        whitePlayer: { id: 'guest_abc', username: 'Guest 1', elo: 1200, sessionToken: 'tok_guest' },
+        blackPlayer: null,
       };
       expect(isUserGameRoom(guestRoom, undefined, 'guest_abc')).toBe(true);
       expect(isUserGameRoom(guestRoom, undefined, 'guest_xyz')).toBe(false);
     });
 
     it('identifies room ownership by sessionToken', () => {
-      expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_blue')).toBe(true);
-      expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_green')).toBe(true);
+      expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_white')).toBe(true);
+      expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_black')).toBe(true);
       expect(isUserGameRoom(baseRoom, undefined, undefined, 'tok_random')).toBe(false);
     });
 
     it('identifies room ownership when user is the targetOpponent', () => {
       const targetedRoom: GameRoom = {
         ...baseRoom,
-        bluePlayer: { id: 'challenger_1', username: 'Challenger', elo: 1200, sessionToken: 'tok_chal' },
-        greenPlayer: null,
+        whitePlayer: { id: 'challenger_1', username: 'Challenger', elo: 1200, sessionToken: 'tok_chal' },
+        blackPlayer: null,
         targetOpponent: { id: 'challengee_2', username: 'Challengee', elo: 1300 },
       };
       expect(isUserGameRoom(targetedRoom, 'challengee_2')).toBe(true);

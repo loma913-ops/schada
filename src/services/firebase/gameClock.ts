@@ -50,7 +50,7 @@ export function isGameTimedOut(game: GameRoom | null | undefined): GameTimeoutRe
   if (game.status !== 'in_progress' || typeof game.timeControlMinutes !== 'number' || game.timeControlMinutes <= 0) {
     return { timedOut: false };
   }
-  if (game.currentTurn !== 'blue' && game.currentTurn !== 'green') {
+  if (game.currentTurn !== 'white' && game.currentTurn !== 'black' && (game.currentTurn as string) !== 'blue' && (game.currentTurn as string) !== 'green') {
     return { timedOut: false };
   }
   const now = Date.now();
@@ -58,13 +58,17 @@ export function isGameTimedOut(game: GameRoom | null | undefined): GameTimeoutRe
     ? Math.max(0, now - game.lastTurnStartTimeMs)
     : 0;
   const currentTurn = game.currentTurn;
-  const currentClockMs = currentTurn === 'blue' ? game.blueTimeMs : game.greenTimeMs;
+  const isWhiteTurn = currentTurn === 'white' || (currentTurn as string) === 'blue';
+  const currentClockMs = isWhiteTurn
+    ? (game.whiteTimeMs ?? game.blueTimeMs)
+    : (game.blackTimeMs ?? game.greenTimeMs);
   if (typeof currentClockMs !== 'number' || isNaN(currentClockMs)) {
     return { timedOut: false };
   }
   const remainingTime = currentClockMs - elapsed;
   if (remainingTime <= 0) {
-    return { timedOut: true, timedOutColor: currentTurn };
+    const canonicalTimedOutColor: PieceColor = isWhiteTurn ? 'white' : 'black';
+    return { timedOut: true, timedOutColor: canonicalTimedOutColor };
   }
   return { timedOut: false };
 }
@@ -86,11 +90,18 @@ export function calculateMoveClocks(
   game: GameRoom,
   playerColor: PieceColor,
   now: number
-): { nextBlueTime: number; nextGreenTime: number } {
+): {
+  nextWhiteTime: number;
+  nextBlackTime: number;
+  /** @deprecated Compatibility alias */
+  nextBlueTime?: number;
+  /** @deprecated Compatibility alias */
+  nextGreenTime?: number;
+} {
   validateClockDependencies();
 
-  let nextBlueTime = game.blueTimeMs;
-  let nextGreenTime = game.greenTimeMs;
+  let nextWhiteTime = game.whiteTimeMs ?? game.blueTimeMs ?? 0;
+  let nextBlackTime = game.blackTimeMs ?? game.greenTimeMs ?? 0;
 
   const isCorrespondence =
     typeof game.timeControlMinutes === 'number' &&
@@ -101,19 +112,29 @@ export function calculateMoveClocks(
 
   if (isCorrespondence) {
     const moveLimitMs = game.timeControlMinutes * msPerMinute;
-    return { nextBlueTime: moveLimitMs, nextGreenTime: moveLimitMs };
+    return {
+      nextWhiteTime: moveLimitMs,
+      nextBlackTime: moveLimitMs,
+      nextBlueTime: moveLimitMs,
+      nextGreenTime: moveLimitMs,
+    };
   }
 
   if (game.timeControlMinutes > 0 && game.lastTurnStartTimeMs) {
     const elapsed = Math.max(0, now - game.lastTurnStartTimeMs);
     const incrementMs = (game.incrementSeconds || 0) * msPerSecond;
 
-    if (playerColor === 'blue') {
-      nextBlueTime = Math.max(0, game.blueTimeMs - elapsed + incrementMs);
+    if (playerColor === 'white' || (playerColor as string) === 'blue') {
+      nextWhiteTime = Math.max(0, (game.whiteTimeMs ?? game.blueTimeMs ?? 0) - elapsed + incrementMs);
     } else {
-      nextGreenTime = Math.max(0, game.greenTimeMs - elapsed + incrementMs);
+      nextBlackTime = Math.max(0, (game.blackTimeMs ?? game.greenTimeMs ?? 0) - elapsed + incrementMs);
     }
   }
 
-  return { nextBlueTime, nextGreenTime };
+  return {
+    nextWhiteTime,
+    nextBlackTime,
+    nextBlueTime: nextWhiteTime,
+    nextGreenTime: nextBlackTime,
+  };
 }

@@ -6,10 +6,18 @@ export interface PlayerEloData {
 }
 
 export interface EloCalculationResult {
-  readonly blueDelta: number;
-  readonly greenDelta: number;
-  readonly newBlueRating: number;
-  readonly newGreenRating: number;
+  readonly whiteDelta: number;
+  readonly blackDelta: number;
+  readonly newWhiteRating: number;
+  readonly newBlackRating: number;
+  /** @deprecated Backwards compatibility alias for whiteDelta */
+  readonly blueDelta?: number;
+  /** @deprecated Backwards compatibility alias for blackDelta */
+  readonly greenDelta?: number;
+  /** @deprecated Backwards compatibility alias for newWhiteRating */
+  readonly newBlueRating?: number;
+  /** @deprecated Backwards compatibility alias for newBlackRating */
+  readonly newGreenRating?: number;
 }
 
 /**
@@ -61,38 +69,45 @@ export function calculateExpectedScore(
  * - O(1) constant, perfectly sustainable as match data volume scales infinitely.
  */
 export function calculateEloUpdate(
-  blue: PlayerEloData,
-  green: PlayerEloData,
-  outcome: 'blue' | 'green' | 'draw',
+  white: PlayerEloData,
+  black: PlayerEloData,
+  outcome: 'white' | 'black' | 'draw' | 'blue' | 'green',
   config: EloConfig = ELO_CONFIG
 ): EloCalculationResult {
   validateEloConfig(config);
 
-  const expectedBlue = calculateExpectedScore(blue.rating, green.rating, config);
-  const expectedGreen = calculateExpectedScore(green.rating, blue.rating, config);
+  const expectedWhite = calculateExpectedScore(white.rating, black.rating, config);
+  const expectedBlack = calculateExpectedScore(black.rating, white.rating, config);
 
-  let actualBlue = 0.5;
-  let actualGreen = 0.5;
+  let actualWhite = 0.5;
+  let actualBlack = 0.5;
 
-  if (outcome === 'blue') {
-    actualBlue = 1.0;
-    actualGreen = 0.0;
-  } else if (outcome === 'green') {
-    actualBlue = 0.0;
-    actualGreen = 1.0;
+  if (outcome === 'white' || (outcome as string) === 'blue') {
+    actualWhite = 1.0;
+    actualBlack = 0.0;
+  } else if (outcome === 'black' || (outcome as string) === 'green') {
+    actualWhite = 0.0;
+    actualBlack = 1.0;
   }
 
-  const kBlue = getKFactor(blue.gamesPlayed, config);
-  const kGreen = getKFactor(green.gamesPlayed, config);
+  const kWhite = getKFactor(white.gamesPlayed, config);
+  const kBlack = getKFactor(black.gamesPlayed, config);
 
-  const blueDelta = Math.round(kBlue * (actualBlue - expectedBlue));
-  const greenDelta = Math.round(kGreen * (actualGreen - expectedGreen));
+  const whiteDelta = Math.round(kWhite * (actualWhite - expectedWhite));
+  const blackDelta = Math.round(kBlack * (actualBlack - expectedBlack));
+
+  const newWhiteRating = Math.max(config.minimumRating, white.rating + whiteDelta);
+  const newBlackRating = Math.max(config.minimumRating, black.rating + blackDelta);
 
   return {
-    blueDelta,
-    greenDelta,
-    newBlueRating: Math.max(config.minimumRating, blue.rating + blueDelta),
-    newGreenRating: Math.max(config.minimumRating, green.rating + greenDelta),
+    whiteDelta,
+    blackDelta,
+    newWhiteRating,
+    newBlackRating,
+    blueDelta: whiteDelta,
+    greenDelta: blackDelta,
+    newBlueRating: newWhiteRating,
+    newGreenRating: newBlackRating,
   };
 }
 

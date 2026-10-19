@@ -10,14 +10,14 @@ describe('AnalysisWorkerClient', () => {
       {
         from: 'd2',
         to: 'b4',
-        piece: { id: 'b_p4', type: 'pawn', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+        piece: { id: 'w_p4', type: 'pawn', color: 'white', hasLeftBase: false, hasReachedGoal: false },
         intermediateSquares: [],
         notation: 'Pd2-b4',
       },
       {
         from: 'e7',
         to: 'g5',
-        piece: { id: 'g_p4', type: 'pawn', color: 'green', hasLeftBase: false, hasReachedGoal: false },
+        piece: { id: 'b_p4', type: 'pawn', color: 'black', hasLeftBase: false, hasReachedGoal: false },
         intermediateSquares: [],
         notation: 'Pe7-g5',
       },
@@ -47,8 +47,8 @@ describe('AnalysisWorkerClient', () => {
     expect(plyResults[1].ply).toBe(1);
     expect(completedReport).not.toBeNull();
     expect(completedReport.moves).toHaveLength(2);
-    expect(typeof completedReport.blueAccuracy).toBe('number');
-    expect(typeof completedReport.greenAccuracy).toBe('number');
+    expect(typeof completedReport.whiteAccuracy).toBe('number');
+    expect(typeof completedReport.blackAccuracy).toBe('number');
     expect(client.isRunning()).toBe(false);
   });
 
@@ -68,8 +68,8 @@ describe('AnalysisWorkerClient', () => {
 
     expect(emptyReport).not.toBeNull();
     expect(emptyReport.moves).toHaveLength(0);
-    expect(emptyReport.blueAccuracy).toBe(100);
-    expect(emptyReport.greenAccuracy).toBe(100);
+    expect(emptyReport.whiteAccuracy).toBe(100);
+    expect(emptyReport.blackAccuracy).toBe(100);
     expect(client.isRunning()).toBe(false);
   });
 
@@ -80,7 +80,7 @@ describe('AnalysisWorkerClient', () => {
       {
         from: 'd2',
         to: 'b4',
-        piece: { id: 'b_p4', type: 'pawn', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+        piece: { id: 'w_p4', type: 'pawn', color: 'white', hasLeftBase: false, hasReachedGoal: false },
         intermediateSquares: [],
         notation: 'Pd2-b4',
       },

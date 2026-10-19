@@ -15,13 +15,13 @@ import { SCHADA_RULES_CONFIG } from './rulesConfig';
  */
 export function calculateScoreBreakdown(board: BoardMatrix, color: PieceColor): ScoreBreakdown {
   const goalRank =
-    color === 'blue'
-      ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
-      : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+    color === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
   const baseRank =
-    color === 'blue'
-      ? SCHADA_RULES_CONFIG.board.blueBaseRankIndex
-      : SCHADA_RULES_CONFIG.board.greenBaseRankIndex;
+    color === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
 
   let goalScore = 0;
   let outsideGoalHighPiecesScore = 0;
@@ -71,28 +71,28 @@ export function evaluateGameResult(
   board: BoardMatrix,
   winReason: WinReason
 ): GameResult {
-  const blueScore = calculateScoreBreakdown(board, 'blue');
-  const greenScore = calculateScoreBreakdown(board, 'green');
+  const whiteScore = calculateScoreBreakdown(board, 'white');
+  const blackScore = calculateScoreBreakdown(board, 'black');
 
   let winner: PieceColor | 'draw' | null = null;
 
   // 1. Primary: Compare goal line scores
-  if (blueScore.goalScore > greenScore.goalScore) {
-    winner = 'blue';
-  } else if (greenScore.goalScore > blueScore.goalScore) {
-    winner = 'green';
+  if (whiteScore.goalScore > blackScore.goalScore) {
+    winner = 'white';
+  } else if (blackScore.goalScore > whiteScore.goalScore) {
+    winner = 'black';
   } else {
     // 2. Tiebreaker 1: Surviving high pieces outside goal line
-    if (blueScore.outsideGoalHighPiecesScore > greenScore.outsideGoalHighPiecesScore) {
-      winner = 'blue';
-    } else if (greenScore.outsideGoalHighPiecesScore > blueScore.outsideGoalHighPiecesScore) {
-      winner = 'green';
+    if (whiteScore.outsideGoalHighPiecesScore > blackScore.outsideGoalHighPiecesScore) {
+      winner = 'white';
+    } else if (blackScore.outsideGoalHighPiecesScore > whiteScore.outsideGoalHighPiecesScore) {
+      winner = 'black';
     } else {
       // 3. Tiebreaker 2: Distance from base line (2/7 for FO, 1/7 for O per rank)
-      if (blueScore.rankDistanceScore > greenScore.rankDistanceScore) {
-        winner = 'blue';
-      } else if (greenScore.rankDistanceScore > blueScore.rankDistanceScore) {
-        winner = 'green';
+      if (whiteScore.rankDistanceScore > blackScore.rankDistanceScore) {
+        winner = 'white';
+      } else if (blackScore.rankDistanceScore > whiteScore.rankDistanceScore) {
+        winner = 'black';
       } else {
         // True draw
         winner = 'draw';
@@ -103,7 +103,9 @@ export function evaluateGameResult(
   return {
     winner,
     winReason,
-    blueScore,
-    greenScore,
+    whiteScore,
+    blackScore,
+    blueScore: whiteScore,
+    greenScore: blackScore,
   };
 }

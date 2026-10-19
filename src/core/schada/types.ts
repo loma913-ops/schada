@@ -1,4 +1,4 @@
-export type PieceColor = 'blue' | 'green';
+export type PieceColor = 'white' | 'black';
 
 export type PieceType = 'field_officer' | 'officer' | 'pawn';
 
@@ -55,8 +55,12 @@ export interface ScoreBreakdown {
 export interface GameResult {
   winner: PieceColor | 'draw' | null;
   winReason: WinReason | null;
-  blueScore: ScoreBreakdown;
-  greenScore: ScoreBreakdown;
+  whiteScore: ScoreBreakdown;
+  blackScore: ScoreBreakdown;
+  /** @deprecated Backwards compatibility alias for whiteScore */
+  blueScore?: ScoreBreakdown;
+  /** @deprecated Backwards compatibility alias for blackScore */
+  greenScore?: ScoreBreakdown;
 }
 
 export type BoardMatrix = Record<Square, Piece | null>;
@@ -66,8 +70,8 @@ export interface BoardState {
   currentTurn: PieceColor;
   moveHistory: Move[];
   capturedPieces: {
-    blue: Piece[];
-    green: Piece[];
+    white: Piece[];
+    black: Piece[];
   };
   positionHistory: string[]; // FEN-like or position hashes for 3-fold repetition
   isGameOver: boolean;

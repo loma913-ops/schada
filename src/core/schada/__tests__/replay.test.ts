@@ -47,14 +47,14 @@ describe('Replay configuration validation', () => {
 describe('computeCumulativeGameStates and computeGameStateAtMove', () => {
   it('computes cumulative game states with O(1) lookup index mapping', () => {
     const initialState = createInitialGameState();
-    const legalBlueMoves = getLegalMovesForSquare(initialState.board, 'c1');
-    expect(legalBlueMoves.length).toBeGreaterThan(0);
-    const move1 = legalBlueMoves[0];
+    const legalWhiteMoves = getLegalMovesForSquare(initialState.board, 'c1');
+    expect(legalWhiteMoves.length).toBeGreaterThan(0);
+    const move1 = legalWhiteMoves[0];
 
     const stateAfterMove1 = executeMove(initialState, move1);
-    const legalGreenMoves = getLegalMovesForSquare(stateAfterMove1.board, 'd8');
-    expect(legalGreenMoves.length).toBeGreaterThan(0);
-    const move2 = legalGreenMoves[0];
+    const legalBlackMoves = getLegalMovesForSquare(stateAfterMove1.board, 'd8');
+    expect(legalBlackMoves.length).toBeGreaterThan(0);
+    const move2 = legalBlackMoves[0];
 
     const history = [move1, move2];
     const states = computeCumulativeGameStates(history);
@@ -62,17 +62,17 @@ describe('computeCumulativeGameStates and computeGameStateAtMove', () => {
     // states[0] corresponds to index -1 (start of game)
     expect(states).toHaveLength(3);
     expect(states[0].board).toEqual(initialState.board);
-    expect(states[0].currentTurn).toBe('blue');
+    expect(states[0].currentTurn).toBe('white');
 
     // states[1] corresponds to index 0 (after move 1)
     expect(states[1].board[move1.to]).toBeDefined();
     expect(states[1].board[move1.from]).toBeNull();
-    expect(states[1].currentTurn).toBe('green');
+    expect(states[1].currentTurn).toBe('black');
 
     // states[2] corresponds to index 1 (after move 2)
     expect(states[2].board[move2.to]).toBeDefined();
     expect(states[2].board[move2.from]).toBeNull();
-    expect(states[2].currentTurn).toBe('blue');
+    expect(states[2].currentTurn).toBe('white');
   });
 
   it('returns initial game state when history is empty or targetIndex is -1', () => {
@@ -83,14 +83,14 @@ describe('computeCumulativeGameStates and computeGameStateAtMove', () => {
     const dummyMove: Move = {
       from: 'a2',
       to: 'a3',
-      piece: { id: 'blue_pawn_a2', color: 'blue', type: 'pawn', hasLeftBase: false, hasReachedGoal: false },
+      piece: { id: 'white_pawn_a2', color: 'white', type: 'pawn', hasLeftBase: false, hasReachedGoal: false },
       intermediateSquares: [],
       notation: 'Pa2-a3',
     };
 
     const stateAtStart = computeGameStateAtMove([dummyMove], -1);
     expect(stateAtStart.board).toEqual(initialState.board);
-    expect(stateAtStart.currentTurn).toBe('blue');
+    expect(stateAtStart.currentTurn).toBe('white');
     expect(stateAtStart.moveHistory).toHaveLength(0);
   });
 
@@ -99,11 +99,11 @@ describe('computeCumulativeGameStates and computeGameStateAtMove', () => {
     const move: Move = {
       from: 'a2',
       to: 'a3',
-      piece: { id: 'blue_pawn_a2', color: 'blue', type: 'pawn', hasLeftBase: false, hasReachedGoal: false },
+      piece: { id: 'white_pawn_a2', color: 'white', type: 'pawn', hasLeftBase: false, hasReachedGoal: false },
       intermediateSquares: [],
       notation: 'Pa2-a3',
     };
-    const finalState = resignGame(initialState, 'green');
+    const finalState = resignGame(initialState, 'black');
 
     const result = computeGameStateAtMove([move], 0, finalState);
     expect(result).toBe(finalState);
@@ -120,7 +120,7 @@ describe('computeCumulativeGameStates and computeGameStateAtMove', () => {
     const dummyMove: Move = {
       from: 'a2',
       to: 'a3',
-      piece: { id: 'blue_pawn_a2', color: 'blue', type: 'pawn', hasLeftBase: false, hasReachedGoal: false },
+      piece: { id: 'white_pawn_a2', color: 'white', type: 'pawn', hasLeftBase: false, hasReachedGoal: false },
       intermediateSquares: [],
       notation: 'Pa2-a3',
     };

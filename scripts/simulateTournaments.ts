@@ -205,7 +205,7 @@ Starting simulation...
   console.log(`✓ Total Tournaments Simulated: ${summary.totalTournaments.toLocaleString()}`);
   console.log(`✓ Total Games Simulated:       ${summary.totalMatches.toLocaleString()}`);
   console.log(`✓ Total Duration:              ${formatDuration(summary.totalDurationMs)}`);
-  console.log(`✓ Color Split:                 Blue ${summary.overallBlueWins} (${((summary.overallBlueWins / summary.totalMatches) * 100).toFixed(1)}%) vs. Green ${summary.overallGreenWins} (${((summary.overallGreenWins / summary.totalMatches) * 100).toFixed(1)}%)`);
+  console.log(`✓ Color Split:                 White ${summary.overallWhiteWins} (${((summary.overallWhiteWins / summary.totalMatches) * 100).toFixed(1)}%) vs. Black ${summary.overallBlackWins} (${((summary.overallBlackWins / summary.totalMatches) * 100).toFixed(1)}%)`);
   console.log(`\nAll files successfully generated at:`);
   console.log(`  • Notation files:    ${path.join(summary.outputDir, TOURNAMENT_SIMULATION_CONFIG.subdirectories.games)}`);
   console.log(`  • Tournament files:  ${path.join(summary.outputDir, TOURNAMENT_SIMULATION_CONFIG.subdirectories.tournaments)}`);

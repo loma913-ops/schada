@@ -74,14 +74,14 @@ describe('Cryptographic Pseudo-Random Utilities (CSPRNG)', () => {
     });
 
     it('selects uniformly among multiple elements without out-of-bounds error', () => {
-      const pool = ['blue', 'green'] as const;
-      const counts: Record<string, number> = { blue: 0, green: 0 };
+      const pool = ['white', 'black'] as const;
+      const counts: Record<string, number> = { white: 0, black: 0 };
       for (let i = 0; i < 100; i++) {
         const choice = getSecureRandomChoice(pool);
         counts[choice]++;
       }
-      expect(counts.blue).toBeGreaterThan(0);
-      expect(counts.green).toBeGreaterThan(0);
+      expect(counts.white).toBeGreaterThan(0);
+      expect(counts.black).toBeGreaterThan(0);
     });
 
     it('throws RangeError for empty array or oversized array', () => {

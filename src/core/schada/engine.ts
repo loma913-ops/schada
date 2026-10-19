@@ -26,7 +26,7 @@ export function createEmptyBoard(): BoardMatrix {
 export function createInitialBoard(): BoardMatrix {
   const board = createEmptyBoard();
 
-  // Blue armies (Rank 1 & 2)
+  // White armies (Rank 1 & 2)
   for (let c = 0; c < 8; c++) {
     const file = String.fromCharCode('a'.charCodeAt(0) + c) as FileLetter;
 
@@ -34,9 +34,9 @@ export function createInitialBoard(): BoardMatrix {
     const pieceType = c % 2 === 0 ? 'field_officer' : 'officer';
     const sq1 = `${file}1` as Square;
     board[sq1] = {
-      id: `blue_${pieceType}_${sq1}`,
+      id: `white_${pieceType}_${sq1}`,
       type: pieceType,
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -44,15 +44,15 @@ export function createInitialBoard(): BoardMatrix {
     // Rank 2: 8 Pawns
     const sq2 = `${file}2` as Square;
     board[sq2] = {
-      id: `blue_pawn_${sq2}`,
+      id: `white_pawn_${sq2}`,
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
   }
 
-  // Green armies (Rank 8 & 7)
+  // Black armies (Rank 8 & 7)
   for (let c = 0; c < 8; c++) {
     const file = String.fromCharCode('a'.charCodeAt(0) + c) as FileLetter;
 
@@ -61,9 +61,9 @@ export function createInitialBoard(): BoardMatrix {
     const pieceType = c % 2 === 0 ? 'officer' : 'field_officer';
     const sq8 = `${file}8` as Square;
     board[sq8] = {
-      id: `green_${pieceType}_${sq8}`,
+      id: `black_${pieceType}_${sq8}`,
       type: pieceType,
-      color: 'green',
+      color: 'black',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -71,9 +71,9 @@ export function createInitialBoard(): BoardMatrix {
     // Rank 7: 8 Pawns
     const sq7 = `${file}7` as Square;
     board[sq7] = {
-      id: `green_pawn_${sq7}`,
+      id: `black_pawn_${sq7}`,
       type: 'pawn',
-      color: 'green',
+      color: 'black',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -86,13 +86,13 @@ export function createInitialGameState(): BoardState {
   const board = createInitialBoard();
   return {
     board,
-    currentTurn: 'blue',
+    currentTurn: 'white',
     moveHistory: [],
     capturedPieces: {
-      blue: [],
-      green: [],
+      white: [],
+      black: [],
     },
-    positionHistory: [generatePositionHash(board, 'blue')],
+    positionHistory: [generatePositionHash(board, 'white')],
     isGameOver: false,
     result: null,
   };
@@ -119,8 +119,14 @@ export function getLegalMovesForSquare(board: BoardMatrix, square: Square): Move
   const [col, row] = squareToColRow(square);
   const color = piece.color;
   const isHighPiece = piece.type === 'field_officer' || piece.type === 'officer';
-  const baseRank = color === 'blue' ? 0 : 7;
-  const goalRank = color === 'blue' ? 7 : 0;
+  const baseRank =
+    color === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
+  const goalRank =
+    color === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
 
   const vectors = SCHADA_VECTORS[square] || [];
   const legalMoves: Move[] = [];
@@ -145,7 +151,10 @@ export function getLegalMovesForSquare(board: BoardMatrix, square: Square): Move
 
     // 3. High pieces in their goal line are IMMUNE to capture!
     if (destPiece && (destPiece.type === 'field_officer' || destPiece.type === 'officer')) {
-      const enemyGoalRank = destPiece.color === 'blue' ? 7 : 0;
+      const enemyGoalRank =
+        destPiece.color === 'white'
+          ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+          : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
       if (destRow === enemyGoalRank) {
         continue; // Cannot capture high piece residing in its goal line
       }
@@ -234,8 +243,14 @@ export function isSquareAttacked(
   attackerColor: PieceColor
 ): boolean {
   const [targetCol, targetRow] = squareToColRow(targetSquare);
-  const baseRank = attackerColor === 'blue' ? 0 : 7;
-  const goalRank = attackerColor === 'blue' ? 7 : 0;
+  const baseRank =
+    attackerColor === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
+  const goalRank =
+    attackerColor === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
 
   for (let c = 0; c < 8; c++) {
     for (let r = 0; r < 8; r++) {
@@ -294,7 +309,7 @@ export function isSquareAttacked(
  * - Space Complexity: O(T), where T <= P is the number of threatened squares added to the Set.
  *
  * Rules & Edge Cases:
- * - Both Blue and Green pieces under attack are included.
+ * - Both White and Black pieces under attack are included.
  * - High pieces inside their goal rank are immune to capture and are therefore excluded.
  * - Respects base line / goal line movement constraints and intermediate path leaps/obstructions.
  */
@@ -307,8 +322,14 @@ export function getPiecesUnderAttack(board: BoardMatrix): Set<Square> {
     const [fromCol, fromRow] = squareToColRow(fromSquare);
     const color = piece.color;
     const isHighPiece = piece.type === 'field_officer' || piece.type === 'officer';
-    const baseRank = color === 'blue' ? 0 : 7;
-    const goalRank = color === 'blue' ? 7 : 0;
+    const baseRank =
+      color === 'white'
+        ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+        : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
+    const goalRank =
+      color === 'white'
+        ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+        : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
 
     const vectors = SCHADA_VECTORS[fromSquare];
     if (!vectors) continue;
@@ -333,7 +354,10 @@ export function getPiecesUnderAttack(board: BoardMatrix): Set<Square> {
 
       // 3. High pieces in their goal line are IMMUNE to capture
       const isTargetHighPiece = destPiece.type === 'field_officer' || destPiece.type === 'officer';
-      const enemyGoalRank = destPiece.color === 'blue' ? 7 : 0;
+      const enemyGoalRank =
+        destPiece.color === 'white'
+          ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+          : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
       if (isTargetHighPiece && destRow === enemyGoalRank) {
         continue;
       }
@@ -379,7 +403,10 @@ export function getPiecesUnderAttack(board: BoardMatrix): Set<Square> {
  * Checks if all remaining high pieces of a player have reached their goal line.
  */
 export function haveAllRemainingHighPiecesReachedGoal(board: BoardMatrix, color: PieceColor): boolean {
-  const goalRank = color === 'blue' ? 7 : 0;
+  const goalRank =
+    color === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
   let remainingHighPiecesCount = 0;
 
   for (const [sq, piece] of Object.entries(board)) {
@@ -440,7 +467,10 @@ export function isPieceObstructedByEnemy(board: BoardMatrix, square: Square): bo
     const destPiece = board[destSquare];
     if (destPiece && destPiece.color !== color) {
       // Enemy high piece in goal line cannot be captured, obstructing landing
-      const enemyGoalRank = destPiece.color === 'blue' ? 7 : 0;
+      const enemyGoalRank =
+        destPiece.color === 'white'
+          ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+          : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
       if (
         (destPiece.type === 'field_officer' || destPiece.type === 'officer') &&
         destRow === enemyGoalRank
@@ -467,9 +497,9 @@ export function isPieceObstructedByEnemy(board: BoardMatrix, square: Square): bo
  */
 export function areNonGoalHighPiecesBlocked(board: BoardMatrix, color: PieceColor): boolean {
   const goalRank =
-    color === 'blue'
-      ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
-      : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+    color === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
   let nonGoalHighPiecesCount = 0;
   let hasAnyLegalHighPieceMove = false;
   let hasEnemyObstruction = false;
@@ -521,13 +551,13 @@ export function isMutualShuffling(
     const [, fromRow] = squareToColRow(m.from);
     const [, toRow] = squareToColRow(m.to);
     const baseRank =
-      m.piece.color === 'blue'
-        ? SCHADA_RULES_CONFIG.board.blueBaseRankIndex
-        : SCHADA_RULES_CONFIG.board.greenBaseRankIndex;
+      m.piece.color === 'white'
+        ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+        : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
     const goalRank =
-      m.piece.color === 'blue'
-        ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
-        : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+      m.piece.color === 'white'
+        ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+        : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
 
     const isWithinBase = fromRow === baseRank && toRow === baseRank;
     const isWithinGoal = fromRow === goalRank && toRow === goalRank;
@@ -565,27 +595,27 @@ export function executeMove(state: BoardState, move: Move): BoardState {
   // Handle capture
   const captured = newBoard[move.to];
   const newCaptured = {
-    blue: [...state.capturedPieces.blue],
-    green: [...state.capturedPieces.green],
+    white: [...state.capturedPieces.white],
+    black: [...state.capturedPieces.black],
   };
   if (captured) {
-    if (captured.color === 'blue') {
-      newCaptured.blue.push(captured);
+    if (captured.color === 'white') {
+      newCaptured.white.push(captured);
     } else {
-      newCaptured.green.push(captured);
+      newCaptured.black.push(captured);
     }
   }
 
   // Update piece attributes
   const [, destRow] = squareToColRow(move.to);
   const baseRank =
-    currentPiece.color === 'blue'
-      ? SCHADA_RULES_CONFIG.board.blueBaseRankIndex
-      : SCHADA_RULES_CONFIG.board.greenBaseRankIndex;
+    currentPiece.color === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+      : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
   const goalRank =
-    currentPiece.color === 'blue'
-      ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
-      : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+    currentPiece.color === 'white'
+      ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+      : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
 
   if (destRow !== baseRank) {
     currentPiece.hasLeftBase = true;
@@ -597,7 +627,7 @@ export function executeMove(state: BoardState, move: Move): BoardState {
   // Place piece on destination
   newBoard[move.to] = currentPiece;
 
-  const nextTurn: PieceColor = state.currentTurn === 'blue' ? 'green' : 'blue';
+  const nextTurn: PieceColor = state.currentTurn === 'white' ? 'black' : 'white';
   const newPositionHash = generatePositionHash(newBoard, nextTurn);
   const newPositionHistory = [...state.positionHistory, newPositionHash];
   const newMoveHistory = [...state.moveHistory, move];
@@ -608,8 +638,8 @@ export function executeMove(state: BoardState, move: Move): BoardState {
 
   // 1. Goal reached: If all remaining high pieces of EITHER player have reached their goal line
   if (
-    haveAllRemainingHighPiecesReachedGoal(newBoard, 'blue') ||
-    haveAllRemainingHighPiecesReachedGoal(newBoard, 'green')
+    haveAllRemainingHighPiecesReachedGoal(newBoard, 'white') ||
+    haveAllRemainingHighPiecesReachedGoal(newBoard, 'black')
   ) {
     isGameOver = true;
     result = evaluateGameResult(newBoard, 'goal_reached');
@@ -658,9 +688,10 @@ export function executeMove(state: BoardState, move: Move): BoardState {
 
 export function resignGame(state: BoardState, resigningColor: PieceColor): BoardState {
   if (state.isGameOver) return state;
-  const winner = resigningColor === 'blue' ? 'green' : 'blue';
-  const blueScore = evaluateGameResult(state.board, 'resignation').blueScore;
-  const greenScore = evaluateGameResult(state.board, 'resignation').greenScore;
+  const isWhite = resigningColor === 'white' || (resigningColor as string) === 'blue';
+  const winner = isWhite ? 'black' : 'white';
+  const whiteScore = evaluateGameResult(state.board, 'resignation').whiteScore;
+  const blackScore = evaluateGameResult(state.board, 'resignation').blackScore;
 
   return {
     ...state,
@@ -668,17 +699,20 @@ export function resignGame(state: BoardState, resigningColor: PieceColor): Board
     result: {
       winner,
       winReason: 'resignation',
-      blueScore,
-      greenScore,
+      whiteScore,
+      blackScore,
+      blueScore: whiteScore,
+      greenScore: blackScore,
     },
   };
 }
 
 export function timeoutGame(state: BoardState, timedOutColor: PieceColor): BoardState {
   if (state.isGameOver) return state;
-  const winner = timedOutColor === 'blue' ? 'green' : 'blue';
-  const blueScore = evaluateGameResult(state.board, 'timeout').blueScore;
-  const greenScore = evaluateGameResult(state.board, 'timeout').greenScore;
+  const isWhite = timedOutColor === 'white' || (timedOutColor as string) === 'blue';
+  const winner = isWhite ? 'black' : 'white';
+  const whiteScore = evaluateGameResult(state.board, 'timeout').whiteScore;
+  const blackScore = evaluateGameResult(state.board, 'timeout').blackScore;
 
   return {
     ...state,
@@ -686,8 +720,10 @@ export function timeoutGame(state: BoardState, timedOutColor: PieceColor): Board
     result: {
       winner,
       winReason: 'timeout',
-      blueScore,
-      greenScore,
+      whiteScore,
+      blackScore,
+      blueScore: whiteScore,
+      greenScore: blackScore,
     },
   };
 }

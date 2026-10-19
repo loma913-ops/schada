@@ -29,9 +29,11 @@ function createMockRoom(overrides: Partial<GameRoom> = {}): GameRoom {
     createdAt: Date.now(),
     boardState: createInitialGameState(),
     creatorColorPref: 'random',
-    currentTurn: 'blue',
-    bluePlayer: null,
-    greenPlayer: null,
+    currentTurn: 'white',
+    whitePlayer: null,
+    blackPlayer: null,
+    whiteTimeMs: 300000,
+    blackTimeMs: 300000,
     blueTimeMs: 300000,
     greenTimeMs: 300000,
     lastTurnStartTimeMs: null,
@@ -73,8 +75,8 @@ describe('lobbyService', () => {
       id: 'live',
       status: 'in_progress',
       createdAt: 3000,
-      bluePlayer: { id: 'p1', username: 'P1', elo: 1200, sessionToken: 't1' },
-      greenPlayer: { id: 'p2', username: 'P2', elo: 1200, sessionToken: 't2' },
+      whitePlayer: { id: 'p1', username: 'P1', elo: 1200, sessionToken: 't1' },
+      blackPlayer: { id: 'p2', username: 'P2', elo: 1200, sessionToken: 't2' },
     });
 
     const sorted = sortLobbyRooms([olderWaiting, liveMatch, newerWaiting]);
@@ -88,8 +90,8 @@ describe('lobbyService', () => {
       id: 'pub_live',
       status: 'in_progress',
       isPrivate: false,
-      bluePlayer: { id: 'p1', username: 'P1', elo: 1200, sessionToken: 't1' },
-      greenPlayer: { id: 'p2', username: 'P2', elo: 1200, sessionToken: 't2' },
+      whitePlayer: { id: 'p1', username: 'P1', elo: 1200, sessionToken: 't1' },
+      blackPlayer: { id: 'p2', username: 'P2', elo: 1200, sessionToken: 't2' },
     });
 
     localGameStore.set(publicWaiting);
@@ -109,8 +111,8 @@ describe('lobbyService', () => {
       id: 'live1',
       status: 'in_progress',
       isPrivate: false,
-      bluePlayer: { id: 'p1', username: 'P1', elo: 1200, sessionToken: 't1' },
-      greenPlayer: { id: 'p2', username: 'P2', elo: 1200, sessionToken: 't2' },
+      whitePlayer: { id: 'p1', username: 'P1', elo: 1200, sessionToken: 't1' },
+      blackPlayer: { id: 'p2', username: 'P2', elo: 1200, sessionToken: 't2' },
     });
 
     localGameStore.set(publicWaiting);
@@ -147,7 +149,7 @@ describe('lobbyService', () => {
       isRanked: true,
       timeControlMinutes: 5,
       incrementSeconds: 0,
-      bluePlayer: { id: hostUser, username: 'HostUser', elo: 1200, sessionToken: 'host_token' },
+      whitePlayer: { id: hostUser, username: 'HostUser', elo: 1200, sessionToken: 'host_token' },
     });
     localGameStore.set(room1);
 

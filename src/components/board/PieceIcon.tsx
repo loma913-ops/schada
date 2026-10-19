@@ -6,10 +6,17 @@ interface PieceIconProps {
 }
 
 export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
-  const isBlue = piece.color === 'blue';
-  const primaryColor = isBlue ? '#2563eb' : '#16a34a';
-  const secondaryColor = isBlue ? '#1d4ed8' : '#15803d';
-  const highlightColor = isBlue ? '#60a5fa' : '#4ade80';
+  const isWhite = piece.color === 'white' || (piece.color as string) === 'blue';
+  const primaryColor = isWhite ? '#F1EFE7' : '#18181B';
+  const secondaryColor = isWhite ? '#27272a' : '#09090b';
+  const highlightColor = isWhite ? '#71717a' : '#a1a1aa';
+  const centerColor = isWhite ? '#18181B' : '#F1EFE7';
+
+  // Internal element colors with high visibility on both ivory and charcoal bases
+  const starFill = isWhite ? highlightColor : '#64646e';
+  const starStroke = isWhite ? secondaryColor : '#a1a1aa';
+  const diamondFill = isWhite ? highlightColor : '#64646e';
+  const diamondStroke = isWhite ? secondaryColor : '#a1a1aa';
 
   if (piece.type === 'field_officer') {
     return (
@@ -33,11 +40,11 @@ export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
         {/* Central Crown / Star */}
         <path
           d="M 50 26 L 56 42 L 72 44 L 60 56 L 63 72 L 50 64 L 37 72 L 40 56 L 28 44 L 44 42 Z"
-          fill="#ffffff"
-          stroke={secondaryColor}
-          strokeWidth="1.5"
+          fill={starFill}
+          stroke={starStroke}
+          strokeWidth="3"
         />
-        <circle cx="50" cy="50" r="5" fill={primaryColor} />
+        <circle cx="50" cy="50" r="5" fill={centerColor} />
       </svg>
     );
   }
@@ -56,11 +63,11 @@ export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
         {/* Central Crest / Diamond */}
         <path
           d="M 50 25 L 75 50 L 50 75 L 25 50 Z"
-          fill={highlightColor}
-          stroke="#ffffff"
+          fill={diamondFill}
+          stroke={diamondStroke}
           strokeWidth="3"
         />
-        <circle cx="50" cy="50" r="8" fill="#ffffff" />
+        <circle cx="50" cy="50" r="8" fill={centerColor} />
       </svg>
     );
   }
@@ -79,7 +86,7 @@ export const PieceIcon: React.FC<PieceIconProps> = memo(({ piece }) => {
       />
       {/* Central Ring */}
       <circle cx="50" cy="50" r="20" fill="none" stroke={highlightColor} strokeWidth="3" />
-      <circle cx="50" cy="50" r="7" fill="#ffffff" />
+      <circle cx="50" cy="50" r="7" fill={centerColor} />
     </svg>
   );
 });

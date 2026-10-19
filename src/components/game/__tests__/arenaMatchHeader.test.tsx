@@ -33,13 +33,13 @@ vi.mock('@/core/bot/schadaBot', () => ({
 }));
 
 describe('Arena Match Header Time Limit Display', () => {
-  const mockBluePlayer: ArenaPlayer = {
+  const mockwhitePlayer: ArenaPlayer = {
     id: 'user_blue',
     username: 'BlueHero',
     elo: 1500,
   };
 
-  const mockGreenPlayer: ArenaPlayer = {
+  const mockblackPlayer: ArenaPlayer = {
     id: 'user_green',
     username: 'GreenRival',
     elo: 1480,
@@ -52,8 +52,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={2880}
           incrementSeconds={0}
           isRanked={false}
@@ -71,8 +71,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={1440}
           incrementSeconds={0}
           isRanked={false}
@@ -90,8 +90,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={10}
           incrementSeconds={0}
           isRanked={false}
@@ -105,8 +105,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={3}
           incrementSeconds={2}
           isRanked={false}
@@ -122,8 +122,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={0}
           incrementSeconds={0}
           isRanked={false}
@@ -139,10 +139,10 @@ describe('Arena Match Header Time Limit Display', () => {
       ...initialBoard,
       isGameOver: true,
       result: {
-        winner: 'blue' as const,
+        winner: 'white' as const,
         winReason: 'goal_reached' as const,
-        blueScore: { goalScore: 2, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 2 },
-        greenScore: { goalScore: 0, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 0 },
+        whiteScore: { goalScore: 2, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 2 },
+        blackScore: { goalScore: 0, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 0 },
       },
     };
 
@@ -151,8 +151,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={finishedGameState}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={5}
           incrementSeconds={0}
           isRanked={false}

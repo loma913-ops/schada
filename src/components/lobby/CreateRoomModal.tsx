@@ -24,7 +24,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
 
   const [timeControl, setTimeControl] = useState<number>(FORMAT_CONFIG.defaultMatchMinutes);
   const [increment, setIncrement] = useState<number>(FORMAT_CONFIG.defaultIncrementSeconds);
-  const [colorPref, setColorPref] = useState<'random' | 'blue' | 'green'>('random');
+  const [colorPref, setColorPref] = useState<'random' | 'white' | 'black'>('random');
   const [isPrivate, setIsPrivate] = useState<boolean>(false);
   const [isRanked, setIsRanked] = useState<boolean>(!isGuest);
   const [loading, setLoading] = useState(false);
@@ -207,19 +207,19 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
                 </button>
                 <button
                   type="button"
-                  className={`action-btn ${colorPref === 'blue' ? 'active' : ''} pref-blue`}
+                  className={`action-btn ${colorPref === 'white' ? 'active' : ''} pref-white`}
                   style={{ flex: 1 }}
-                  onClick={() => setColorPref('blue')}
+                  onClick={() => setColorPref('white')}
                 >
-                  Blue
+                  White
                 </button>
                 <button
                   type="button"
-                  className={`action-btn ${colorPref === 'green' ? 'active' : ''} pref-green`}
+                  className={`action-btn ${colorPref === 'black' ? 'active' : ''} pref-black`}
                   style={{ flex: 1 }}
-                  onClick={() => setColorPref('green')}
+                  onClick={() => setColorPref('black')}
                 >
-                  Green
+                  Black
                 </button>
               </div>
             </div>

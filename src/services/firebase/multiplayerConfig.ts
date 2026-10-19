@@ -52,8 +52,12 @@ export interface MatchmakingConfig {
   readonly defaultGuestRating: number;
   readonly defaultGuestName: string;
   readonly defaultGuestHostName: string;
-  readonly passAndPlayBlueName: string;
-  readonly passAndPlayGreenName: string;
+  readonly passAndPlayWhiteName: string;
+  readonly passAndPlayBlackName: string;
+  /** @deprecated Backwards compatibility alias for passAndPlayWhiteName */
+  readonly passAndPlayBlueName?: string;
+  /** @deprecated Backwards compatibility alias for passAndPlayBlackName */
+  readonly passAndPlayGreenName?: string;
   readonly botBaseElo: number;
   readonly botEloStepPerLevel: number;
   readonly defaultCleanupIntervalMs: number;
@@ -333,15 +337,17 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
-  if (typeof matchmaking.passAndPlayBlueName !== 'string' || matchmaking.passAndPlayBlueName.trim().length === 0) {
+  const whiteName = matchmaking.passAndPlayWhiteName ?? matchmaking.passAndPlayBlueName;
+  if (typeof whiteName !== 'string' || whiteName.trim().length === 0) {
     throw new MultiplayerConfigError(
-      `Invalid matchmaking.passAndPlayBlueName: expected non-empty string, received "${matchmaking.passAndPlayBlueName}".`
+      `Invalid matchmaking.passAndPlayWhiteName: expected non-empty string, received "${whiteName}".`
     );
   }
 
-  if (typeof matchmaking.passAndPlayGreenName !== 'string' || matchmaking.passAndPlayGreenName.trim().length === 0) {
+  const blackName = matchmaking.passAndPlayBlackName ?? matchmaking.passAndPlayGreenName;
+  if (typeof blackName !== 'string' || blackName.trim().length === 0) {
     throw new MultiplayerConfigError(
-      `Invalid matchmaking.passAndPlayGreenName: expected non-empty string, received "${matchmaking.passAndPlayGreenName}".`
+      `Invalid matchmaking.passAndPlayBlackName: expected non-empty string, received "${blackName}".`
     );
   }
 
@@ -623,8 +629,10 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     defaultGuestRating: 1200,
     defaultGuestName: 'Guest',
     defaultGuestHostName: 'Guest Host',
-    passAndPlayBlueName: 'Player 1 (Blue)',
-    passAndPlayGreenName: 'Player 2 (Green)',
+    passAndPlayWhiteName: 'Player 1 (White)',
+    passAndPlayBlackName: 'Player 2 (Black)',
+    passAndPlayBlueName: 'Player 1 (White)',
+    passAndPlayGreenName: 'Player 2 (Black)',
     botBaseElo: 1000,
     botEloStepPerLevel: 80,
     defaultCleanupIntervalMs: 60_000,

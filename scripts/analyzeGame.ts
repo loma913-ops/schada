@@ -297,7 +297,8 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
 
   for (const m of report.moves) {
     const badge = badges[m.quality];
-    const plyLabel = m.turn === 'blue' ? `${m.moveNumber}.` : `${m.moveNumber}...`;
+    const isWhiteMove = m.turn === 'white' || (m.turn as string) === 'blue';
+    const plyLabel = isWhiteMove ? `${m.moveNumber}.` : `${m.moveNumber}...`;
     const sym = padEndVisual(badge.symbol, 2);
     const qualityLabel = `${badge.ansiColor}${sym} ${badge.label}${RESET_COLOR}`;
     const evalStr = formatEval(m.evalAfter, config);
@@ -348,8 +349,10 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
   console.log(`\n${BOLD}════════════════════════════════════════════════════════════════════════════${RESET_COLOR}`);
   console.log(`${BOLD}                        ACCURACY & SUMMARY STATS                            ${RESET_COLOR}`);
   console.log(`${BOLD}════════════════════════════════════════════════════════════════════════════${RESET_COLOR}`);
-  console.log(`  ${BOLD}Blue Accuracy:${RESET_COLOR}  ${report.blueAccuracy.toFixed(config.accuracy.accuracyDecimals)}%`);
-  console.log(`  ${BOLD}Green Accuracy:${RESET_COLOR} ${report.greenAccuracy.toFixed(config.accuracy.accuracyDecimals)}%`);
+  const whiteAcc = report.whiteAccuracy ?? report.blueAccuracy ?? 0;
+  const blackAcc = report.blackAccuracy ?? report.greenAccuracy ?? 0;
+  console.log(`  ${BOLD}White Accuracy:${RESET_COLOR} ${whiteAcc.toFixed(config.accuracy.accuracyDecimals)}%`);
+  console.log(`  ${BOLD}Black Accuracy:${RESET_COLOR} ${blackAcc.toFixed(config.accuracy.accuracyDecimals)}%`);
   console.log(`\n${DIM}Move Quality Distribution:${RESET_COLOR}`);
 
   const qualities: MoveQuality[] = [
@@ -366,9 +369,9 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
   ];
 
   const distHeader = `  ${padEndVisual('Classification', w.distributionCol)} ${padStartVisual(
-    'Blue',
+    'White',
     w.countCol
-  )} ${padStartVisual('Green', w.countCol)}`;
+  )} ${padStartVisual('Black', w.countCol)}`;
   const distWidth = getVisibleWidth(distHeader) - 2;
   const distDivider = `  ${DIM}${'-'.repeat(distWidth)}${RESET_COLOR}`;
 
@@ -376,15 +379,15 @@ function renderTerminalReport(report: GameAnalysisReport, config: AnalysisConfig
   console.log(distDivider);
   for (const q of qualities) {
     const badge = badges[q];
-    const blueCount = report.blueBreakdown[q];
-    const greenCount = report.greenBreakdown[q];
+    const whiteCount = (report.whiteBreakdown ?? report.blueBreakdown)?.[q] ?? 0;
+    const blackCount = (report.blackBreakdown ?? report.greenBreakdown)?.[q] ?? 0;
     const sym = padEndVisual(badge.symbol, 2);
     const classText = `${badge.ansiColor}${sym}  ${badge.label}${RESET_COLOR}`;
     console.log(
       `  ${padEndVisual(classText, w.distributionCol)} ${padStartVisual(
-        String(blueCount),
+        String(whiteCount),
         w.countCol
-      )} ${padStartVisual(String(greenCount), w.countCol)}`
+      )} ${padStartVisual(String(blackCount), w.countCol)}`
     );
   }
   console.log(`${distDivider}\n`);

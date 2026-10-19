@@ -120,10 +120,16 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
   const initialTimeMs = params.timeControlMinutes > 0 ? params.timeControlMinutes * 60 * 1000 : 0;
 
   // Determine initial color assignment
-  const colorPref = params.colorPref || 'random';
+  const rawPref = params.colorPref || 'random';
+  const colorPref: PieceColor | 'random' =
+    (rawPref as string) === 'blue'
+      ? 'white'
+      : (rawPref as string) === 'green'
+        ? 'black'
+        : rawPref;
   let creatorColor: PieceColor;
   if (colorPref === 'random') {
-    creatorColor = getSecureRandomChoice(['blue', 'green'] as const);
+    creatorColor = getSecureRandomChoice(['white', 'black'] as const);
   } else {
     creatorColor = colorPref;
   }
@@ -163,10 +169,12 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
       incrementSeconds: params.incrementSeconds || 0,
       isRanked,
       creatorColorPref: colorPref,
-      bluePlayer: creatorColor === 'blue' ? creatorPlayer : null,
-      greenPlayer: creatorColor === 'green' ? creatorPlayer : null,
+      whitePlayer: (creatorColor === 'white' || (creatorColor as string) === 'blue') ? creatorPlayer : null,
+      blackPlayer: (creatorColor === 'black' || (creatorColor as string) === 'green') ? creatorPlayer : null,
       boardState: initialBoard,
-      currentTurn: 'blue',
+      currentTurn: 'white',
+      whiteTimeMs: initialTimeMs,
+      blackTimeMs: initialTimeMs,
       blueTimeMs: initialTimeMs,
       greenTimeMs: initialTimeMs,
       lastTurnStartTimeMs: null,
@@ -233,24 +241,24 @@ export async function joinGame(
 
       // Check if existing token matches already assigned player
       if (existingToken) {
-        if (game.bluePlayer && game.bluePlayer.sessionToken === existingToken) {
-          return { success: true, role: 'player', color: 'blue', sessionToken: existingToken };
+        if (game.whitePlayer && game.whitePlayer.sessionToken === existingToken) {
+          return { success: true, role: 'player', color: 'white', sessionToken: existingToken };
         }
-        if (game.greenPlayer && game.greenPlayer.sessionToken === existingToken) {
-          return { success: true, role: 'player', color: 'green', sessionToken: existingToken };
+        if (game.blackPlayer && game.blackPlayer.sessionToken === existingToken) {
+          return { success: true, role: 'player', color: 'black', sessionToken: existingToken };
         }
       }
 
       // Check if user ID matches one of the seated players (e.g. re-login on another browser)
-      if (game.bluePlayer && game.bluePlayer.id === user.id) {
-        const token = game.bluePlayer.sessionToken || generateToken();
+      if (game.whitePlayer && game.whitePlayer.id === user.id) {
+        const token = game.whitePlayer.sessionToken || generateToken();
         setLocalSessionToken(gameId, token);
-        return { success: true, role: 'player', color: 'blue', sessionToken: token };
+        return { success: true, role: 'player', color: 'white', sessionToken: token };
       }
-      if (game.greenPlayer && game.greenPlayer.id === user.id) {
-        const token = game.greenPlayer.sessionToken || generateToken();
+      if (game.blackPlayer && game.blackPlayer.id === user.id) {
+        const token = game.blackPlayer.sessionToken || generateToken();
         setLocalSessionToken(gameId, token);
-        return { success: true, role: 'player', color: 'green', sessionToken: token };
+        return { success: true, role: 'player', color: 'black', sessionToken: token };
       }
 
       // If game is waiting for an opponent, atomically claim the empty seat!
@@ -288,12 +296,12 @@ export async function joinGame(
           lastTurnStartTimeMs: Date.now(),
         };
 
-        if (!game.bluePlayer) {
-          assignedColor = 'blue';
-          updatePayload.bluePlayer = joiningPlayer;
+        if (!game.whitePlayer) {
+          assignedColor = 'white';
+          updatePayload.whitePlayer = joiningPlayer;
         } else {
-          assignedColor = 'green';
-          updatePayload.greenPlayer = joiningPlayer;
+          assignedColor = 'black';
+          updatePayload.blackPlayer = joiningPlayer;
         }
 
         tx.update(docRef, sanitize(updatePayload));
@@ -321,23 +329,23 @@ export async function joinGame(
   }
 
   if (existingToken) {
-    if (game.bluePlayer && game.bluePlayer.sessionToken === existingToken) {
-      return { success: true, role: 'player', color: 'blue', sessionToken: existingToken };
+    if (game.whitePlayer && game.whitePlayer.sessionToken === existingToken) {
+      return { success: true, role: 'player', color: 'white', sessionToken: existingToken };
     }
-    if (game.greenPlayer && game.greenPlayer.sessionToken === existingToken) {
-      return { success: true, role: 'player', color: 'green', sessionToken: existingToken };
+    if (game.blackPlayer && game.blackPlayer.sessionToken === existingToken) {
+      return { success: true, role: 'player', color: 'black', sessionToken: existingToken };
     }
   }
 
-  if (game.bluePlayer && game.bluePlayer.id === user.id) {
-    const token = game.bluePlayer.sessionToken || generateToken();
+  if (game.whitePlayer && game.whitePlayer.id === user.id) {
+    const token = game.whitePlayer.sessionToken || generateToken();
     setLocalSessionToken(gameId, token);
-    return { success: true, role: 'player', color: 'blue', sessionToken: token };
+    return { success: true, role: 'player', color: 'white', sessionToken: token };
   }
-  if (game.greenPlayer && game.greenPlayer.id === user.id) {
-    const token = game.greenPlayer.sessionToken || generateToken();
+  if (game.blackPlayer && game.blackPlayer.id === user.id) {
+    const token = game.blackPlayer.sessionToken || generateToken();
     setLocalSessionToken(gameId, token);
-    return { success: true, role: 'player', color: 'green', sessionToken: token };
+    return { success: true, role: 'player', color: 'black', sessionToken: token };
   }
 
   if (game.status === 'waiting') {
@@ -369,12 +377,12 @@ export async function joinGame(
     };
 
     let assignedColor: PieceColor;
-    if (!game.bluePlayer) {
-      assignedColor = 'blue';
-      game.bluePlayer = joiningPlayer;
+    if (!game.whitePlayer) {
+      assignedColor = 'white';
+      game.whitePlayer = joiningPlayer;
     } else {
-      assignedColor = 'green';
-      game.greenPlayer = joiningPlayer;
+      assignedColor = 'black';
+      game.blackPlayer = joiningPlayer;
     }
 
     game.status = 'in_progress';
@@ -690,6 +698,8 @@ const lastDispatchedDisconnectState = new Map<string, boolean>();
  */
 export function clearDisconnectState(gameId?: string): void {
   if (gameId) {
+    lastDispatchedDisconnectState.delete(`${gameId}_white`);
+    lastDispatchedDisconnectState.delete(`${gameId}_black`);
     lastDispatchedDisconnectState.delete(`${gameId}_blue`);
     lastDispatchedDisconnectState.delete(`${gameId}_green`);
   } else {
@@ -707,10 +717,10 @@ export function clearDisconnectState(gameId?: string): void {
  * - Growth Rate: O(1) flat execution cost minimizing Firestore CRUD operations.
  *
  * @param gameId Unique identifier of the game room.
- * @param color Color of the player ('blue' or 'green').
+ * @param color Color of the player ('white' or 'black').
  * @param disconnected Whether the player is currently disconnected.
  * @throws TypeError if gameId is not a non-empty string.
- * @throws RangeError if color is neither 'blue' nor 'green'.
+ * @throws RangeError if color is neither 'white' nor 'black'.
  */
 export async function setPlayerDisconnectedAction(
   gameId: string,
@@ -720,19 +730,23 @@ export async function setPlayerDisconnectedAction(
   if (typeof gameId !== 'string' || gameId.trim().length === 0) {
     throw new TypeError(`Invalid gameId: expected non-empty string, received "${gameId}".`);
   }
-  if (color !== 'blue' && color !== 'green') {
-    throw new RangeError(`Invalid color: expected "blue" or "green", received "${color}".`);
+  const isWhite = color === 'white' || (color as string) === 'blue';
+  const isBlack = color === 'black' || (color as string) === 'green';
+  if (!isWhite && !isBlack) {
+    throw new RangeError(`Invalid color: expected "white" or "black", received "${color}".`);
   }
 
-  const stateKey = `${gameId}_${color}`;
+  const normalizedColor: PieceColor = isWhite ? 'white' : 'black';
+  const stateKey = `${gameId}_${normalizedColor}`;
   if (lastDispatchedDisconnectState.get(stateKey) === disconnected) {
     return;
   }
   lastDispatchedDisconnectState.set(stateKey, disconnected);
 
-  const updatePayload: Partial<GameRoom> = {
-    [color === 'blue' ? 'blueDisconnectedAt' : 'greenDisconnectedAt']: disconnected ? Date.now() : null,
-  };
+  const timestamp = disconnected ? Date.now() : null;
+  const updatePayload: Partial<GameRoom> = isWhite
+    ? { whiteDisconnectedAt: timestamp, blueDisconnectedAt: timestamp }
+    : { blackDisconnectedAt: timestamp, greenDisconnectedAt: timestamp };
 
   if (isFirebaseConfigured() && db) {
     try {
@@ -763,10 +777,10 @@ export async function setPlayerDisconnectedAction(
  * - Growth Rate: O(1) flat growth rate ensuring stable scaling across concurrent games.
  *
  * @param gameId Unique identifier of the game room.
- * @param abandonedColor Color of the player who abandoned ('blue' or 'green').
+ * @param abandonedColor Color of the player who abandoned ('white' or 'black').
  * @returns Updated user profile if current user's rating was affected, or null.
  * @throws TypeError if gameId is not a non-empty string.
- * @throws RangeError if abandonedColor is neither 'blue' nor 'green'.
+ * @throws RangeError if abandonedColor is neither 'white' nor 'black'.
  */
 export async function abandonGameDueToDisconnectAction(
   gameId: string,
@@ -775,9 +789,12 @@ export async function abandonGameDueToDisconnectAction(
   if (typeof gameId !== 'string' || gameId.trim().length === 0) {
     throw new TypeError(`Invalid gameId: expected non-empty string, received "${gameId}".`);
   }
-  if (abandonedColor !== 'blue' && abandonedColor !== 'green') {
-    throw new RangeError(`Invalid abandonedColor: expected "blue" or "green", received "${abandonedColor}".`);
+  const isWhite = abandonedColor === 'white' || (abandonedColor as string) === 'blue';
+  const isBlack = abandonedColor === 'black' || (abandonedColor as string) === 'green';
+  if (!isWhite && !isBlack) {
+    throw new RangeError(`Invalid abandonedColor: expected "white" or "black", received "${abandonedColor}".`);
   }
+  const normalizedColor: PieceColor = isWhite ? 'white' : 'black';
 
   if (pendingResolutionGameIds.has(gameId)) return null;
   pendingResolutionGameIds.add(gameId);
@@ -807,7 +824,7 @@ export async function abandonGameDueToDisconnectAction(
 
         gameCategory = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
         const callerId = auth?.currentUser?.uid;
-        const transition = computeAbandonmentTransition(game, abandonedColor, callerId);
+        const transition = computeAbandonmentTransition(game, normalizedColor, callerId);
         abandonedPlayerId = transition.abandonedPlayerId;
         abandonedDelta = transition.abandonedDelta;
         winnerPlayerId = transition.winnerPlayerId;
@@ -862,7 +879,7 @@ export async function abandonGameDueToDisconnectAction(
     }
 
     const gameCategory = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
-    const transition = computeAbandonmentTransition(game, abandonedColor);
+    const transition = computeAbandonmentTransition(game, normalizedColor);
     localGameStore.set({ ...game, ...transition.updatePayload });
 
     if (transition.winnerPlayerId && (!transition.winnerPlayerId.startsWith('guest_') && transition.winnerPlayerId !== 'guest')) {

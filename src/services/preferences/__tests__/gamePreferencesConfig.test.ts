@@ -56,7 +56,7 @@ describe('gamePreferencesConfig', () => {
     const invalidFallbackTheme: GamePreferencesConfig = {
       storageKeys: { showThreatIndicators: 'key', theme: 'theme_key' },
       mediaQueries: { prefersDark: '(prefers-color-scheme: dark)' },
-      defaults: { showThreatIndicators: true, fallbackTheme: 'blue' as any },
+      defaults: { showThreatIndicators: true, fallbackTheme: 'invalid_theme' as any },
     };
     expect(() => validateGamePreferencesConfig(invalidFallbackTheme)).toThrow(GamePreferencesConfigError);
   });

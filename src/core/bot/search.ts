@@ -2,12 +2,12 @@ import {
   FastBoard,
   type FastMove,
   EMPTY,
-  BLUE_FO,
-  BLUE_O,
-  BLUE_PAWN,
-  GREEN_FO,
-  GREEN_O,
-  GREEN_PAWN,
+  WHITE_FO,
+  WHITE_O,
+  WHITE_PAWN,
+  BLACK_FO,
+  BLACK_O,
+  BLACK_PAWN,
 } from './fastBoard';
 import { evaluateBoard, evaluateTerminalWin, TERMINAL_WIN, TERMINAL_LOSS } from './evaluator';
 import { BOT_ENGINE_CONFIG, type BotTierConfig } from './botConfig';
@@ -60,7 +60,7 @@ export function computeZobristHash(board: FastBoard): number {
       hash ^= ZOBRIST_FLAGS[i * 4 + f];
     }
   }
-  if (board.currentTurn === 'green') {
+  if (board.currentTurn === 'black') {
     hash ^= ZOBRIST_TURN;
   }
   return hash >>> 0;
@@ -112,14 +112,14 @@ export function createSearchContext(tier: BotTierConfig, timeLimitMs: number): S
 function getPieceMaterialScore(piece: number): number {
   const w = BOT_ENGINE_CONFIG.evaluationWeights;
   switch (piece) {
-    case BLUE_FO:
-    case GREEN_FO:
+    case WHITE_FO:
+    case BLACK_FO:
       return w.fieldOfficerMaterial;
-    case BLUE_O:
-    case GREEN_O:
+    case WHITE_O:
+    case BLACK_O:
       return w.officerMaterial;
-    case BLUE_PAWN:
-    case GREEN_PAWN:
+    case WHITE_PAWN:
+    case BLACK_PAWN:
       return w.pawnMaterial;
     default:
       return 0;
@@ -152,10 +152,10 @@ function scoreMoveForOrdering(
     return sp.captureBaseBonus + victim * sp.mvvLvaVictimMultiplier - attacker;
   }
 
-  const isHigh = move.piece === BLUE_FO || move.piece === BLUE_O || move.piece === GREEN_FO || move.piece === GREEN_O;
+  const isHigh = move.piece === WHITE_FO || move.piece === WHITE_O || move.piece === BLACK_FO || move.piece === BLACK_O;
   const destRow = Math.floor(move.to / 8);
-  const isBlue = move.piece <= 3;
-  const goalRow = isBlue ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+  const isWhite = move.piece <= 3;
+  const goalRow = isWhite ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
   if (isHigh && destRow === goalRow) {
     return sp.goalEntryBonus;
   }
@@ -172,8 +172,8 @@ function scoreMoveForOrdering(
   }
 
   if (isHigh) {
-    const fromDist = isBlue ? DISTANCE_TABLES.blueSliding[move.from] : DISTANCE_TABLES.greenSliding[move.from];
-    const toDist = isBlue ? DISTANCE_TABLES.blueSliding[move.to] : DISTANCE_TABLES.greenSliding[move.to];
+    const fromDist = isWhite ? DISTANCE_TABLES.whiteSliding[move.from] : DISTANCE_TABLES.blackSliding[move.from];
+    const toDist = isWhite ? DISTANCE_TABLES.whiteSliding[move.to] : DISTANCE_TABLES.blackSliding[move.to];
     const gain = fromDist - toDist;
     return gain * sp.distanceGainMultiplier;
   }
@@ -212,7 +212,7 @@ function quiescence(
     return alpha;
   }
 
-  if (board.haveAllRemainingHighPiecesReachedGoal('blue') || board.haveAllRemainingHighPiecesReachedGoal('green')) {
+  if (board.haveAllRemainingHighPiecesReachedGoal('white') || board.haveAllRemainingHighPiecesReachedGoal('black')) {
     return evaluateTerminalWin(board, board.currentTurn, ply);
   }
 
@@ -227,7 +227,7 @@ function quiescence(
   const allMoves = board.generateLegalMoves(board.currentTurn);
   const tacticalMoves = allMoves.filter((m) => {
     if (m.captured !== EMPTY) return true;
-    const isHigh = m.piece === BLUE_FO || m.piece === BLUE_O || m.piece === GREEN_FO || m.piece === GREEN_O;
+    const isHigh = m.piece === WHITE_FO || m.piece === WHITE_O || m.piece === BLACK_FO || m.piece === BLACK_O;
     const destRow = Math.floor(m.to / 8);
     const goalRow = m.piece <= 3 ? 7 : 0;
     return isHigh && destRow === goalRow;
@@ -277,7 +277,7 @@ function pvs(
     return alpha;
   }
 
-  if (board.haveAllRemainingHighPiecesReachedGoal('blue') || board.haveAllRemainingHighPiecesReachedGoal('green')) {
+  if (board.haveAllRemainingHighPiecesReachedGoal('white') || board.haveAllRemainingHighPiecesReachedGoal('black')) {
     return evaluateTerminalWin(board, board.currentTurn, ply);
   }
 
@@ -312,17 +312,17 @@ function pvs(
   const searchParams = BOT_ENGINE_CONFIG.searchParameters;
   const isBetaFinite = Number.isFinite(beta) && Math.abs(beta) < TERMINAL_WIN - searchParams.terminalNearWinCutoff;
   if (ctx.tier.useNullMovePruning && allowNull && depth >= searchParams.nullMoveMinDepth && ply > 0 && isBetaFinite) {
-    const isBlue = board.currentTurn === 'blue';
-    const highRemain = isBlue
-      ? board.blueHighTotal - board.blueHighInGoal
-      : board.greenHighTotal - board.greenHighInGoal;
+    const isWhite = board.currentTurn === 'white';
+    const highRemain = isWhite
+      ? board.whiteHighTotal - board.whiteHighInGoal
+      : board.blackHighTotal - board.blackHighInGoal;
 
     if (highRemain > 1) {
       const staticEval = evaluateBoard(board, board.currentTurn, ctx.tier, ply);
       if (staticEval >= beta) {
-        board.currentTurn = isBlue ? 'green' : 'blue';
+        board.currentTurn = isWhite ? 'black' : 'white';
         const nullScore = -pvs(board, depth - 1 - searchParams.nullMoveReduction, -beta, -beta + 1, ply + 1, ctx, false);
-        board.currentTurn = isBlue ? 'blue' : 'green';
+        board.currentTurn = isWhite ? 'white' : 'black';
 
         if (ctx.timedOut) return alpha;
         if (nullScore >= beta) return beta;
@@ -423,9 +423,9 @@ export function searchBestMove(
     }
 
     const nonGoalShuffle = legalMoves.filter((m) => {
-      const isHigh = m.piece === BLUE_FO || m.piece === BLUE_O || m.piece === GREEN_FO || m.piece === GREEN_O;
+      const isHigh = m.piece === WHITE_FO || m.piece === WHITE_O || m.piece === BLACK_FO || m.piece === BLACK_O;
       const fromRow = Math.floor(m.from / 8);
-      const goalRow = m.piece <= 3 ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+      const goalRow = m.piece <= 3 ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
       return !(isHigh && fromRow === goalRow);
     });
     const pool = nonGoalShuffle.length > 0 ? nonGoalShuffle : legalMoves;

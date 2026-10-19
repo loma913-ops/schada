@@ -51,11 +51,15 @@
   --sq-vector-line: rgba(50, 40, 30, 0.7);
   --sq-vector-dot: #2b1f13;
 
-  /* Pieces */
-  --piece-blue: #2a75d3;
-  --piece-blue-glow: rgba(42, 117, 211, 0.4);
-  --piece-green: #388e3c;
-  --piece-green-glow: rgba(56, 142, 60, 0.4);
+  /* Pieces (White: Ivory #F1EFE7, Black: Charcoal #18181B) */
+  --piece-white: #F1EFE7;
+  --piece-white-glow: rgba(241, 239, 231, 0.4);
+  --piece-black: #18181B;
+  --piece-black-glow: rgba(24, 24, 27, 0.4);
+  --piece-blue: var(--piece-white);
+  --piece-blue-glow: var(--piece-white-glow);
+  --piece-green: var(--piece-black);
+  --piece-green-glow: var(--piece-black-glow);
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', Menlo, monospace;

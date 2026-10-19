@@ -71,13 +71,13 @@ describe('GameService Multiplayer Sync', () => {
       timeControlMinutes: 5,
       incrementSeconds: 3,
       isRanked: true,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
 
     expect(gameId).toBeDefined();
-    expect(color).toBe('blue');
+    expect(color).toBe('white');
     expect(sessionToken).toBeDefined();
     expect(getLocalSessionToken(gameId)).toBe(sessionToken);
 
@@ -89,7 +89,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'user_1', username: 'HostPlayer', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: true,
       creator,
     });
@@ -102,7 +102,7 @@ describe('GameService Multiplayer Sync', () => {
 
     expect(joinRes.success).toBe(true);
     expect(joinRes.role).toBe('player');
-    expect(joinRes.color).toBe('green');
+    expect(joinRes.color).toBe('black');
 
     // 3rd user joining should be a spectator
     localStorage.removeItem('schada_player_token_' + gameId);
@@ -118,7 +118,7 @@ describe('GameService Multiplayer Sync', () => {
     const targetOpponent = { id: 'target_id', username: 'TargetUser', elo: 1350 };
     const { gameId } = await createGame({
       timeControlMinutes: 10,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
       targetOpponent,
@@ -142,78 +142,78 @@ describe('GameService Multiplayer Sync', () => {
     const targetRes = await joinGame(gameId, targetOpponent);
     expect(targetRes.success).toBe(true);
     expect(targetRes.role).toBe('player');
-    expect(targetRes.color).toBe('green');
+    expect(targetRes.color).toBe('black');
 
     const updatedRoom = localGameStore.get(gameId);
     expect(updatedRoom?.status).toBe('in_progress');
-    expect(updatedRoom?.greenPlayer?.id).toBe('target_id');
+    expect(updatedRoom?.blackPlayer?.id).toBe('target_id');
   });
 
   it('allows players to execute moves and switches turns', async () => {
-    const creator = { id: 'p1', username: 'BluePlayer', elo: 1300 };
+    const creator = { id: 'p1', username: 'whitePlayer', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: true,
       creator,
     });
 
     // Join player 2
     localStorage.removeItem('schada_player_token_' + gameId);
-    await joinGame(gameId, { id: 'p2', username: 'GreenPlayer', elo: 1200 });
+    await joinGame(gameId, { id: 'p2', username: 'blackPlayer', elo: 1200 });
 
-    // In localGameStore, retrieve game to get blue's legal move
+    // In localGameStore, retrieve game to get white's legal move
     const openRooms = await getOpenRooms();
-    // Let's get move for blue pawn at e2 or FO at a1
+    // Let's get move for white pawn at e2 or FO at a1
     const p1Move = getLegalMovesForSquare(openRooms[0]?.boardState?.board || ({} as any), 'a1')[0] || {
       from: 'a1',
       to: 'a3',
-      piece: { id: 'blue_fo_a1', type: 'field_officer', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+      piece: { id: 'white_fo_a1', type: 'field_officer', color: 'white', hasLeftBase: false, hasReachedGoal: false },
       intermediateSquares: ['a2'],
       notation: 'FO-a3',
     };
 
-    // Attempting green move first should fail
-    await expect(makeGameMove(gameId, p1Move, 'green')).rejects.toThrow('It is not your turn.');
+    // Attempting black move first should fail
+    await expect(makeGameMove(gameId, p1Move, 'black')).rejects.toThrow('It is not your turn.');
 
-    // Blue makes move
-    await makeGameMove(gameId, p1Move, 'blue');
+    // White makes move
+    await makeGameMove(gameId, p1Move, 'white');
 
-    // Next move by blue should fail now because turn switched to green
-    await expect(makeGameMove(gameId, p1Move, 'blue')).rejects.toThrow('It is not your turn.');
+    // Next move by white should fail now because turn switched to black
+    await expect(makeGameMove(gameId, p1Move, 'white')).rejects.toThrow('It is not your turn.');
   });
 
   it('optimizes move execution when currentGame is passed directly', async () => {
-    const creator = { id: 'p1', username: 'BluePlayer', elo: 1300 };
+    const creator = { id: 'p1', username: 'whitePlayer', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: true,
       creator,
     });
 
     localStorage.removeItem('schada_player_token_' + gameId);
-    await joinGame(gameId, { id: 'p2', username: 'GreenPlayer', elo: 1200 });
+    await joinGame(gameId, { id: 'p2', username: 'blackPlayer', elo: 1200 });
 
     const currentRoom = localGameStore.get(gameId)!;
     const p1Move = getLegalMovesForSquare(currentRoom.boardState.board, 'a1')[0] || {
       from: 'a1',
       to: 'a3',
-      piece: { id: 'blue_fo_a1', type: 'field_officer', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+      piece: { id: 'white_fo_a1', type: 'field_officer', color: 'white', hasLeftBase: false, hasReachedGoal: false },
       intermediateSquares: ['a2'],
       notation: 'FO-a3',
     };
 
     // Make move providing currentGame directly
-    await makeGameMove(gameId, p1Move, 'blue', currentRoom);
+    await makeGameMove(gameId, p1Move, 'white', currentRoom);
 
     const updatedGame = localGameStore.get(gameId);
     expect(updatedGame?.boardState.moveHistory.length).toBe(1);
-    expect(updatedGame?.boardState.currentTurn).toBe('green');
+    expect(updatedGame?.boardState.currentTurn).toBe('black');
   });
 
   it('resets player clock on move completion in correspondence matches', async () => {
-    const creator = { id: 'p_corr_1', username: 'CorrBlue', elo: 1300 };
+    const creator = { id: 'p_corr_1', username: 'CorrWhite', elo: 1300 };
     const daysPerMove = 2;
     const msPerMinute =
       LOBBY_CONFIG.secondsPerMinute * CANONICAL_DIGITAL_CLOCK_CONFIG.timeUnits.msPerSecond;
@@ -221,19 +221,19 @@ describe('GameService Multiplayer Sync', () => {
     const twoDaysMs = twoDaysMinutes * msPerMinute;
     const { gameId } = await createGame({
       timeControlMinutes: twoDaysMinutes,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: true,
       creator,
     });
 
     localStorage.removeItem('schada_player_token_' + gameId);
-    await joinGame(gameId, { id: 'p_corr_2', username: 'CorrGreen', elo: 1200 });
+    await joinGame(gameId, { id: 'p_corr_2', username: 'CorrBlack', elo: 1200 });
 
     const currentRoom = localGameStore.get(gameId)!;
-    expect(currentRoom.blueTimeMs).toBe(twoDaysMs);
-    expect(currentRoom.greenTimeMs).toBe(twoDaysMs);
+    expect(currentRoom.whiteTimeMs).toBe(twoDaysMs);
+    expect(currentRoom.blackTimeMs).toBe(twoDaysMs);
 
-    // Simulate 12 hours elapsed on blue's turn
+    // Simulate 12 hours elapsed on white's turn
     const elapsedHours = 12;
     const elapsedMs =
       elapsedHours *
@@ -243,21 +243,21 @@ describe('GameService Multiplayer Sync', () => {
     localGameStore.set(currentRoom);
 
     const p1Move = getLegalMovesForSquare(currentRoom.boardState.board, 'a1')[0];
-    await makeGameMove(gameId, p1Move, 'blue');
+    await makeGameMove(gameId, p1Move, 'white');
 
     const updatedGame = localGameStore.get(gameId);
-    expect(updatedGame?.boardState.currentTurn).toBe('green');
-    // Blue's clock should be reset to 2 days (Days per move)
-    expect(updatedGame?.blueTimeMs).toBe(twoDaysMs);
-    // Green's clock should also be allocated full 2 days for their upcoming move
-    expect(updatedGame?.greenTimeMs).toBe(twoDaysMs);
+    expect(updatedGame?.boardState.currentTurn).toBe('black');
+    // White's clock should be reset to 2 days (Days per move)
+    expect(updatedGame?.whiteTimeMs).toBe(twoDaysMs);
+    // Black's clock should also be allocated full 2 days for their upcoming move
+    expect(updatedGame?.blackTimeMs).toBe(twoDaysMs);
   });
 
   it('handles resignation cleanly', async () => {
     const creator = { id: 'p1', username: 'ResigningHost', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: true,
       creator,
     });
@@ -266,7 +266,7 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + gameId);
     await joinGame(gameId, { id: 'p2', username: 'WinnerPlayer', elo: 1200 });
 
-    await resignGameAction(gameId, 'blue');
+    await resignGameAction(gameId, 'white');
 
     // New visitor without previous player token should be spectator
     localStorage.removeItem('schada_player_token_' + gameId);
@@ -278,7 +278,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p1', username: 'Host1', elo: 1300, gamesPlayed: 10 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: true,
       isRanked: true,
       creator,
@@ -292,18 +292,18 @@ describe('GameService Multiplayer Sync', () => {
       latestGame = g;
     });
 
-    // Host (blue) resigns
-    await resignGameAction(gameId, 'blue');
+    // Host (white) resigns
+    await resignGameAction(gameId, 'white');
 
     expect(latestGame).not.toBeNull();
     expect((latestGame as any).status).toBe('completed');
-    expect((latestGame as any).winner).toBe('green');
+    expect((latestGame as any).winner).toBe('black');
     expect((latestGame as any).winReason).toBe('resignation');
     expect((latestGame as any).eloResult).toBeDefined();
-    expect((latestGame as any).eloResult.blueDelta).toBeLessThan(0);
-    expect((latestGame as any).eloResult.greenDelta).toBeGreaterThan(0);
-    expect((latestGame as any).bluePlayer.elo).toBe((latestGame as any).eloResult.newBlueElo);
-    expect((latestGame as any).greenPlayer.elo).toBe((latestGame as any).eloResult.newGreenElo);
+    expect((latestGame as any).eloResult.whiteDelta).toBeLessThan(0);
+    expect((latestGame as any).eloResult.blackDelta).toBeGreaterThan(0);
+    expect((latestGame as any).whitePlayer.elo).toBe((latestGame as any).eloResult.newWhiteElo);
+    expect((latestGame as any).blackPlayer.elo).toBe((latestGame as any).eloResult.newBlackElo);
     expect((latestGame as any).processedEloUserIds).toContain('p1');
 
     // Winner marks themselves processed
@@ -317,7 +317,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
@@ -335,7 +335,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
@@ -361,7 +361,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
@@ -387,7 +387,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
     const { gameId, sessionToken } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
@@ -417,7 +417,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p1', username: 'ActiveHost', elo: 1300 };
     const { gameId: activeGameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
@@ -440,7 +440,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
@@ -466,7 +466,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p1', username: 'WaitingHost', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
@@ -510,9 +510,9 @@ describe('GameService Multiplayer Sync', () => {
   it('respects limitCount parameter on getOpenRooms', async () => {
     const creator = { id: 'p1', username: 'LimitTester', elo: 1300 };
     await Promise.all([
-      createGame({ timeControlMinutes: 5, colorPref: 'blue', isPrivate: false, creator }),
-      createGame({ timeControlMinutes: 10, colorPref: 'blue', isPrivate: false, creator }),
-      createGame({ timeControlMinutes: 3, colorPref: 'blue', isPrivate: false, creator }),
+      createGame({ timeControlMinutes: 5, colorPref: 'white', isPrivate: false, creator }),
+      createGame({ timeControlMinutes: 10, colorPref: 'white', isPrivate: false, creator }),
+      createGame({ timeControlMinutes: 3, colorPref: 'white', isPrivate: false, creator }),
     ]);
 
     const limited = await getOpenRooms(2);
@@ -526,7 +526,7 @@ describe('GameService Multiplayer Sync', () => {
     // 1. Create Game 1 (older, becomes in_progress)
     const { gameId: gameId1 } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator: creator1,
     });
@@ -537,7 +537,7 @@ describe('GameService Multiplayer Sync', () => {
     // 2. Create Game 2 (newer waiting room)
     const { gameId: gameId2 } = await createGame({
       timeControlMinutes: 10,
-      colorPref: 'green',
+      colorPref: 'black',
       isPrivate: false,
       creator: creator2,
     });
@@ -593,7 +593,9 @@ describe('GameService Multiplayer Sync', () => {
     const waitingGame = {
       status: 'waiting',
       timeControlMinutes: 5,
-      currentTurn: 'blue',
+      currentTurn: 'white',
+      whiteTimeMs: 300000,
+      blackTimeMs: 300000,
       blueTimeMs: 300000,
       greenTimeMs: 300000,
       lastTurnStartTimeMs: Date.now() - 400000,
@@ -604,7 +606,9 @@ describe('GameService Multiplayer Sync', () => {
     const untimedGame = {
       status: 'in_progress',
       timeControlMinutes: 0,
-      currentTurn: 'blue',
+      currentTurn: 'white',
+      whiteTimeMs: 0,
+      blackTimeMs: 0,
       blueTimeMs: 0,
       greenTimeMs: 0,
       lastTurnStartTimeMs: Date.now() - 400000,
@@ -615,7 +619,9 @@ describe('GameService Multiplayer Sync', () => {
     const liveGame = {
       status: 'in_progress',
       timeControlMinutes: 5,
-      currentTurn: 'blue',
+      currentTurn: 'white',
+      whiteTimeMs: 300000,
+      blackTimeMs: 300000,
       blueTimeMs: 300000,
       greenTimeMs: 300000,
       lastTurnStartTimeMs: Date.now() - 10000, // 10s elapsed out of 300s
@@ -623,32 +629,36 @@ describe('GameService Multiplayer Sync', () => {
     expect(isGameTimedOut(liveGame)).toEqual({ timedOut: false });
 
     // In-progress game where active turn time has run out
-    const expiredBlueGame = {
+    const expiredWhiteGame = {
       status: 'in_progress',
       timeControlMinutes: 2,
-      currentTurn: 'blue',
+      currentTurn: 'white',
+      whiteTimeMs: 120000,
+      blackTimeMs: 120000,
       blueTimeMs: 120000,
       greenTimeMs: 120000,
       lastTurnStartTimeMs: Date.now() - 130000, // 130s elapsed out of 120s
     } as GameRoom;
-    expect(isGameTimedOut(expiredBlueGame)).toEqual({ timedOut: true, timedOutColor: 'blue' });
+    expect(isGameTimedOut(expiredWhiteGame)).toEqual({ timedOut: true, timedOutColor: 'white' });
 
-    const expiredGreenGame = {
+    const expiredBlackGame = {
       status: 'in_progress',
       timeControlMinutes: 1,
-      currentTurn: 'green',
+      currentTurn: 'black',
+      whiteTimeMs: 60000,
+      blackTimeMs: 40000,
       blueTimeMs: 60000,
       greenTimeMs: 40000,
       lastTurnStartTimeMs: Date.now() - 50000, // 50s elapsed out of 40s
     } as GameRoom;
-    expect(isGameTimedOut(expiredGreenGame)).toEqual({ timedOut: true, timedOutColor: 'green' });
+    expect(isGameTimedOut(expiredBlackGame)).toEqual({ timedOut: true, timedOutColor: 'black' });
   });
 
   it('filters out timed-out in-progress games in sortLobbyRooms and auto-resolves in cleanup', async () => {
     const creator = { id: 'p1', username: 'Host1', elo: 1300 };
     const { gameId } = await createGame({
       timeControlMinutes: 1,
-      colorPref: 'blue',
+      colorPref: 'white',
       isPrivate: false,
       creator,
     });
@@ -682,7 +692,7 @@ describe('GameService Multiplayer Sync', () => {
     expect(nonNullGame).not.toBeNull();
     expect(nonNullGame.status).toBe('completed');
     expect(nonNullGame.winReason).toBe('timeout');
-    expect(nonNullGame.winner).toBe('green'); // blue ran out of time, green won
+    expect(nonNullGame.winner).toBe('black'); // white ran out of time, black won
   });
 
   it('validates cleanupAbandonedGames parameters strictly', async () => {
@@ -792,7 +802,7 @@ describe('GameService Multiplayer Sync', () => {
     const { gameId } = await createGame({
       timeControlMinutes: 5,
       isRanked: true,
-      colorPref: 'blue',
+      colorPref: 'white',
       creator: rankedHost,
     });
 
@@ -809,7 +819,7 @@ describe('GameService Multiplayer Sync', () => {
     // Verify room is still waiting and has no opponent
     const gameSnapshot = localGameStore.get(gameId);
     expect(gameSnapshot?.status).toBe('waiting');
-    expect(gameSnapshot?.greenPlayer).toBeNull();
+    expect(gameSnapshot?.blackPlayer).toBeNull();
 
     // 2. Anonymous guest with 'guest' ID attempts to join
     const anonJoiner = { id: 'guest', username: 'GuestAnon', elo: 1200 };
@@ -823,11 +833,11 @@ describe('GameService Multiplayer Sync', () => {
     const regJoinRes = await joinGame(gameId, regJoiner);
     expect(regJoinRes.success).toBe(true);
     expect(regJoinRes.role).toBe('player');
-    expect(regJoinRes.color).toBe('green');
+    expect(regJoinRes.color).toBe('black');
 
     const updatedGame = localGameStore.get(gameId);
     expect(updatedGame?.status).toBe('in_progress');
-    expect(updatedGame?.greenPlayer?.id).toBe('usr_legit_challenger');
+    expect(updatedGame?.blackPlayer?.id).toBe('usr_legit_challenger');
   });
 
   it('returns null in computeRankedGameEloResult if either player is a guest', async () => {
@@ -835,13 +845,13 @@ describe('GameService Multiplayer Sync', () => {
     const { gameId } = await createGame({
       timeControlMinutes: 5,
       isRanked: true,
-      colorPref: 'blue',
+      colorPref: 'white',
       creator: host,
     });
 
     const game = localGameStore.get(gameId)!;
     // Artificially inject guest as opponent to test defensive Elo barrier
-    game.greenPlayer = {
+    game.blackPlayer = {
       id: 'guest_infiltrator',
       username: 'GuestInfiltrator',
       elo: 1200,
@@ -849,7 +859,7 @@ describe('GameService Multiplayer Sync', () => {
       sessionToken: 'token_guest',
     };
 
-    const eloResult = computeRankedGameEloResult(game, 'blue');
+    const eloResult = computeRankedGameEloResult(game, 'white');
     expect(eloResult).toBeNull();
   });
 
@@ -860,18 +870,18 @@ describe('GameService Multiplayer Sync', () => {
     const { gameId, color: creatorColor } = await createGame({
       timeControlMinutes: 5,
       isRanked: true,
-      colorPref: 'blue',
+      colorPref: 'white',
       creator,
     });
-    expect(creatorColor).toBe('blue');
+    expect(creatorColor).toBe('white');
 
     localStorage.removeItem('schada_player_token_' + gameId);
     const joinRes = await joinGame(gameId, joiner);
     expect(joinRes.success).toBe(true);
-    expect(joinRes.color).toBe('green');
+    expect(joinRes.color).toBe('black');
 
-    // Boogerd1936 (blue) resigns
-    await resignGameAction(gameId, 'blue');
+    // Boogerd1936 (white) resigns
+    await resignGameAction(gameId, 'white');
 
     let gameAfterResign: any = null;
     const unsub = subscribeToGame(gameId, (g) => {
@@ -881,11 +891,11 @@ describe('GameService Multiplayer Sync', () => {
 
     expect(gameAfterResign).not.toBeNull();
     expect(gameAfterResign.status).toBe('completed');
-    expect(gameAfterResign.winner).toBe('green');
+    expect(gameAfterResign.winner).toBe('black');
     expect(gameAfterResign.winReason).toBe('resignation');
     expect(gameAfterResign.eloResult).toBeDefined();
-    expect(gameAfterResign.eloResult.blueDelta).toBeLessThan(0);
-    expect(gameAfterResign.eloResult.greenDelta).toBeGreaterThan(0);
+    expect(gameAfterResign.eloResult.whiteDelta).toBeLessThan(0);
+    expect(gameAfterResign.eloResult.blackDelta).toBeGreaterThan(0);
     expect(gameAfterResign.processedEloUserIds).toContain('p1_resign');
   });
 
@@ -896,15 +906,15 @@ describe('GameService Multiplayer Sync', () => {
     const { gameId } = await createGame({
       timeControlMinutes: 5,
       isRanked: true,
-      colorPref: 'blue',
+      colorPref: 'white',
       creator,
     });
 
     localStorage.removeItem('schada_player_token_' + gameId);
     await joinGame(gameId, joiner);
 
-    // Blue times out
-    await timeoutGameAction(gameId, 'blue');
+    // White times out
+    await timeoutGameAction(gameId, 'white');
 
     let gameAfterTimeout: any = null;
     const unsub = subscribeToGame(gameId, (g) => {
@@ -914,11 +924,11 @@ describe('GameService Multiplayer Sync', () => {
 
     expect(gameAfterTimeout).not.toBeNull();
     expect(gameAfterTimeout.status).toBe('completed');
-    expect(gameAfterTimeout.winner).toBe('green');
+    expect(gameAfterTimeout.winner).toBe('black');
     expect(gameAfterTimeout.winReason).toBe('timeout');
     expect(gameAfterTimeout.eloResult).toBeDefined();
-    expect(gameAfterTimeout.eloResult.blueDelta).toBeLessThan(0);
-    expect(gameAfterTimeout.eloResult.greenDelta).toBeGreaterThan(0);
+    expect(gameAfterTimeout.eloResult.whiteDelta).toBeLessThan(0);
+    expect(gameAfterTimeout.eloResult.blackDelta).toBeGreaterThan(0);
     expect(gameAfterTimeout.processedEloUserIds).toContain('p1_time');
   });
 
@@ -927,7 +937,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: user1.id, username: user1.username, elo: user1.perModeStats.blitz.elo, gamesPlayed: user1.perModeStats.blitz.gamesPlayed };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isRanked: true,
       creator,
     });
@@ -935,7 +945,7 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + gameId);
     await joinGame(gameId, { id: 'p_winner', username: 'Winner', elo: 1200 });
 
-    const updatedProfile = await resignGameAction(gameId, 'blue');
+    const updatedProfile = await resignGameAction(gameId, 'white');
     expect(updatedProfile).not.toBeNull();
     expect(updatedProfile?.perModeStats?.blitz.gamesPlayed).toBe(1);
     expect(updatedProfile?.perModeStats?.blitz.gamesLost).toBe(1);
@@ -946,7 +956,7 @@ describe('GameService Multiplayer Sync', () => {
     const unrankedCreator = { id: user2.id, username: user2.username, elo: user2.perModeStats.blitz.elo, gamesPlayed: user2.perModeStats.blitz.gamesPlayed };
     const { gameId: unrankedId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isRanked: false,
       creator: unrankedCreator,
     });
@@ -954,7 +964,7 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + unrankedId);
     await joinGame(unrankedId, { id: 'p_casual_winner', username: 'CasualWinner', elo: 1200 });
 
-    const unrankedUpdated = await resignGameAction(unrankedId, 'blue');
+    const unrankedUpdated = await resignGameAction(unrankedId, 'white');
     expect(unrankedUpdated).not.toBeNull();
     expect(unrankedUpdated?.perModeStats?.blitz.gamesPlayed).toBe(1);
     expect(unrankedUpdated?.perModeStats?.blitz.gamesLost).toBe(1);
@@ -966,7 +976,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: user1.id, username: user1.username, elo: user1.perModeStats.blitz.elo, gamesPlayed: user1.perModeStats.blitz.gamesPlayed };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'green',
+      colorPref: 'black',
       isRanked: true,
       creator,
     });
@@ -974,7 +984,7 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + gameId);
     await joinGame(gameId, { id: 'p_time_winner', username: 'TimeWinner', elo: 1200 });
 
-    const updatedProfile = await timeoutGameAction(gameId, 'green');
+    const updatedProfile = await timeoutGameAction(gameId, 'black');
     expect(updatedProfile).not.toBeNull();
     expect(updatedProfile?.perModeStats?.blitz.gamesPlayed).toBe(1);
     expect(updatedProfile?.perModeStats?.blitz.gamesLost).toBe(1);
@@ -985,7 +995,7 @@ describe('GameService Multiplayer Sync', () => {
     const unrankedCreator = { id: user2.id, username: user2.username, elo: user2.perModeStats.blitz.elo, gamesPlayed: user2.perModeStats.blitz.gamesPlayed };
     const { gameId: unrankedId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'green',
+      colorPref: 'black',
       isRanked: false,
       creator: unrankedCreator,
     });
@@ -993,7 +1003,7 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + unrankedId);
     await joinGame(unrankedId, { id: 'p_casual_time_win', username: 'TimeCasualWinner', elo: 1200 });
 
-    const unrankedUpdated = await timeoutGameAction(unrankedId, 'green');
+    const unrankedUpdated = await timeoutGameAction(unrankedId, 'black');
     expect(unrankedUpdated).not.toBeNull();
     expect(unrankedUpdated?.perModeStats?.blitz.gamesPlayed).toBe(1);
     expect(unrankedUpdated?.perModeStats?.blitz.gamesLost).toBe(1);
@@ -1004,7 +1014,7 @@ describe('GameService Multiplayer Sync', () => {
     const creator = { id: 'p_auth_1', username: 'PlayerOne', elo: 1400, gamesPlayed: 20 };
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isRanked: true,
       creator,
     });
@@ -1018,13 +1028,13 @@ describe('GameService Multiplayer Sync', () => {
     });
 
     expect(currentGame).not.toBeNull();
-    const eloResult = computeRankedGameEloResult(currentGame!, 'blue');
+    const eloResult = computeRankedGameEloResult(currentGame!, 'white');
     expect(eloResult).not.toBeNull();
-    expect(eloResult?.initialBlueElo).toBe(1400);
-    expect(eloResult?.initialGreenElo).toBe(1250);
-    expect(eloResult?.blueDelta).toBeGreaterThan(0);
-    expect(eloResult?.greenDelta).toBeLessThan(0);
-    expect(eloResult?.newBlueElo).toBe(1400 + eloResult!.blueDelta);
+    expect(eloResult?.initialWhiteElo).toBe(1400);
+    expect(eloResult?.initialBlackElo).toBe(1250);
+    expect(eloResult?.whiteDelta).toBeGreaterThan(0);
+    expect(eloResult?.blackDelta).toBeLessThan(0);
+    expect(eloResult?.newWhiteElo).toBe(1400 + eloResult!.whiteDelta);
     unsub();
   });
 
@@ -1034,7 +1044,7 @@ describe('GameService Multiplayer Sync', () => {
 
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isRanked: true,
       creator: { id: userA.id, username: userA.username, elo: userA.perModeStats.blitz.elo, gamesPlayed: userA.perModeStats.blitz.gamesPlayed },
     });
@@ -1042,8 +1052,8 @@ describe('GameService Multiplayer Sync', () => {
     localStorage.removeItem('schada_player_token_' + gameId);
     await joinGame(gameId, { id: userB.id, username: userB.username, elo: userB.perModeStats.blitz.elo, gamesPlayed: userB.perModeStats.blitz.gamesPlayed });
 
-    // Blue player resigns -> Green player (userB) wins
-    await resignGameAction(gameId, 'blue');
+    // White player resigns -> Black player (userB) wins
+    await resignGameAction(gameId, 'white');
 
     const updatedUserA = localBackend.getUserById(userA.id);
     const updatedUserB = localBackend.getUserById(userB.id);
@@ -1065,7 +1075,7 @@ describe('GameService Multiplayer Sync', () => {
 
     const { gameId } = await createGame({
       timeControlMinutes: 5,
-      colorPref: 'blue',
+      colorPref: 'white',
       isRanked: true,
       creator: { id: userA.id, username: userA.username, elo: userA.perModeStats.blitz.elo, gamesPlayed: userA.perModeStats.blitz.gamesPlayed },
     });
@@ -1078,7 +1088,7 @@ describe('GameService Multiplayer Sync', () => {
     expect(game).not.toBeNull();
     if (game) {
       game.status = 'completed';
-      game.winner = 'green';
+      game.winner = 'black';
       game.processedEloUserIds = [userA.id];
       localGameStore.set(game);
     }
@@ -1116,7 +1126,7 @@ describe('GameService Multiplayer Sync', () => {
       const creator = { id: 'user_gen_test', username: 'TestHost', elo: 1300 };
       const { gameId } = await createGame({
         timeControlMinutes: 5,
-        colorPref: 'blue',
+        colorPref: 'white',
         creator,
       });
 
@@ -1130,7 +1140,7 @@ describe('GameService Multiplayer Sync', () => {
       // Pre-seed a game with a specific ID
       const initialGame = await createGame({
         timeControlMinutes: 5,
-        colorPref: 'blue',
+        colorPref: 'white',
         creator,
       });
       expect(initialGame.gameId).toHaveLength(9);
@@ -1138,7 +1148,7 @@ describe('GameService Multiplayer Sync', () => {
       // Verify that createGame creates another unique game without colliding
       const secondGame = await createGame({
         timeControlMinutes: 5,
-        colorPref: 'blue',
+        colorPref: 'white',
         creator,
       });
       expect(secondGame.gameId).toHaveLength(9);
@@ -1159,7 +1169,7 @@ describe('GameService Multiplayer Sync', () => {
       await expect(
         createGame({
           timeControlMinutes: 5,
-          colorPref: 'blue',
+          colorPref: 'white',
           creator,
         })
       ).rejects.toThrow(

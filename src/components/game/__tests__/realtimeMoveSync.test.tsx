@@ -11,14 +11,14 @@ describe('Real-Time Move Sync UI & State Tracking', () => {
     {
       from: 'b2',
       to: 'b3',
-      piece: { id: 'b_p1', type: 'pawn', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+      piece: { id: 'w_p1', type: 'pawn', color: 'white', hasLeftBase: false, hasReachedGoal: false },
       intermediateSquares: [],
       notation: 'b2-b3',
     },
     {
       from: 'b7',
       to: 'b6',
-      piece: { id: 'g_p1', type: 'pawn', color: 'green', hasLeftBase: false, hasReachedGoal: false },
+      piece: { id: 'b_p1', type: 'pawn', color: 'black', hasLeftBase: false, hasReachedGoal: false },
       intermediateSquares: [],
       notation: 'b7-b6',
     },

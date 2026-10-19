@@ -224,12 +224,12 @@ export const LobbyTable: React.FC<LobbyTableProps> = ({
   const renderGameRow = (room: GameRoom) => {
     const isWaiting = room.status === 'waiting';
     const isRankedGuestDisabled = isWaiting && isGuest && room.isRanked;
-    const host = room.bluePlayer || room.greenPlayer;
+    const host = room.whitePlayer || room.blackPlayer;
     const opponent =
-      room.bluePlayer && room.greenPlayer
-        ? room.bluePlayer === host
-          ? room.greenPlayer
-          : room.bluePlayer
+      room.whitePlayer && room.blackPlayer
+        ? room.whitePlayer === host
+          ? room.blackPlayer
+          : room.whitePlayer
         : room.targetOpponent || null;
 
     const defaultHostName = MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestHostName;

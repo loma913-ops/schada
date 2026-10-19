@@ -47,12 +47,12 @@ describe('Tournament Simulation Engine', () => {
 
   it('simulates a single game between two bots, updates Elo, and generates notation', () => {
     const bots = initializeBotParticipants(1200);
-    const blueBot = bots[0]; // Novice
-    const greenBot = bots[1]; // Beginner
+    const whiteBot = bots[0]; // Novice
+    const blackBot = bots[1]; // Beginner
 
     const match = simulateSingleGame(
-      blueBot,
-      greenBot,
+      whiteBot,
+      blackBot,
       1,
       1,
       'Quarterfinals',
@@ -63,9 +63,9 @@ describe('Tournament Simulation Engine', () => {
     expect(match.tournamentId).toBe(1);
     expect(match.matchId).toBe(1);
     expect(match.movesCount).toBeGreaterThan(0);
-    expect(['blue', 'green', 'draw']).toContain(match.winnerColor);
-    expect(blueBot.gamesPlayed).toBe(1);
-    expect(greenBot.gamesPlayed).toBe(1);
+    expect(['white', 'black', 'draw']).toContain(match.winnerColor);
+    expect(whiteBot.gamesPlayed).toBe(1);
+    expect(blackBot.gamesPlayed).toBe(1);
     expect(match.notationText).toContain('[Event "Schada Championship Tournament #1"]');
     expect(match.notationText).toContain('[Round "Quarterfinals Match 1"]');
     expect(match.filename).toMatch(/^t0001_m1_quarterfinals_/);

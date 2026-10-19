@@ -94,7 +94,7 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "isRanked", "order": "ASCENDING" },
-        { "fieldPath": "bluePlayer.id", "order": "ASCENDING" },
+        { "fieldPath": "whitePlayer.id", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
@@ -104,7 +104,7 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "isRanked", "order": "ASCENDING" },
-        { "fieldPath": "greenPlayer.id", "order": "ASCENDING" },
+        { "fieldPath": "blackPlayer.id", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },

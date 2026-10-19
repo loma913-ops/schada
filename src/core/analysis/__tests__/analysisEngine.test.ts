@@ -100,15 +100,15 @@ describe('Analysis Engine', () => {
     expect(report.moves[1].quality).toBe('book');
 
     // Verify player accuracy is computed
-    expect(report.blueAccuracy).toBeGreaterThanOrEqual(0);
-    expect(report.blueAccuracy).toBeLessThanOrEqual(100);
-    expect(report.greenAccuracy).toBeGreaterThanOrEqual(0);
-    expect(report.greenAccuracy).toBeLessThanOrEqual(100);
+    expect(report.whiteAccuracy).toBeGreaterThanOrEqual(0);
+    expect(report.whiteAccuracy).toBeLessThanOrEqual(100);
+    expect(report.blackAccuracy).toBeGreaterThanOrEqual(0);
+    expect(report.blackAccuracy).toBeLessThanOrEqual(100);
 
-    // Verify next best move prediction for Move 20 Green's turn
+    // Verify next best move prediction for Move 20 Black's turn
     expect(report.isComplete).toBe(false);
     expect(report.nextMove).toBeDefined();
-    expect(report.nextMove?.turn).toBe('green');
+    expect(report.nextMove?.turn).toBe('black');
     expect(report.nextMove?.bestMove).toBeDefined();
     expect(report.nextMove?.notation).toBeDefined();
     expect(report.nextMove?.candidateMoves.length).toBeGreaterThan(0);
@@ -122,10 +122,10 @@ describe('Analysis Engine', () => {
     });
 
     expect(report.totalPlies).toBe(6);
-    expect(Number.isFinite(report.blueAccuracy)).toBe(true);
-    expect(Number.isFinite(report.greenAccuracy)).toBe(true);
-    expect(report.blueAccuracy).not.toBeNaN();
-    expect(report.greenAccuracy).not.toBeNaN();
+    expect(Number.isFinite(report.whiteAccuracy)).toBe(true);
+    expect(Number.isFinite(report.blackAccuracy)).toBe(true);
+    expect(report.whiteAccuracy).not.toBeNaN();
+    expect(report.blackAccuracy).not.toBeNaN();
 
     for (const move of report.moves) {
       expect(Number.isFinite(move.evalBefore)).toBe(true);

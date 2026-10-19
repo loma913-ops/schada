@@ -164,15 +164,19 @@ export class AnalysisWorkerClient {
       if (ply >= moves.length) {
         this.activeId = null;
         this.activeCallbacks = null;
-        const blueStats = calculatePlayerAccuracy(evaluatedMoves, 'blue', CANONICAL_ANALYSIS_CONFIG);
-        const greenStats = calculatePlayerAccuracy(evaluatedMoves, 'green', CANONICAL_ANALYSIS_CONFIG);
+        const whiteStats = calculatePlayerAccuracy(evaluatedMoves, 'white', CANONICAL_ANALYSIS_CONFIG);
+        const blackStats = calculatePlayerAccuracy(evaluatedMoves, 'black', CANONICAL_ANALYSIS_CONFIG);
         const report: GameAnalysisReport = {
           metadata: {},
           moves: evaluatedMoves,
-          blueAccuracy: blueStats.accuracy,
-          greenAccuracy: greenStats.accuracy,
-          blueBreakdown: blueStats.breakdown,
-          greenBreakdown: greenStats.breakdown,
+          whiteAccuracy: whiteStats.accuracy,
+          blackAccuracy: blackStats.accuracy,
+          whiteBreakdown: whiteStats.breakdown,
+          blackBreakdown: blackStats.breakdown,
+          blueAccuracy: whiteStats.accuracy,
+          greenAccuracy: blackStats.accuracy,
+          blueBreakdown: whiteStats.breakdown,
+          greenBreakdown: blackStats.breakdown,
           isComplete: currentState.isGameOver,
           totalPlies: evaluatedMoves.length,
           analyzedAt: new Date().toISOString(),

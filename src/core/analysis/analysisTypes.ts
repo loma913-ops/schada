@@ -50,10 +50,18 @@ export interface PlayerQualityBreakdown {
 export interface GameAnalysisReport {
   readonly metadata: Readonly<Record<string, string>>;
   readonly moves: readonly EvaluatedMove[];
-  readonly blueAccuracy: number;
-  readonly greenAccuracy: number;
-  readonly blueBreakdown: Readonly<Record<MoveQuality, number>>;
-  readonly greenBreakdown: Readonly<Record<MoveQuality, number>>;
+  readonly whiteAccuracy: number;
+  readonly blackAccuracy: number;
+  readonly whiteBreakdown: Readonly<Record<MoveQuality, number>>;
+  readonly blackBreakdown: Readonly<Record<MoveQuality, number>>;
+  /** @deprecated Backwards compatibility alias for whiteAccuracy */
+  readonly blueAccuracy?: number;
+  /** @deprecated Backwards compatibility alias for blackAccuracy */
+  readonly greenAccuracy?: number;
+  /** @deprecated Backwards compatibility alias for whiteBreakdown */
+  readonly blueBreakdown?: Readonly<Record<MoveQuality, number>>;
+  /** @deprecated Backwards compatibility alias for blackBreakdown */
+  readonly greenBreakdown?: Readonly<Record<MoveQuality, number>>;
   readonly nextMove?: NextMovePrediction;
   readonly isComplete: boolean;
   readonly totalPlies: number;

@@ -7,11 +7,23 @@ export interface GamePlayer extends ArenaPlayer {
 }
 
 export interface GameEloResult {
-  blueDelta: number;
-  greenDelta: number;
-  newBlueElo: number;
-  newGreenElo: number;
+  whiteDelta: number;
+  blackDelta: number;
+  newWhiteElo: number;
+  newBlackElo: number;
+  initialWhiteElo?: number;
+  initialBlackElo?: number;
+  /** @deprecated Backwards compatibility alias for whiteDelta */
+  blueDelta?: number;
+  /** @deprecated Backwards compatibility alias for blackDelta */
+  greenDelta?: number;
+  /** @deprecated Backwards compatibility alias for newWhiteElo */
+  newBlueElo?: number;
+  /** @deprecated Backwards compatibility alias for newBlackElo */
+  newGreenElo?: number;
+  /** @deprecated Backwards compatibility alias for initialWhiteElo */
   initialBlueElo?: number;
+  /** @deprecated Backwards compatibility alias for initialBlackElo */
   initialGreenElo?: number;
 }
 
@@ -24,21 +36,33 @@ export interface GameRoom {
   incrementSeconds: number;
   isRanked: boolean;
   creatorColorPref: PieceColor | 'random';
-  bluePlayer: GamePlayer | null;
-  greenPlayer: GamePlayer | null;
+  whitePlayer: GamePlayer | null;
+  blackPlayer: GamePlayer | null;
+  /** @deprecated Backwards compatibility alias for whitePlayer */
+  bluePlayer?: GamePlayer | null;
+  /** @deprecated Backwards compatibility alias for blackPlayer */
+  greenPlayer?: GamePlayer | null;
   boardState: BoardState;
   currentTurn: PieceColor;
-  blueTimeMs: number;
-  greenTimeMs: number;
+  whiteTimeMs: number;
+  blackTimeMs: number;
   lastTurnStartTimeMs: number | null;
   winner?: PieceColor | 'draw' | null;
   winReason?: string | null;
   eloResult?: GameEloResult | null;
   processedEloUserIds?: string[];
   abandonedAt?: number;
-  blueDisconnectedAt?: number | null;
-  greenDisconnectedAt?: number | null;
+  whiteDisconnectedAt?: number | null;
+  blackDisconnectedAt?: number | null;
   targetOpponent?: ArenaPlayer | null;
+  /** @deprecated Backwards compatibility alias for whiteTimeMs */
+  blueTimeMs?: number;
+  /** @deprecated Backwards compatibility alias for blackTimeMs */
+  greenTimeMs?: number;
+  /** @deprecated Backwards compatibility alias for whiteDisconnectedAt */
+  blueDisconnectedAt?: number | null;
+  /** @deprecated Backwards compatibility alias for blackDisconnectedAt */
+  greenDisconnectedAt?: number | null;
 }
 
 export interface GameTimeoutResult {

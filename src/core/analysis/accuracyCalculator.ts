@@ -163,7 +163,7 @@ export function calculatePlayerAccuracy(
     breakdown[m.quality]++;
   }
 
-  // 1. Build all-ply Win% timeline (from Blue POV), starting with initial board (0 cp)
+  // 1. Build all-ply Win% timeline (from White POV), starting with initial board (0 cp)
   const allWinPercents: number[] = [evaluationToWinPercent(0, config)];
   for (let i = 0; i < evaluatedMoves.length; i++) {
     allWinPercents.push(evaluationToWinPercent(evaluatedMoves[i].evalAfter, config));
@@ -195,9 +195,9 @@ export function calculatePlayerAccuracy(
       acc = config.accuracy.perfectAccuracy;
     } else {
       // Perspective-corrected scores:
-      // In evaluatedMoves, evalBefore and evalAfter are normalized to Blue POV.
+      // In evaluatedMoves, evalBefore and evalAfter are normalized to White POV.
       // Active player's POV before the move:
-      const beforeCp = color === 'blue' ? m.evalBefore : -m.evalBefore;
+      const beforeCp = color === 'white' || (color as string) === 'blue' ? m.evalBefore : -m.evalBefore;
       // Active player's POV after playing the move:
       const afterCp = beforeCp - m.evalDelta;
       acc = calculateMoveAccuracy(beforeCp, afterCp, config);
@@ -278,13 +278,18 @@ export function createEmptyAnalysisReport(
   config: AnalysisConfig = CANONICAL_ANALYSIS_CONFIG
 ): GameAnalysisReport {
   validateAnalysisConfig(config);
+  const emptyBreakdown = createEmptyQualityBreakdown();
   return {
     metadata: {},
     moves: [],
+    whiteAccuracy: config.accuracy.perfectAccuracy,
+    blackAccuracy: config.accuracy.perfectAccuracy,
+    whiteBreakdown: emptyBreakdown,
+    blackBreakdown: emptyBreakdown,
     blueAccuracy: config.accuracy.perfectAccuracy,
     greenAccuracy: config.accuracy.perfectAccuracy,
-    blueBreakdown: createEmptyQualityBreakdown(),
-    greenBreakdown: createEmptyQualityBreakdown(),
+    blueBreakdown: emptyBreakdown,
+    greenBreakdown: emptyBreakdown,
     isComplete,
     totalPlies: 0,
     analyzedAt: new Date().toISOString(),

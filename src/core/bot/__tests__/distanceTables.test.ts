@@ -15,30 +15,30 @@ describe('Distance Tables & Graph Topology', () => {
   });
 
   it('guarantees distance to goal row is 0 for goal squares', () => {
-    // Blue goal is row 7 (a8..h8, indices 56..63)
+    // White goal is row 7 (a8..h8, indices 56..63)
     for (let idx = 56; idx <= 63; idx++) {
-      expect(DISTANCE_TABLES.blueSliding[idx]).toBe(0);
-      expect(DISTANCE_TABLES.blueLeaping[idx]).toBe(0);
+      expect(DISTANCE_TABLES.whiteSliding[idx]).toBe(0);
+      expect(DISTANCE_TABLES.whiteLeaping[idx]).toBe(0);
     }
 
-    // Green goal is row 0 (a1..h1, indices 0..7)
+    // Black goal is row 0 (a1..h1, indices 0..7)
     for (let idx = 0; idx <= 7; idx++) {
-      expect(DISTANCE_TABLES.greenSliding[idx]).toBe(0);
-      expect(DISTANCE_TABLES.greenLeaping[idx]).toBe(0);
+      expect(DISTANCE_TABLES.blackSliding[idx]).toBe(0);
+      expect(DISTANCE_TABLES.blackLeaping[idx]).toBe(0);
     }
   });
 
   it('computes positive, finite distances for standard starting squares', () => {
-    // Blue army starting rank (rank 1 and 2, rows 0 and 1)
+    // White army starting rank (rank 1 and 2, rows 0 and 1)
     for (let idx = 0; idx < 16; idx++) {
-      expect(DISTANCE_TABLES.blueSliding[idx]).toBeGreaterThan(0);
-      expect(DISTANCE_TABLES.blueSliding[idx]).toBeLessThan(99);
+      expect(DISTANCE_TABLES.whiteSliding[idx]).toBeGreaterThan(0);
+      expect(DISTANCE_TABLES.whiteSliding[idx]).toBeLessThan(99);
     }
 
-    // Green army starting rank (rank 7 and 8, rows 6 and 7)
+    // Black army starting rank (rank 7 and 8, rows 6 and 7)
     for (let idx = 48; idx < 64; idx++) {
-      expect(DISTANCE_TABLES.greenSliding[idx]).toBeGreaterThan(0);
-      expect(DISTANCE_TABLES.greenSliding[idx]).toBeLessThan(99);
+      expect(DISTANCE_TABLES.blackSliding[idx]).toBeGreaterThan(0);
+      expect(DISTANCE_TABLES.blackSliding[idx]).toBeLessThan(99);
     }
   });
 

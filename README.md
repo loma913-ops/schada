@@ -32,9 +32,12 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
   - **Field Officer (4 per side)**: High piece (hexagonal crest with star). Can leap over intermediate friendly pieces along straight movement vectors. Worth **2 points** in the goal line.
   - **Officer (4 per side)**: High piece (hexagonal crest with diamond). Standard slider. Cannot leap. Worth **1 point** in the goal line.
   - **Pawn (8 per side)**: Support blocker (circular shield). Can capture and move according to square vectors, but cannot score goal points.
+- **Piece Colors & Styling**:
+  - **White (Ivory `#F1EFE7`)**: Charcoal (`#18181B`) center emblem and high-contrast interior accents.
+  - **Black (Charcoal `#18181B`)**: Ivory (`#F1EFE7`) center emblem and lightened interior accents with matched stroke geometry (`3px`).
 - **Base Line & Goal Line Restrictions**:
   - High pieces can shuffle along their base line, but once they leave it, they **cannot return**.
-  - Once high pieces reach their goal line (Rank 8 for Blue, Rank 1 for Green), they **cannot leave**, and are **immune to enemy capture** (marked with a gold shield badge).
+  - Once high pieces reach their goal line (Rank 8 for White, Rank 1 for Black), they **cannot leave**, and are **immune to enemy capture** (marked with a gold shield badge).
 - **Victory & Scoring**:
   - The game concludes when all surviving high pieces of a player reach their goal line, upon opponent piece elimination or immobilization (no legal moves), 3-fold repetition, 6-ply mutual high-piece base/goal shuffling, or when high pieces outside the goal are blocked by enemy pieces.
   - Scoring is determined by goal line points ($\text{Field Officer} = 2, \text{Officer} = 1$).
@@ -72,6 +75,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Interactive Game Analysis Engine**: Post-game Move Quality Distribution table (10 tiers with graphical symbol badges) and player accuracy metrics in the Game Over modal alongside on-demand Web Worker notation review.
 - **9-Digit Alphanumeric Game URLs & Collision Protection**: Canonical Base62 (case-sensitive) 9-character game identifiers with CSPRNG generation, transactional collision prevention, and strict format validation.
 - **Native Mobile Applications**: Android and iOS app editions powered by Capacitor 8 with native hardware haptics, edge-to-edge safe area layout, and adaptive splash screens.
+- **Ivory & Charcoal Visual Theme**: Canonical White (Ivory `#F1EFE7`) and Black (Charcoal `#18181B`) piece styling with balanced contrast and matched vector stroke geometry.
 
 ---
 
@@ -99,7 +103,7 @@ The Schada AI engine (`src/core/bot`) is implemented from scratch in TypeScript 
 - **Zobrist Transposition Table**: 262,144-entry (2¹⁸) hash table storing exact scores, upper bounds, and lower bounds with depth-preferred replacement.
 - **Move Ordering**: Prioritizes PV moves > MVV-LVA Captures > Goal Entry > Killer Moves > History Heuristic > Shortest-Path Distance Gains.
 - **Quiescence Search**: Resolves volatile capture chains and goal-line entries beyond the horizon to prevent tactical blunders.
-- **Opening Book**: Universal engine-calibrated database of 294 positions covering all 14 legal Blue opening moves (e.g., *Flank Flow*, *Center Flow*, *Pawn Strikes*, *Wing Outposts*) with tactical vector safety and Boltzmann-distributed selection weights.
+- **Opening Book**: Universal engine-calibrated database of 294 positions covering all 14 legal White opening moves (e.g., *Flank Flow*, *Center Flow*, *Pawn Strikes*, *Wing Outposts*) with tactical vector safety and Boltzmann-distributed selection weights.
 - **Distance Tables**: Precomputed breadth-first search (BFS) shortest-path tables (`DISTANCE_TABLES`) quantifying exact minimum moves to the goal rank for every square.
 
 ### Standalone Championship Simulator (CLI)
@@ -110,7 +114,7 @@ Schada includes a standalone, command-line championship simulator (`scripts/simu
 
 #### How It Works
 - **Championship Bracket**: Each tournament seeds all 8 bots in a single-elimination knockout bracket (4 Quarterfinals → 2 Semifinals → 1 Championship Final = 7 matches per tournament).
-- **Random Seeding & Colors**: Shuffles seeds every tournament to ensure a diverse spread of matchups across all tiers, and assigns Blue/Green colors randomly (50/50) per match to eliminate first-move bias.
+- **Random Seeding & Colors**: Shuffles seeds every tournament to ensure a diverse spread of matchups across all tiers, and assigns White/Black colors randomly (50/50) per match to eliminate first-move bias.
 - **Draw Resolution**: In the rare event of a true draw (equal goal scores, surviving pieces, and rank distances), an immediate rematch is played with swapped colors until a decisive winner advances.
 - **Elo Rating Calibration**: All 8 bots start at **1200 Elo**. Ratings update immediately after every match using the canonical `eloService` ($K=40$ for the first 15 games, $K=20$ thereafter). Ratings persist across all tournaments within a run and cleanly reset to 1200 whenever a new simulation is launched.
 
@@ -148,7 +152,7 @@ Upon completion (or during live execution), the simulator writes the following f
 
 - **`<output-dir>/games/`**: Individual `.txt` notation files for every match played (`t0001_m1_quarterfinals_novice_vs_casual.txt`), formatted with event metadata, player Elo deltas, final scores, and numbered turn notation.
 - **`<output-dir>/tournaments/`**: Individual `.json` result files for each tournament (`tournament_0001.json`), containing bracket progression, match pairings, winners, and a concluding `finalRankings` array sorted #1 (Champion) down to #8 (Quarterfinalist) with bot names, final Elo, match wins, and match losses.
-- **`<output-dir>/bot_summary.json`**: Machine-readable JSON summary containing overall championship rankings across all tournaments, final Elo standings, peak/lowest ratings, win/loss records, Blue vs. Green win splits, victory condition distributions, and full 8×8 head-to-head match matrices.
+- **`<output-dir>/bot_summary.json`**: Machine-readable JSON summary containing overall championship rankings across all tournaments, final Elo standings, peak/lowest ratings, win/loss records, White vs. Black win splits, victory condition distributions, and full 8×8 head-to-head match matrices.
 - **`<output-dir>/bot_summary.md`**: Publication-ready Markdown report featuring:
   - Final tournament championship standings across all tournament games (ranked #1 to #8 by championships won, match win rate, and final Elo).
   - Elo ratings leaderboard with gains/losses, peak ratings, and side splits.
@@ -175,7 +179,7 @@ Schada includes a non-destructive move navigation engine (`src/core/schada/repla
 - **Non-Destructive Inspection**: Navigating historical plies allows full inspection of captured pieces, board coordinates, and move annotations. Once a player is ready to make a move, navigating back to live mode immediately re-enables interactive piece movement.
 - **Real-Time Live Auto-Advance & Unread Move Notifications**: When an opponent makes a move, the board automatically updates and steps forward in real time if the player is following live moves. If the player is inspecting historical plies, their viewed position is preserved without interruption while move audio plays, the notation list and turn indicator update, and a pulsating unread dot appears on the 'Live' (`>>|`) button, automatically clearing once the player returns to the live position.
 - **Sticky Controls (Desktop & Mobile)**: Navigation controls and match status remain pinned and sticky at the top across desktop panels and mobile notation sheets, ensuring controls never scroll out of sight during move review.
-- **Post-Game Game Review & Real-Time Analysis**: Following match completion, the Game Over modal immediately presents the match outcome, win reason, scoring breakdown, Move Quality Distribution table (all 10 tiers with graphical vector symbols), and player accuracy percentages (Blue & Green) calculated via background analysis. The modal can be closed via the 'Review' action, 'X' button, backdrop click, or `Escape` key, permitting full board inspection, move navigation, and board flipping. In Review mode, an 'Analyze' action button is displayed in the Moves Notation header bar across desktop and mobile, opening an Analysis Settings modal with configurable Depth (1–20 plies) and Time Limit (1.0–15.0s per move) sliders alongside real-time estimated completion time. Triggering analysis launches a dedicated background Web Worker that evaluates moves off the main thread at 60 FPS, streaming graphical vector move quality symbols (Brilliant, Great Move, Inaccuracy, Mistake, Miss, Blunder) in real time directly to the right of each move notation with native tooltips and live ply progress feedback. Players can reopen match results at any time via the 'Results' button or exit to the lobby via 'Lobby'.
+- **Post-Game Game Review & Real-Time Analysis**: Following match completion, the Game Over modal immediately presents the match outcome, win reason, scoring breakdown, Move Quality Distribution table (all 10 tiers with graphical vector symbols), and player accuracy percentages (White & Black) calculated via background analysis. The modal can be closed via the 'Review' action, 'X' button, backdrop click, or `Escape` key, permitting full board inspection, move navigation, and board flipping. In Review mode, an 'Analyze' action button is displayed in the Moves Notation header bar across desktop and mobile, opening an Analysis Settings modal with configurable Depth (1–20 plies) and Time Limit (1.0–15.0s per move) sliders alongside real-time estimated completion time. Triggering analysis launches a dedicated background Web Worker that evaluates moves off the main thread at 60 FPS, streaming graphical vector move quality symbols (Brilliant, Great Move, Inaccuracy, Mistake, Miss, Blunder) in real time directly to the right of each move notation with native tooltips and live ply progress feedback. Players can reopen match results at any time via the 'Results' button or exit to the lobby via 'Lobby'.
 
 ---
 
