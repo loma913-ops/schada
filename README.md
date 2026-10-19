@@ -26,7 +26,7 @@ Schada combines a fast, minimalist, Lichess-inspired user experience with a math
 
 In Schada, **the board squares dictate piece movement**, rather than the pieces themselves:
 
-- **8x8 Board**: Each square features directional lines and dots denoting allowable movement vectors.
+- **8x8 Board & Square Styling**: 64-square grid with alternating darkened light squares (`#D3B18C`, the exact halfway midpoint between the original light `#F0D9B5` and dark `#B58863` squares) and dark squares (`#B58863`). Each square features directional lines and dots denoting allowable movement vectors.
 - **180° Rotational Symmetry**: The top half (ranks 5–8) is an exact 180° rotation of the bottom half (ranks 1–4).
 - **Three Piece Types**:
   - **Field Officer (4 per side)**: High piece (hexagonal crest with star). Can leap over intermediate friendly pieces along straight movement vectors. Worth **2 points** in the goal line.
@@ -75,7 +75,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Interactive Game Analysis Engine**: Post-game Move Quality Distribution table (10 tiers with graphical symbol badges) and player accuracy metrics in the Game Over modal alongside on-demand Web Worker notation review.
 - **9-Digit Alphanumeric Game URLs & Collision Protection**: Canonical Base62 (case-sensitive) 9-character game identifiers with CSPRNG generation, transactional collision prevention, and strict format validation.
 - **Native Mobile Applications**: Android and iOS app editions powered by Capacitor 8 with native hardware haptics, edge-to-edge safe area layout, and adaptive splash screens.
-- **Ivory & Charcoal Visual Theme**: Canonical White (Ivory `#F1EFE7`) and Black (Charcoal `#18181B`) piece styling with balanced contrast and matched vector stroke geometry.
+- **Ivory & Charcoal Visual Theme**: Canonical White (Ivory `#F1EFE7`) and Black (Charcoal `#18181B`) piece styling with balanced contrast, darkened light squares (`#D3B18C`), and matched vector stroke geometry.
 
 ---
 

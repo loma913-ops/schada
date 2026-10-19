@@ -202,4 +202,60 @@ describe('BoardSquare piece under attack badge', () => {
     expect(attackBadgeIndex).toBeGreaterThan(-1);
     expect(captureRingIndex).toBeLessThan(attackBadgeIndex);
   });
+
+  it('renders board-square with light class when (col + row) is odd (e.g. a2, b1)', () => {
+    const htmlA2 = renderToString(
+      <BoardSquare
+        square="a2"
+        piece={null}
+        isSelected={false}
+        isLastMove={false}
+        legalMoveTarget={undefined}
+        onClick={() => { }}
+        isUnderAttack={false}
+      />
+    );
+    expect(htmlA2).toContain('board-square light');
+
+    const htmlB1 = renderToString(
+      <BoardSquare
+        square="b1"
+        piece={null}
+        isSelected={false}
+        isLastMove={false}
+        legalMoveTarget={undefined}
+        onClick={() => { }}
+        isUnderAttack={false}
+      />
+    );
+    expect(htmlB1).toContain('board-square light');
+  });
+
+  it('renders board-square with dark class when (col + row) is even (e.g. a1, b2)', () => {
+    const htmlA1 = renderToString(
+      <BoardSquare
+        square="a1"
+        piece={null}
+        isSelected={false}
+        isLastMove={false}
+        legalMoveTarget={undefined}
+        onClick={() => { }}
+        isUnderAttack={false}
+      />
+    );
+    expect(htmlA1).toContain('board-square dark');
+
+    const htmlB2 = renderToString(
+      <BoardSquare
+        square="b2"
+        piece={null}
+        isSelected={false}
+        isLastMove={false}
+        legalMoveTarget={undefined}
+        onClick={() => { }}
+        isUnderAttack={false}
+      />
+    );
+    expect(htmlB2).toContain('board-square dark');
+  });
 });

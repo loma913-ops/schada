@@ -310,6 +310,11 @@
   position: relative;
   background: var(--board-light);
   margin-bottom: 0.75rem;
+  color-scheme: only light;
+}
+
+.square-zoom-box.light {
+  background: var(--board-light);
 }
 
 .square-zoom-box.dark {
@@ -343,6 +348,7 @@
   border: 3px solid var(--board-border);
   border-radius: var(--radius-sm);
   background: var(--board-border);
+  color-scheme: only light;
 }
 
 .rules-picker-cell {

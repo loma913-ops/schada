@@ -39,11 +39,11 @@
   --accent-amber: #b45309;
 
   /* Board Theme */
-  --board-light: #f0d9b5;
+  --board-light: #d3b18c;
   --board-dark: #b58863;
   --board-border: #2c241c;
   --board-coord-light: #b58863;
-  --board-coord-dark: #f0d9b5;
+  --board-coord-dark: #d3b18c;
 
   --sq-selected: rgba(100, 140, 50, 0.65);
   --sq-last-move: var(--accent-green);
