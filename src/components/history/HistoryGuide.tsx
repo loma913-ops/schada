@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   History,
   BookOpen,
@@ -14,65 +14,6 @@ import {
   Layers,
 } from 'lucide-react';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
-
-interface TimelineEvent {
-  year: string;
-  title: string;
-  badge: string;
-  description: string;
-}
-
-const TIMELINE_EVENTS: readonly TimelineEvent[] = Object.freeze([
-  {
-    year: '1936',
-    title: 'The Origin & The Jansen Patent',
-    badge: 'Invention',
-    description:
-      'On April 16, 1936, Theodoor Nicol Maria Jansen of Schiedam files Dutch Patent Request #77428 (Octrooi No. 42.613) for an 8×8 board marked with movement circles and lines. Jan Boogerd is commissioned to invent the actual rules, piece mechanics, and scoring to turn the board into a playable mind sport. An early prototype is named "Janbo" (after Boogerd) and briefly manufactured as "Schaakdam" by Schilte & Zonen of Ysselstein.',
-  },
-  {
-    year: '1937-1938',
-    title: 'Firma Groenteman, Perry & Co., and "Het Wereld Spel"',
-    badge: 'Publication',
-    description:
-      'Firma Groenteman & Co. of Amsterdam acquires patent rights and promotes Schada. Company owner Mr. Groenteman - also chairman of the Amsterdam Checkers Society - demonstrates the game publicly on December 13, 1937. In 1938, luxury distributor Perry & Co. markets Schada in three wooden editions (30cm, 35cm, 41½cm) as "Het Wereld Spel" (The World Game).',
-  },
-  {
-    year: '1938-1939',
-    title: 'Rotterdam Championship & The 1939 Rulebook',
-    badge: 'Tournaments',
-    description:
-      'Schada is played competitively in the Rotterdam Individual Championships (Persoonlijk Kampioenschap) in 1938 and 1939. Jan Boogerd publishes his official "Handleiding voor het Denkspel Schada" in Rotterdam, declaring it "De grootste denkmeter ter wereld" (The greatest measure of thought in the world). An original copy is preserved in the Koninklijke Bibliotheek in The Hague.',
-  },
-  {
-    year: '1940-1945',
-    title: 'Wartime Occupation & The Multicolor Edition',
-    badge: 'WWII Survival',
-    description:
-      'Following the May 1940 bombing of Rotterdam and Nazi occupation of the Netherlands, Firma Groenteman ceases operations. A simplified cardboard wartime edition is produced by Multicolor of Deventer bearing German occupation control mark "K744" (Rijksbureau). Boogerd invents the "Sparo-Leg-Enverduisteringspuzzle" (blackout puzzle) during the occupation curfews.',
-  },
-  {
-    year: '1974',
-    title: 'The 77-Year-Old Inventor in De Tijd',
-    badge: 'Rediscovery',
-    description:
-      'National newspapers De Tijd (June 24, 1974) and Nieuwsblad van het Noorden publish feature interviews with Jan Boogerd, now 77 and living at Kerstroosstraat 6, Rotterdam. Photographed behind his original Schada board, Boogerd shares his ongoing inventions including "Vliegende Vogel" and notes that a publisher has acquired Schada for a prospective re-release.',
-  },
-  {
-    year: '1980s-2016',
-    title: "Fred Horn's Archival Investigation",
-    badge: 'Historical Research',
-    description:
-      "Games historian Fred Horn embarks on a 35-year search to document Boogerd and Schada. After privacy law barriers in the 1980s, a 2015 online genealogical breakthrough uncovers Boogerd's full biography. Horn presents his findings at the Board Game Studies Colloquium XIX in Nürnberg (April 2016), published in the AGPC Quarterly.",
-  },
-  {
-    year: 'Present',
-    title: 'Modern Digital Re-Evaluation',
-    badge: 'Living Legacy',
-    description:
-      "Kerry Handscomb publishes an in-depth translation and rule commentary in The New Abstract Games (AbstractGames.org). Today, Schada is brought to life online as a digital competitive platform honoring Boogerd's original 1936 vision.",
-  },
-]);
 
 interface OtherInvention {
   name: string;
@@ -120,7 +61,6 @@ const BOOGERD_INVENTIONS: readonly OtherInvention[] = Object.freeze([
 ]);
 
 export const HistoryGuide: React.FC = () => {
-  const [selectedTimelineEvent, setSelectedTimelineEvent] = useState<number>(0);
   const { gameMetadata } = SCHADA_RULES_CONFIG;
 
   return (
@@ -211,9 +151,8 @@ export const HistoryGuide: React.FC = () => {
         <div className="rules-card-header">
           <h2 className="rules-card-title">
             <Sparkles size={22} color="var(--accent-gold)" />
-            1. The Spark: Patent No. 42.613 & The Inventor
+            1. The Spark: Patent No. 42.613 & The Inventor (1936-1937)
           </h2>
-          <span className="rules-card-badge">1936–1937</span>
         </div>
 
         <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1rem' }}>
@@ -248,7 +187,6 @@ export const HistoryGuide: React.FC = () => {
             <Compass size={22} color="var(--accent-blue)" />
             2. The Evolution of the Name: From "Janbo" to "Schada"
           </h2>
-          <span className="rules-card-badge">Eponymous Roots</span>
         </div>
 
         <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1rem' }}>
@@ -290,9 +228,8 @@ export const HistoryGuide: React.FC = () => {
         <div className="rules-card-header">
           <h2 className="rules-card-title">
             <Award size={22} color="var(--accent-gold)" />
-            3. The Pre-War Zenith: Patents and Rotterdam Championships
+            3. The Pre-War Zenith: Patents and Rotterdam Championships (1937-1939)
           </h2>
-          <span className="rules-card-badge">1937–1939</span>
         </div>
 
         <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1rem' }}>
@@ -318,14 +255,6 @@ export const HistoryGuide: React.FC = () => {
             Perry & Co. offered the game in three distinct handcrafted wooden formats: 30 cm, 35 cm, and 41½ cm with round drilled peg holes, priced between 3.85 and 6.60 Dutch guilders.
           </p>
         </div>
-
-        {/* Royal Library Quote */}
-        <blockquote className="rules-quote">
-          "When looking at the Schada game board you will definitely wonder what these dots on the 64 spaces are for. But these dots, respected reader, represent something new in the sport of thinking... The aim of my invention was to make the value and the movement of the game-pieces dependent on the spaces, in contrast with existing board games. Thereby, a real way to measure thinking evolved, according to the powers of the players to win points in the games that they play... I advise anyone who starts to play the game Schada not to look at it as easy, because that would lead to disappointment when playing against a more serious player. After a short while, it was clear to me that the problems to solve and the possibilities of play have no limit."
-          <span className="rules-quote-author">
-            - Jan Boogerd, <em>Handleiding voor Schada</em> (Rotterdam, 1939 - Koninklijke Bibliotheek Den Haag)
-          </span>
-        </blockquote>
       </div>
 
       {/* Chapter 4: WWII Occupation & Cardboard Wartime Sets */}
@@ -333,9 +262,8 @@ export const HistoryGuide: React.FC = () => {
         <div className="rules-card-header">
           <h2 className="rules-card-title">
             <Shield size={22} color="var(--accent-red)" />
-            4. World War II: The Bombing of Rotterdam & Wartime Manufacture
+            4. World War II: The Bombing of Rotterdam (1940-1945)
           </h2>
-          <span className="rules-card-badge">1940–1945</span>
         </div>
 
         <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1rem' }}>
@@ -376,7 +304,6 @@ export const HistoryGuide: React.FC = () => {
             <Layers size={22} color="var(--accent-blue)" />
             5. The Inventor's Universe: Boogerd's Other Creations
           </h2>
-          <span className="rules-card-badge">Portfolio</span>
         </div>
 
         <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
@@ -400,57 +327,13 @@ export const HistoryGuide: React.FC = () => {
         </div>
       </div>
 
-      {/* Interactive Timeline */}
-      <div className="rules-card">
-        <div className="rules-card-header">
-          <h2 className="rules-card-title">
-            <Calendar size={22} color="var(--accent-green)" />
-            6. Interactive Chronology: 90 Years of Schada
-          </h2>
-          <span className="rules-card-badge">Timeline</span>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-          {TIMELINE_EVENTS.map((event, idx) => {
-            const isSelected = selectedTimelineEvent === idx;
-            return (
-              <button
-                key={event.year}
-                type="button"
-                className={`rules-tab-btn ${isSelected ? 'active' : ''}`}
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.82rem' }}
-                onClick={() => setSelectedTimelineEvent(idx)}
-              >
-                {event.year}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selected Event Display */}
-        <div style={{ background: 'var(--bg-tertiary)', padding: '1.25rem', borderRadius: 'var(--radius-sm)', borderLeft: '4px solid var(--accent-blue)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              {TIMELINE_EVENTS[selectedTimelineEvent].year}: {TIMELINE_EVENTS[selectedTimelineEvent].title}
-            </div>
-            <span className="rules-chip highlight" style={{ fontSize: '0.75rem' }}>
-              {TIMELINE_EVENTS[selectedTimelineEvent].badge}
-            </span>
-          </div>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            {TIMELINE_EVENTS[selectedTimelineEvent].description}
-          </p>
-        </div>
-      </div>
-
-      {/* Chapter 7: The Long Rediscovery & Modern Era */}
+      {/* Chapter 6: The Long Rediscovery & Modern Era */}
       <div className="rules-card">
         <div className="rules-card-header">
           <h2 className="rules-card-title">
             <Search size={22} color="var(--accent-gold)" />
-            7. The Long Rediscovery: Fred Horn & Kerry Handscomb
+            6. The Long Rediscovery: Fred Horn & Kerry Handscomb (1980s-Present)
           </h2>
-          <span className="rules-card-badge">1980s–Present</span>
         </div>
 
         <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1rem' }}>
