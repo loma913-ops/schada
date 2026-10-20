@@ -11,6 +11,8 @@ describe('firebaseRuntimeConfig', () => {
     expect(() => validateFirebaseRuntimeConfig(FIREBASE_RUNTIME_CONFIG)).not.toThrow();
     expect(FIREBASE_RUNTIME_CONFIG.emulators.firestoreEmulatorPort).toBe(8080);
     expect(FIREBASE_RUNTIME_CONFIG.emulators.authEmulatorUrl).toContain('9099');
+    expect(FIREBASE_RUNTIME_CONFIG.transport.forceLongPolling).toBe(true);
+    expect(FIREBASE_RUNTIME_CONFIG.transport.longPollingTimeoutSeconds).toBe(30);
   });
 
   it('throws on null or undefined config', () => {
@@ -27,6 +29,41 @@ describe('firebaseRuntimeConfig', () => {
       },
     };
     expect(() => validateFirebaseRuntimeConfig(invalidPort)).toThrow('Invalid emulators.firestoreEmulatorPort');
+  });
+
+  it('throws on invalid or missing transport configuration', () => {
+    const missingTransport = {
+      ...FIREBASE_RUNTIME_CONFIG,
+      transport: undefined as any,
+    };
+    expect(() => validateFirebaseRuntimeConfig(missingTransport)).toThrow('Invalid transport: expected configuration object.');
+
+    const invalidForcePolling = {
+      ...FIREBASE_RUNTIME_CONFIG,
+      transport: {
+        ...FIREBASE_RUNTIME_CONFIG.transport,
+        forceLongPolling: 'true' as any,
+      },
+    };
+    expect(() => validateFirebaseRuntimeConfig(invalidForcePolling)).toThrow('Invalid transport.forceLongPolling: expected boolean.');
+
+    const timeoutTooLow = {
+      ...FIREBASE_RUNTIME_CONFIG,
+      transport: {
+        ...FIREBASE_RUNTIME_CONFIG.transport,
+        longPollingTimeoutSeconds: 4,
+      },
+    };
+    expect(() => validateFirebaseRuntimeConfig(timeoutTooLow)).toThrow('Invalid transport.longPollingTimeoutSeconds: expected integer [5, 30]');
+
+    const timeoutTooHigh = {
+      ...FIREBASE_RUNTIME_CONFIG,
+      transport: {
+        ...FIREBASE_RUNTIME_CONFIG.transport,
+        longPollingTimeoutSeconds: 31,
+      },
+    };
+    expect(() => validateFirebaseRuntimeConfig(timeoutTooHigh)).toThrow('Invalid transport.longPollingTimeoutSeconds: expected integer [5, 30]');
   });
 
   it('validates client options and throws on missing required production fields', () => {

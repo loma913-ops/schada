@@ -2,7 +2,7 @@
  * Firebase Runtime and Emulator Configuration.
  *
  * Centralizes environment variable extraction, emulator host/port settings,
- * and startup parameter validation for Firebase client services.
+ * transport configuration, and startup parameter validation for Firebase client services.
  * Validates configuration to eliminate hard-coded fallback values.
  */
 
@@ -19,6 +19,11 @@ export interface FirebaseEmulatorSettings {
   readonly firestoreEmulatorPort: number;
 }
 
+export interface FirestoreTransportSettings {
+  readonly forceLongPolling: boolean;
+  readonly longPollingTimeoutSeconds: number;
+}
+
 export interface FirebaseClientOptions {
   readonly apiKey: string;
   readonly authDomain: string;
@@ -31,6 +36,7 @@ export interface FirebaseClientOptions {
 
 export interface FirebaseRuntimeConfig {
   readonly emulators: FirebaseEmulatorSettings;
+  readonly transport: FirestoreTransportSettings;
   readonly requiredProductionFields: readonly (keyof FirebaseClientOptions)[];
 }
 
@@ -39,6 +45,10 @@ export const FIREBASE_RUNTIME_CONFIG: FirebaseRuntimeConfig = Object.freeze({
     authEmulatorUrl: 'http://localhost:9099',
     firestoreEmulatorHost: 'localhost',
     firestoreEmulatorPort: 8080,
+  }),
+  transport: Object.freeze({
+    forceLongPolling: true,
+    longPollingTimeoutSeconds: 30,
   }),
   requiredProductionFields: Object.freeze(['apiKey', 'projectId'] as const),
 });
@@ -81,6 +91,27 @@ export function validateFirebaseRuntimeConfig(config: FirebaseRuntimeConfig): vo
   ) {
     throw new FirebaseRuntimeConfigError(
       `Invalid emulators.firestoreEmulatorPort: expected valid port [1, 65535], received ${firestoreEmulatorPort}.`
+    );
+  }
+
+  if (!config.transport || typeof config.transport !== 'object') {
+    throw new FirebaseRuntimeConfigError('Invalid transport: expected configuration object.');
+  }
+
+  const { forceLongPolling, longPollingTimeoutSeconds } = config.transport;
+
+  if (typeof forceLongPolling !== 'boolean') {
+    throw new FirebaseRuntimeConfigError('Invalid transport.forceLongPolling: expected boolean.');
+  }
+
+  if (
+    typeof longPollingTimeoutSeconds !== 'number' ||
+    isNaN(longPollingTimeoutSeconds) ||
+    longPollingTimeoutSeconds < 5 ||
+    longPollingTimeoutSeconds > 30
+  ) {
+    throw new FirebaseRuntimeConfigError(
+      `Invalid transport.longPollingTimeoutSeconds: expected integer [5, 30], received ${longPollingTimeoutSeconds}.`
     );
   }
 

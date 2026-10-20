@@ -94,9 +94,24 @@ if (isFirebaseConfigured()) {
 
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
+
+  const transportConfig = FIREBASE_RUNTIME_CONFIG.transport;
+  const forceLongPolling =
+    import.meta.env.VITE_FIREBASE_FORCE_LONG_POLLING !== undefined
+      ? import.meta.env.VITE_FIREBASE_FORCE_LONG_POLLING === 'true'
+      : transportConfig.forceLongPolling;
+
   try {
     db = initializeFirestore(app, {
       localCache: memoryLocalCache(),
+      ...(forceLongPolling
+        ? {
+            experimentalForceLongPolling: true,
+            experimentalLongPollingOptions: {
+              timeoutSeconds: transportConfig.longPollingTimeoutSeconds,
+            },
+          }
+        : {}),
     });
   } catch {
     db = getFirestore(app);

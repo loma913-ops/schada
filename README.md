@@ -275,13 +275,16 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
 
+# Optional: Force HTTP long-polling over TCP port 443 (defaults to true in firebaseRuntimeConfig)
+VITE_FIREBASE_FORCE_LONG_POLLING=true
+
 # Stripe Donation & Payment Configuration
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 VITE_STRIPE_PAYMENT_LINK=https://donate.stripe.com/test_...
 VITE_STRIPE_PAYMENT_LINK_LIFETIME=https://donate.stripe.com/test_...
 ```
 
-`VITE_FIREBASE_MEASUREMENT_ID` is required when Firebase is configured and analytics is enabled; startup throws a descriptive error if it is missing or malformed. Analytics behavior (enable flag, event names, privacy signals) is configured in `src/services/firebase/analyticsConfig.ts`.
+`VITE_FIREBASE_MEASUREMENT_ID` is required when Firebase is configured and analytics is enabled; startup throws a descriptive error if it is missing or malformed. Analytics behavior (enable flag, event names, privacy signals) is configured in `src/services/firebase/analyticsConfig.ts`. Transport resilience (forcing HTTP long-polling over TCP port 443 to mitigate QUIC network idle timeouts and antivirus stream buffering) is managed in `src/services/firebase/firebaseRuntimeConfig.ts`.
 
 To connect to the local Firebase Emulator Suite:
 ```bash
