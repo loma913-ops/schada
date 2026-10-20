@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { UserProfile } from '@/services/firebase/localProvider';
 import { localBackend, getUserModeElo, isHumanLeaderboardEligible } from '@/services/firebase/localProvider';
 import { db, isFirebaseConfigured } from '@/services/firebase/config';
@@ -9,6 +10,7 @@ import { LOCAL_CONFIG } from '@/services/firebase/localConfig';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { safeGetItem, safeSetItem } from '@/services/storage/storageCleanup';
 import { TIME_CONTROL_CATEGORIES, type TimeControlCategory } from '@/components/lobby/lobbyConfig';
+import { CANONICAL_MATCH_HISTORY_CONFIG } from '@/components/history/matchHistoryConfig';
 
 const CACHE_TTL_MS = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardCacheTtlMs;
 const LEADERBOARD_LIMIT = MULTIPLAYER_SCALE_CONFIG.matchmaking.leaderboardLimit;
@@ -81,6 +83,7 @@ function formatLastUpdated(timestamp: number | null): string {
  * - Cache Invalidation: Stale-While-Revalidate with immediate eviction on profileUpdated event or Elo updates.
  */
 export const LeaderboardTable: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<TimeControlCategory>('blitz');
   const initialCache = readLocalCache(selectedCategory);
   const [players, setPlayers] = useState<UserProfile[]>(() => initialCache?.players ?? []);
@@ -276,7 +279,27 @@ export const LeaderboardTable: React.FC = () => {
               idx === 0 ? 'var(--accent-gold)' : idx === 1 ? '#94a3b8' : '#cd7f32';
 
             return (
-              <div key={p.id} className="leaderboard-grid leaderboard-row">
+              <div
+                key={p.id}
+                className="leaderboard-grid leaderboard-row"
+                style={{ cursor: 'pointer' }}
+                onClick={() =>
+                  navigate(CANONICAL_MATCH_HISTORY_CONFIG.routes.userMatches(p.id), {
+                    state: { targetProfile: p },
+                  })
+                }
+                title={`View ${p.username}'s match history`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(CANONICAL_MATCH_HISTORY_CONFIG.routes.userMatches(p.id), {
+                      state: { targetProfile: p },
+                    });
+                  }
+                }}
+              >
                 {/* Rank */}
                 <div className="leaderboard-col-rank">
                   <span className="leaderboard-rank-badge">

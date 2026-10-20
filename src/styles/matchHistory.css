@@ -1,0 +1,145 @@
+/* ==========================================================================
+   Match History & Analysis View Styles
+   Supports dark and light themes, desktop, tablet, and mobile.
+   ========================================================================== */
+
+.match-history-container {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem 1rem;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: calc(100vh - 56px);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  .match-history-container {
+    padding: 1rem 0.75rem 2.5rem 0.75rem;
+  }
+}
+
+.match-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  width: 100%;
+  text-align: center;
+}
+
+.match-history-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+@media (max-width: 480px) {
+  .match-history-title {
+    font-size: 1.3rem;
+  }
+}
+
+.match-history-count-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.match-history-tabs {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding-bottom: 0.65rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.match-history-empty-card {
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .match-history-empty-card {
+    padding: 2.5rem 1.25rem;
+  }
+}
+
+.match-history-empty-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: rgba(212, 175, 55, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem auto;
+  color: var(--accent-gold);
+}
+
+.match-history-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.match-history-card {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  transition: all 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+.match-history-card:hover {
+  border-color: var(--accent-gold-border);
+  background-color: var(--bg-secondary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.match-history-card:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
+}
+
+.match-history-card:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+  .match-history-card {
+    padding: 0.75rem 0.85rem;
+  }
+}
+

@@ -6,6 +6,14 @@ import {
   onSnapshot,
   runTransaction,
   setDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  type QueryConstraint,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
@@ -154,6 +162,7 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const candidateId = generateGameId();
+    const mode = determineTimeCategory(params.timeControlMinutes, params.incrementSeconds || 0);
 
     const newGame: GameRoom = {
       id: candidateId,
@@ -162,6 +171,8 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
       createdAt: Date.now(),
       timeControlMinutes: params.timeControlMinutes,
       incrementSeconds: params.incrementSeconds || 0,
+      mode,
+      playerIds: [creatorPlayer.id],
       isRanked,
       creatorColorPref: colorPref,
       whitePlayer: creatorColor === 'white' ? creatorPlayer : null,
@@ -278,9 +289,12 @@ export async function joinGame(
         };
 
         let assignedColor: PieceColor;
+        const hostId = game.whitePlayer?.id || game.blackPlayer?.id;
+        const playerIds = Array.from(new Set([hostId, user.id].filter(Boolean) as string[]));
         const updatePayload: Partial<GameRoom> = {
           status: 'in_progress',
           lastTurnStartTimeMs: Date.now(),
+          playerIds,
         };
 
         if (!game.whitePlayer) {
@@ -374,6 +388,7 @@ export async function joinGame(
 
     game.status = 'in_progress';
     game.lastTurnStartTimeMs = Date.now();
+    game.playerIds = Array.from(new Set([game.whitePlayer?.id, game.blackPlayer?.id, user.id].filter(Boolean) as string[]));
     localGameStore.set(game);
 
     return { success: true, role: 'player', color: assignedColor, sessionToken: newToken };
@@ -936,6 +951,121 @@ export async function deleteGame(gameId: string): Promise<void> {
   } else {
     localGameStore.delete(gameId);
   }
+}
+
+/**
+ * Loads a game document once by ID without attaching a real-time listener.
+ * Ideal for standalone move-by-move match analysis.
+ */
+export async function getGameById(gameId: string): Promise<GameRoom | null> {
+  if (!gameId) return null;
+  if (isFirebaseConfigured() && db) {
+    try {
+      const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, gameId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return snap.data() as GameRoom;
+      }
+    } catch (err) {
+      console.warn('Failed to load game from Firestore by ID:', gameId, err);
+    }
+  }
+  return localGameStore.get(gameId);
+}
+
+export interface GetMatchHistoryOptions {
+  readonly userId: string;
+  readonly mode?: TimeControlCategory | 'all';
+  readonly limitCount?: number;
+  readonly cursor?: unknown;
+}
+
+export interface MatchHistoryResult {
+  readonly games: GameRoom[];
+  readonly nextCursor: unknown | null;
+  readonly hasMore: boolean;
+}
+
+/**
+ * Retrieves paginated completed matches for a given player, optionally filtered by mode.
+ * Optimized to fetch only bounded batches from the single source of truth `games` collection.
+ */
+export async function getPlayerMatchHistory(
+  options: GetMatchHistoryOptions
+): Promise<MatchHistoryResult> {
+  const { userId, mode, cursor } = options;
+  const limitCount =
+    typeof options.limitCount === 'number' && options.limitCount > 0
+      ? Math.min(options.limitCount, MULTIPLAYER_SCALE_CONFIG.matchmaking.maxMatchHistoryPageLimit)
+      : MULTIPLAYER_SCALE_CONFIG.matchmaking.matchHistoryPageLimit;
+
+  if (!userId) {
+    return { games: [], nextCursor: null, hasMore: false };
+  }
+
+  if (isFirebaseConfigured() && db) {
+    try {
+      const gamesCol = collection(db, MULTIPLAYER_SCALE_CONFIG.collections.games);
+      const constraints: QueryConstraint[] = [
+        where('playerIds', 'array-contains', userId),
+        where('status', '==', 'completed'),
+      ];
+
+      if (mode && mode !== 'all') {
+        constraints.push(where('mode', '==', mode));
+      }
+
+      constraints.push(orderBy('createdAt', 'desc'));
+
+      if (cursor) {
+        constraints.push(startAfter(cursor));
+      }
+
+      constraints.push(limit(limitCount + 1));
+
+      const q = query(gamesCol, ...constraints);
+      const snap = await getDocs(q);
+
+      const docs = snap.docs;
+      const hasMore = docs.length > limitCount;
+      const pageDocs = hasMore ? docs.slice(0, limitCount) : docs;
+      const games = pageDocs
+        .map((d) => d.data() as GameRoom)
+        .filter((g) => g.boardState?.moveHistory && g.boardState.moveHistory.length > 0);
+      const nextCursor = pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : null;
+
+      // Merge local completed computer matches if viewing the active user's games
+      const localResult = localGameStore.getPlayerMatchHistory(userId, mode, limitCount);
+      const localBotGames = localResult.games.filter(
+        (lg) => lg.isComputer && !games.some((g) => g.id === lg.id)
+      );
+
+      const mergedGames = [...games, ...localBotGames]
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        .slice(0, limitCount);
+
+      return {
+        games: mergedGames,
+        nextCursor,
+        hasMore,
+      };
+    } catch (err: any) {
+      if (err?.code === 'failed-precondition') {
+        console.warn('Firestore composite index building, falling back to local/cached queries for match history:', err);
+      } else {
+        console.warn('Error fetching match history from Firestore:', err);
+      }
+    }
+  }
+
+  // Fallback to local store
+  const localOffset = typeof cursor === 'number' ? cursor : 0;
+  const localRes = localGameStore.getPlayerMatchHistory(userId, mode, limitCount, localOffset);
+  return {
+    games: localRes.games,
+    nextCursor: localRes.hasMore ? localOffset + limitCount : null,
+    hasMore: localRes.hasMore,
+  };
 }
 
 // Wire up timeout handlers to avoid circular module dependencies

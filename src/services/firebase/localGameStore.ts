@@ -4,6 +4,7 @@ import { STORAGE_LIMITS, safeSetItem } from '../storage/storageCleanup';
 import { isGameTimedOut } from './gameClock';
 import { ABANDONED_GAME_EXPIRY_MS, type GameRoom } from './gameTypes';
 import type { PieceColor } from '@/core/schada/types';
+import { determineTimeCategory, type TimeControlCategory } from '@/components/lobby/lobbyConfig';
 
 export const LOCAL_GAMES_STORAGE_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.localGames;
 
@@ -195,6 +196,47 @@ export class LocalGameStore {
     return () => {
       this.globalListeners.delete(callback);
     };
+  }
+
+  /**
+   * Retrieves paginated completed match records for a player, optionally filtered by mode.
+   *
+   * Algorithmic Complexity:
+   * - Time Complexity: O(M log M) where M is total local completed games for sorting.
+   * - Auxiliary Space Complexity: O(K) where K = limitCount.
+   *
+   * @param userId Player identifier to filter matches.
+   * @param mode Optional time control category filter ('all' or specific mode).
+   * @param limitCount Maximum records to return.
+   * @param offset Slicing offset for client-side pagination.
+   */
+  public getPlayerMatchHistory(
+    userId: string,
+    mode?: TimeControlCategory | 'all',
+    limitCount: number = MULTIPLAYER_SCALE_CONFIG.matchmaking.matchHistoryPageLimit,
+    offset: number = 0
+  ): { games: GameRoom[]; hasMore: boolean } {
+    if (!userId) return { games: [], hasMore: false };
+    const all = this.getAll();
+    const candidateGames = Object.values(all).filter((g) => {
+      if (g.status !== 'completed') return false;
+      if (!g.boardState?.moveHistory || g.boardState.moveHistory.length === 0) return false;
+      const isPlayer =
+        (Array.isArray(g.playerIds) && g.playerIds.includes(userId)) ||
+        g.whitePlayer?.id === userId ||
+        g.blackPlayer?.id === userId;
+      if (!isPlayer) return false;
+      if (mode && mode !== 'all') {
+        const gameMode = g.mode ?? determineTimeCategory(g.timeControlMinutes, g.incrementSeconds || 0);
+        if (gameMode !== mode) return false;
+      }
+      return true;
+    });
+
+    candidateGames.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const sliced = candidateGames.slice(offset, offset + limitCount);
+    const hasMore = offset + limitCount < candidateGames.length;
+    return { games: sliced, hasMore };
   }
 }
 

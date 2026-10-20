@@ -5,6 +5,7 @@
 @import './leaderboard.css';
 @import './orientation.css';
 @import './donate.css';
+@import './matchHistory.css';
 
 *,
 *::before,

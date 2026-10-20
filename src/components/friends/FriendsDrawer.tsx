@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import type { UserProfile, LocalFriendRequest } from '@/services/firebase/localProvider';
 import {
@@ -8,10 +9,11 @@ import {
   removeFriend,
   getPendingIncomingRequests,
 } from '@/services/firebase/friendService';
-import { X, UserPlus, Check, Swords, Trash2 } from 'lucide-react';
+import { X, UserPlus, Check, Swords, Trash2, History } from 'lucide-react';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 import { LOCAL_CONFIG } from '@/services/firebase/localConfig';
+import { CANONICAL_MATCH_HISTORY_CONFIG } from '@/components/history/matchHistoryConfig';
 
 interface FriendsDrawerProps {
   isOpen: boolean;
@@ -24,6 +26,7 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
   onClose,
   onChallengeFriend,
 }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [tab, setTab] = useState<'friends' | 'requests'>('friends');
   const [searchUsername, setSearchUsername] = useState('');
@@ -246,6 +249,20 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <button
+                        className="action-btn"
+                        style={{ padding: '0.35rem 0.6rem', color: 'var(--text-secondary)' }}
+                        onClick={() => {
+                          onClose();
+                          navigate(CANONICAL_MATCH_HISTORY_CONFIG.routes.userMatches(f.id), {
+                            state: { targetProfile: f },
+                          });
+                        }}
+                        title={CANONICAL_MATCH_HISTORY_CONFIG.copy.viewPastGamesButtonText}
+                        aria-label={`View ${f.username}'s match history`}
+                      >
+                        <History size={14} />
+                      </button>
                       {onChallengeFriend && (
                         <button
                           className="action-btn"

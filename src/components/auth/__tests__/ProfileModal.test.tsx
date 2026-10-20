@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ProfileModal } from '../ProfileModal';
 import { PWA_CONFIG } from '@/services/pwa/pwaConfig';
+import { CANONICAL_MATCH_HISTORY_CONFIG } from '@/components/history/matchHistoryConfig';
+
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+}));
 
 const mockUsePwa = vi.fn();
 vi.mock('@/context/PwaContext', () => ({
@@ -80,6 +85,7 @@ describe('ProfileModal - PWA Install App Section', () => {
     expect(html).toContain(PWA_CONFIG.copy.installSectionDescription);
     expect(html).toContain(PWA_CONFIG.copy.installAppButtonText);
     expect(html).toContain('Delete Account');
+    expect(html).toContain(CANONICAL_MATCH_HISTORY_CONFIG.copy.viewPastGamesButtonText);
   });
 
   it('does NOT render the Install Application section when already installed (isStandalone is true)', () => {
@@ -99,6 +105,7 @@ describe('ProfileModal - PWA Install App Section', () => {
     expect(html).not.toContain(PWA_CONFIG.copy.installSectionTitle);
     expect(html).not.toContain(PWA_CONFIG.copy.installSectionDescription);
     expect(html).toContain('Delete Account');
+    expect(html).toContain(CANONICAL_MATCH_HISTORY_CONFIG.copy.viewPastGamesButtonText);
   });
 
   it('renders 5-mode breakdown and omits static header rating', () => {
@@ -135,5 +142,40 @@ describe('ProfileModal - PWA Install App Section', () => {
     expect(html).toContain('0L');
     expect(html).toContain('0D');
   });
-});
 
+  it('renders inspected user profile and hides personal account settings', () => {
+    mockUsePwa.mockReturnValue({
+      isStandalone: true,
+      isMobile: false,
+      installModalOpen: false,
+      setInstallModalOpen: vi.fn(),
+      promptInstall: vi.fn(),
+      config: PWA_CONFIG,
+    });
+
+    const inspectedUser = {
+      id: 'usr_other_99',
+      username: 'OtherMaster',
+      email: 'other@schada.org',
+      perModeStats: {
+        bullet: { elo: 1600, gamesPlayed: 10, gamesWon: 7, gamesLost: 2, gamesDrawn: 1 },
+      },
+      status: 'in-game' as const,
+      usernameChangeCount: 1,
+      isPatron: false,
+    };
+
+    const html = renderToStaticMarkup(
+      <ProfileModal isOpen={true} onClose={vi.fn()} inspectedUser={inspectedUser as any} />
+    );
+
+    expect(html).toContain('OtherMaster&#x27;s Profile');
+    expect(html).toContain('OtherMaster');
+    expect(html).toContain(CANONICAL_MATCH_HISTORY_CONFIG.copy.viewPastGamesButtonText);
+    expect(html).toContain('1600');
+    // Account settings should not be shown for other users
+    expect(html).not.toContain('Delete Account');
+    expect(html).not.toContain('Sign Out');
+    expect(html).not.toContain('Game Controls');
+  });
+});

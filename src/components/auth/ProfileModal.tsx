@@ -1,30 +1,36 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { usePwa } from '@/context/PwaContext';
-import { X, LogOut, Edit2, CheckCircle2, AlertTriangle, Sliders, AlertCircle, Trash2, Smartphone } from 'lucide-react';
+import { X, LogOut, Edit2, CheckCircle2, AlertTriangle, Sliders, AlertCircle, Trash2, Smartphone, History } from 'lucide-react';
 import { PatronBadge, isPatronUser } from '@/components/common/PatronBadge';
 import { SchadaStar } from '@/components/common/SchadaStar';
 import { getPatronStatusDescription } from '@/core/donate/patronService';
 import { useGamePreferences } from '@/context/GamePreferencesContext';
 import { AUTH_CONFIG } from '@/services/firebase/authConfig';
 import { TIME_CONTROL_CATEGORIES, type TimeControlCategory } from '@/components/lobby/lobbyConfig';
-import { getUserModeStats } from '@/services/firebase/localProvider';
+import { getUserModeStats, type UserProfile } from '@/services/firebase/localProvider';
+import { CANONICAL_MATCH_HISTORY_CONFIG } from '@/components/history/matchHistoryConfig';
 
 const MODE_DISPLAY_INFO: Record<TimeControlCategory, { label: string; icon: string }> = {
   bullet: { label: 'Bullet', icon: '⚡' },
   blitz: { label: 'Blitz', icon: '🔥' },
   rapid: { label: 'Rapid', icon: '⏱️' },
-  classical: { label: 'Classical', icon: '♟️' },
-  correspondence: { label: 'Correspondence', icon: '✉️' },
+  classical: { label: 'Classical', icon: '⏳' },
+  correspondence: { label: 'Correspondence', icon: '📬' },
 };
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
+  inspectedUser?: UserProfile | null;
 }
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, inspectedUser }) => {
+  const navigate = useNavigate();
   const { user, updateUsername, logout, deleteAccount } = useAuth();
+  const activeUser = inspectedUser || user;
+  const isSelf = !inspectedUser || (Boolean(user) && inspectedUser.id === user?.id);
   const { showThreatIndicators, setShowThreatIndicators } = useGamePreferences();
   const { isStandalone, setInstallModalOpen, config: pwaConfig } = usePwa();
   const [newUsername, setNewUsername] = useState('');
@@ -40,7 +46,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  if (!isOpen || !user) return null;
+  if (!isOpen || !activeUser) return null;
 
   const handleUpdateUsername = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +106,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2 className="modal-title">Player Profile</h2>
+          <h2 className="modal-title">{isSelf ? 'Player Profile' : `${activeUser.username}'s Profile`}</h2>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
           </button>
@@ -128,16 +134,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 className="player-avatar white"
                 style={{ width: '48px', height: '48px', fontSize: '1.25rem', flexShrink: 0 }}
               >
-                {user.username.charAt(0).toUpperCase()}
+                {activeUser.username.charAt(0).toUpperCase()}
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '1.2rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.35rem', maxWidth: '100%' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</span>
-                  {isPatronUser(user) && <PatronBadge size={16} />}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeUser.username}</span>
+                  {isPatronUser(activeUser) && <PatronBadge size={16} />}
                 </div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {user.email}
-                </div>
+                {activeUser.email && (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeUser.email}
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ flexShrink: 0, alignSelf: 'flex-start' }}>
@@ -151,21 +159,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                   padding: '2px 8px',
                   borderRadius: '12px',
                   backgroundColor:
-                    user.status === 'online'
+                    activeUser.status === 'online'
                       ? 'rgba(98, 153, 36, 0.15)'
-                      : user.status === 'in-game'
+                      : activeUser.status === 'in-game'
                       ? 'var(--accent-gold-subtle)'
                       : 'rgba(117, 114, 109, 0.15)',
                   color:
-                    user.status === 'online'
+                    activeUser.status === 'online'
                       ? 'var(--accent-green)'
-                      : user.status === 'in-game'
+                      : activeUser.status === 'in-game'
                       ? 'var(--accent-gold)'
                       : 'var(--text-muted)',
                   border: `1px solid ${
-                    user.status === 'online'
+                    activeUser.status === 'online'
                       ? 'rgba(98, 153, 36, 0.3)'
-                      : user.status === 'in-game'
+                      : activeUser.status === 'in-game'
                       ? 'var(--accent-gold-border)'
                       : 'rgba(117, 114, 109, 0.3)'
                   }`,
@@ -180,12 +188,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                     backgroundColor: 'currentColor',
                   }}
                 />
-                {user.status === 'online' ? 'Online' : user.status === 'in-game' ? 'In Game' : 'Offline'}
+                {activeUser.status === 'online' ? 'Online' : activeUser.status === 'in-game' ? 'In Game' : 'Offline'}
               </span>
             </div>
           </div>
 
-          {isPatronUser(user) && (
+          {isPatronUser(activeUser) && (
             <div
               style={{
                 display: 'flex',
@@ -201,13 +209,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               }}
             >
               <SchadaStar size={13} />
-              <span>{getPatronStatusDescription(user)}</span>
+              <span>{getPatronStatusDescription(activeUser)}</span>
             </div>
           )}
         </div>
 
         {/* Per-Mode Ratings & Statistics */}
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ marginBottom: '1.25rem' }}>
           <div
             style={{
               fontSize: '0.82rem',
@@ -228,7 +236,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             }}
           >
             {TIME_CONTROL_CATEGORIES.map((category) => {
-              const stats = getUserModeStats(user, category);
+              const stats = getUserModeStats(activeUser, category);
               const modeWinRate =
                 stats.gamesPlayed > 0
                   ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
@@ -336,316 +344,349 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           </div>
         </div>
 
-        {/* Game Controls / Board Preferences Section */}
-        <div
+        {/* View Past Games Button */}
+        <button
+          type="button"
+          className="btn-primary"
           style={{
-            padding: '1rem',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: '1rem',
-            backgroundColor: 'var(--bg-tertiary)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Sliders size={16} color="var(--accent-gold)" />
-              <span>Game Controls</span>
-            </div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Preferences</span>
-          </div>
-
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              userSelect: 'none',
-              padding: '0.35rem 0',
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 600 }}>
-                <AlertCircle size={15} color="var(--accent-red)" />
-                <span>Show Pieces Under Attack</span>
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Display red exclamation badges on threatened pieces vulnerable to capture
-              </div>
-            </div>
-
-            <input
-              type="checkbox"
-              role="switch"
-              aria-label="Show Pieces Under Attack"
-              checked={showThreatIndicators}
-              onChange={(e) => setShowThreatIndicators(e.target.checked)}
-              style={{
-                width: '18px',
-                height: '18px',
-                accentColor: 'var(--accent-gold)',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            />
-          </label>
-        </div>
-
-        {/* Username Change Management Section */}
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: '1.5rem',
-            backgroundColor: 'var(--bg-tertiary)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Username Settings</div>
-            {user.usernameChangeCount === 0 ? (
-              <span style={{ fontSize: '0.75rem', color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <CheckCircle2 size={13} /> 1 change remaining
-              </span>
-            ) : (
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <AlertTriangle size={13} /> Change limit reached
-              </span>
-            )}
-          </div>
-
-          {error && (
-            <div style={{ color: 'var(--accent-red)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              {error}
-            </div>
-          )}
-          {success && (
-            <div style={{ color: 'var(--accent-green)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              {success}
-            </div>
-          )}
-
-          {user.usernameChangeCount === 0 ? (
-            !isEditing ? (
-              <button
-                className="action-btn"
-                style={{ width: '100%', marginTop: '0.25rem' }}
-                onClick={() => setIsEditing(true)}
-              >
-                <Edit2 size={15} />
-                <span>Change Username (Allowed Once)</span>
-              </button>
-            ) : (
-              <form onSubmit={handleUpdateUsername} style={{ marginTop: '0.5rem' }}>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Enter new username"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  required
-                  minLength={3}
-                  maxLength={20}
-                  style={{ marginBottom: '0.5rem' }}
-                />
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button type="submit" className="btn-primary" disabled={loading} style={{ padding: '0.5rem' }}>
-                    {loading ? 'Saving...' : 'Confirm Change'}
-                  </button>
-                  <button
-                    type="button"
-                    className="action-btn"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setError(null);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )
-          ) : (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-              Per Schada rules, your username has already been changed once and is now permanently locked to <strong>{user.username}</strong>
-              {isPatronUser(user) && (
-                <PatronBadge size={12} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
-              )}.
-            </p>
-          )}
-        </div>
-
-        {/* Progressive Web Application (PWA) Install Section */}
-        {!isStandalone && (
-          <div
-            style={{
-              padding: '1rem',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-sm)',
-              marginBottom: '1.25rem',
-              backgroundColor: 'var(--bg-tertiary)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Smartphone size={16} color="var(--accent-gold)" />
-                <span>{pwaConfig.copy.installSectionTitle}</span>
-              </div>
-            </div>
-
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-              {pwaConfig.copy.installSectionDescription}
-            </p>
-
-            <button
-              type="button"
-              className="action-btn"
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.4rem',
-              }}
-              onClick={() => {
-                onClose();
-                setInstallModalOpen(true);
-              }}
-              title={pwaConfig.copy.installAppTitle}
-              aria-label={pwaConfig.copy.installAppAriaLabel}
-            >
-              <Smartphone size={15} />
-              <span>{pwaConfig.copy.installAppButtonText}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Account Deletion Section (Store Compliance: Apple Guideline 5.1.1(v)) */}
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid rgba(224, 86, 36, 0.3)',
-            borderRadius: 'var(--radius-sm)',
+            width: '100%',
+            padding: '0.65rem 1rem',
             marginBottom: '1.25rem',
-            backgroundColor: 'var(--bg-tertiary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            fontWeight: 700,
+          }}
+          onClick={() => {
+            onClose();
+            if (isSelf) {
+              navigate(CANONICAL_MATCH_HISTORY_CONFIG.routes.matches);
+            } else {
+              navigate(CANONICAL_MATCH_HISTORY_CONFIG.routes.userMatches(activeUser.id), {
+                state: { targetProfile: activeUser },
+              });
+            }
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Trash2 size={16} />
-              <span>Delete Account</span>
-            </div>
-          </div>
+          <History size={16} />
+          <span>{CANONICAL_MATCH_HISTORY_CONFIG.copy.viewPastGamesButtonText}</span>
+        </button>
 
-          {!isDeletingAccount ? (
-            <>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                Permanently delete your Schada account, profile data, rating, and username. This action cannot be undone.
-              </p>
-              <button
-                type="button"
-                className="action-btn danger"
-                style={{ width: '100%', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                onClick={() => {
-                  setIsDeletingAccount(true);
-                  setDeleteError(null);
-                  setDeletePassword('');
-                  setDeleteConfirmPhrase('');
-                }}
-              >
-                <Trash2 size={14} />
-                <span>Delete Account</span>
-              </button>
-            </>
-          ) : (
-            <form onSubmit={handleDeleteAccount} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div
-                style={{
-                  padding: '0.75rem',
-                  backgroundColor: 'rgba(224, 86, 36, 0.1)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid rgba(224, 86, 36, 0.3)',
-                  color: 'var(--accent-red)',
-                  fontSize: '0.8rem',
-                  lineHeight: '1.4',
-                }}
-              >
-                <strong>Warning:</strong> Account deletion is immediate and permanent. Your ratings and match records will be erased, and the username "{user.username}" will become available to others.
+        {isSelf && user && (
+          <>
+            {/* Game Controls / Board Preferences Section */}
+            <div
+              style={{
+                padding: '1rem',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '1rem',
+                backgroundColor: 'var(--bg-tertiary)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Sliders size={16} color="var(--accent-gold)" />
+                  <span>Game Controls</span>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Preferences</span>
               </div>
 
-              {deleteError && (
-                <div style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>
-                  {deleteError}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  padding: '0.35rem 0',
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 600 }}>
+                    <AlertCircle size={15} color="var(--accent-red)" />
+                    <span>Show Pieces Under Attack</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Display red exclamation badges on threatened pieces vulnerable to capture
+                  </div>
+                </div>
+
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Show Pieces Under Attack"
+                  checked={showThreatIndicators}
+                  onChange={(e) => setShowThreatIndicators(e.target.checked)}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    accentColor: 'var(--accent-gold)',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Username Change Management Section */}
+            <div
+              style={{
+                padding: '1rem',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '1.5rem',
+                backgroundColor: 'var(--bg-tertiary)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Username Settings</div>
+                {user.usernameChangeCount === 0 ? (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <CheckCircle2 size={13} /> 1 change remaining
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <AlertTriangle size={13} /> Change limit reached
+                  </span>
+                )}
+              </div>
+
+              {error && (
+                <div style={{ color: 'var(--accent-red)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div style={{ color: 'var(--accent-green)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                  {success}
                 </div>
               )}
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--text-secondary)' }}>
-                  Confirm your password
-                </label>
-                <input
-                  type="password"
-                  className="form-input"
-                  placeholder="Enter current password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
+              {user.usernameChangeCount === 0 ? (
+                !isEditing ? (
+                  <button
+                    className="action-btn"
+                    style={{ width: '100%', marginTop: '0.25rem' }}
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Edit2 size={15} />
+                    <span>Change Username (Allowed Once)</span>
+                  </button>
+                ) : (
+                  <form onSubmit={handleUpdateUsername} style={{ marginTop: '0.5rem' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Enter new username"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      required
+                      minLength={3}
+                      maxLength={20}
+                      style={{ marginBottom: '0.5rem' }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button type="submit" className="btn-primary" disabled={loading} style={{ padding: '0.5rem' }}>
+                        {loading ? 'Saving...' : 'Confirm Change'}
+                      </button>
+                      <button
+                        type="button"
+                        className="action-btn"
+                        onClick={() => {
+                          setIsEditing(false);
+                          setError(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )
+              ) : (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  Per Schada rules, your username has already been changed once and is now permanently locked to <strong>{user.username}</strong>
+                  {isPatronUser(user) && (
+                    <PatronBadge size={12} style={{ marginLeft: '0.25rem', verticalAlign: 'middle' }} />
+                  )}.
+                </p>
+              )}
+            </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--text-secondary)' }}>
-                  Type <strong>{AUTH_CONFIG.accountDeletionConfirmationPhrase}</strong> to confirm
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder={`Type ${AUTH_CONFIG.accountDeletionConfirmationPhrase}`}
-                  value={deleteConfirmPhrase}
-                  onChange={(e) => setDeleteConfirmPhrase(e.target.value)}
-                  required
-                />
-              </div>
+            {/* Progressive Web Application (PWA) Install Section */}
+            {!isStandalone && (
+              <div
+                style={{
+                  padding: '1rem',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  marginBottom: '1.25rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Smartphone size={16} color="var(--accent-gold)" />
+                    <span>{pwaConfig.copy.installSectionTitle}</span>
+                  </div>
+                </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <button
-                  type="submit"
-                  className="action-btn danger"
-                  disabled={deleteLoading || deleteConfirmPhrase !== AUTH_CONFIG.accountDeletionConfirmationPhrase || !deletePassword}
-                  style={{ flex: 1, padding: '0.5rem', opacity: (deleteConfirmPhrase !== AUTH_CONFIG.accountDeletionConfirmationPhrase || !deletePassword || deleteLoading) ? 0.6 : 1 }}
-                >
-                  {deleteLoading ? 'Deleting Account...' : 'Permanently Delete'}
-                </button>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                  {pwaConfig.copy.installSectionDescription}
+                </p>
+
                 <button
                   type="button"
                   className="action-btn"
-                  disabled={deleteLoading}
-                  onClick={() => {
-                    setIsDeletingAccount(false);
-                    setDeleteError(null);
-                    setDeletePassword('');
-                    setDeleteConfirmPhrase('');
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
                   }}
+                  onClick={() => {
+                    onClose();
+                    setInstallModalOpen(true);
+                  }}
+                  title={pwaConfig.copy.installAppTitle}
+                  aria-label={pwaConfig.copy.installAppAriaLabel}
                 >
-                  Cancel
+                  <Smartphone size={15} />
+                  <span>{pwaConfig.copy.installAppButtonText}</span>
                 </button>
               </div>
-            </form>
-          )}
-        </div>
+            )}
 
-        {/* Sign Out Button */}
-        <button
-          className="action-btn danger"
-          style={{ width: '100%', padding: '0.65rem' }}
-          onClick={handleLogout}
-        >
-          <LogOut size={16} />
-          <span>Sign Out</span>
-        </button>
+            {/* Account Deletion Section (Store Compliance: Apple Guideline 5.1.1(v)) */}
+            <div
+              style={{
+                padding: '1rem',
+                border: '1px solid rgba(224, 86, 36, 0.3)',
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '1.25rem',
+                backgroundColor: 'var(--bg-tertiary)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Trash2 size={16} />
+                  <span>Delete Account</span>
+                </div>
+              </div>
+
+              {!isDeletingAccount ? (
+                <>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                    Permanently delete your Schada account, profile data, rating, and username. This action cannot be undone.
+                  </p>
+                  <button
+                    type="button"
+                    className="action-btn danger"
+                    style={{ width: '100%', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                    onClick={() => {
+                      setIsDeletingAccount(true);
+                      setDeleteError(null);
+                      setDeletePassword('');
+                      setDeleteConfirmPhrase('');
+                    }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete Account</span>
+                  </button>
+                </>
+              ) : (
+                <form onSubmit={handleDeleteAccount} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div
+                    style={{
+                      padding: '0.75rem',
+                      backgroundColor: 'rgba(224, 86, 36, 0.1)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid rgba(224, 86, 36, 0.3)',
+                      color: 'var(--accent-red)',
+                      fontSize: '0.8rem',
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    <strong>Warning:</strong> Account deletion is immediate and permanent. Your ratings and match records will be erased, and the username "{user.username}" will become available to others.
+                  </div>
+
+                  {deleteError && (
+                    <div style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>
+                      {deleteError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--text-secondary)' }}>
+                      Confirm your password
+                    </label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder="Enter current password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--text-secondary)' }}>
+                      Type <strong>{AUTH_CONFIG.accountDeletionConfirmationPhrase}</strong> to confirm
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder={`Type ${AUTH_CONFIG.accountDeletionConfirmationPhrase}`}
+                      value={deleteConfirmPhrase}
+                      onChange={(e) => setDeleteConfirmPhrase(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <button
+                      type="submit"
+                      className="action-btn danger"
+                      disabled={deleteLoading || deleteConfirmPhrase !== AUTH_CONFIG.accountDeletionConfirmationPhrase || !deletePassword}
+                      style={{ flex: 1, padding: '0.5rem', opacity: (deleteConfirmPhrase !== AUTH_CONFIG.accountDeletionConfirmationPhrase || !deletePassword || deleteLoading) ? 0.6 : 1 }}
+                    >
+                      {deleteLoading ? 'Deleting Account...' : 'Permanently Delete'}
+                    </button>
+                    <button
+                      type="button"
+                      className="action-btn"
+                      disabled={deleteLoading}
+                      onClick={() => {
+                        setIsDeletingAccount(false);
+                        setDeleteError(null);
+                        setDeletePassword('');
+                        setDeleteConfirmPhrase('');
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Sign Out Button */}
+            <button
+              className="action-btn danger"
+              style={{ width: '100%', padding: '0.65rem' }}
+              onClick={handleLogout}
+            >
+              <LogOut size={16} />
+              <span>Sign Out</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

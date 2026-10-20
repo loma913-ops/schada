@@ -76,6 +76,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **9-Digit Alphanumeric Game URLs & Collision Protection**: Canonical Base62 (case-sensitive) 9-character game identifiers with CSPRNG generation, transactional collision prevention, and strict format validation.
 - **Native Mobile Applications**: Android and iOS app editions powered by Capacitor 8 with native hardware haptics, edge-to-edge safe area layout, and adaptive splash screens.
 - **Ivory & Charcoal Visual Theme**: Canonical White (Ivory `#F1EFE7`) and Black (Charcoal `#18181B`) piece styling with balanced contrast, darkened light squares (`#D3B18C`), and matched vector stroke geometry.
+- **Per-Mode Match History & Move-by-Move Analysis**: Dedicated full-page past matches view per mode with bounded pagination, win/loss breakdowns, and zero-read move-by-move interactive board analysis.
 
 ---
 

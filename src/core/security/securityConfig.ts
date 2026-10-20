@@ -34,6 +34,10 @@ export interface SecurityConfig {
   readonly mutableUserKeys: readonly string[];
   /** Strict immutable property keys for game documents */
   readonly immutableGameKeys: readonly string[];
+  /** Allowed canonical game mode categories */
+  readonly allowedGameModes: readonly string[];
+  /** Maximum seated players per game document */
+  readonly maxGamePlayers: number;
   /** Standard empty string fallback for email hydration when unauthenticated */
   readonly emptyEmailFallback: string;
   /** Exact character length of canonical game identifiers */
@@ -168,6 +172,20 @@ export function validateSecurityConfig(config: SecurityConfig): void {
 
   if (!Array.isArray(config.immutableGameKeys) || config.immutableGameKeys.length === 0) {
     throw new SecurityConfigError('Invalid immutableGameKeys: expected non-empty array of strings.');
+  }
+
+  if (!Array.isArray(config.allowedGameModes) || config.allowedGameModes.length === 0) {
+    throw new SecurityConfigError('Invalid allowedGameModes: expected non-empty array of strings.');
+  }
+
+  if (
+    typeof config.maxGamePlayers !== 'number' ||
+    !Number.isInteger(config.maxGamePlayers) ||
+    config.maxGamePlayers <= 0
+  ) {
+    throw new SecurityConfigError(
+      `Invalid maxGamePlayers: expected positive integer, received ${String(config.maxGamePlayers)}.`
+    );
   }
 
   if (typeof config.emptyEmailFallback !== 'string') {
@@ -350,7 +368,16 @@ export const SECURITY_CONFIG: SecurityConfig = Object.freeze({
     'timeControlMinutes',
     'incrementSeconds',
     'creatorColorPref',
+    'mode',
   ]),
+  allowedGameModes: Object.freeze([
+    'bullet',
+    'blitz',
+    'rapid',
+    'classical',
+    'correspondence',
+  ]),
+  maxGamePlayers: 2,
   emptyEmailFallback: '',
   gameIdLength: 9,
   gameIdCharset: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',

@@ -70,6 +70,8 @@ export interface MatchmakingConfig {
   readonly clockSyncJitterThresholdMs: number;
   readonly reconcileEloBatchLimit: number;
   readonly reconcileCooldownMs: number;
+  readonly matchHistoryPageLimit: number;
+  readonly maxMatchHistoryPageLimit: number;
   readonly guestRankedErrorMessage: string;
   readonly guestRankedNoticeTitle: string;
   readonly guestRankedNoticeMessage: string;
@@ -476,6 +478,28 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
   }
 
   if (
+    typeof matchmaking.matchHistoryPageLimit !== 'number' ||
+    !Number.isInteger(matchmaking.matchHistoryPageLimit) ||
+    matchmaking.matchHistoryPageLimit <= 0 ||
+    matchmaking.matchHistoryPageLimit > 100
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.matchHistoryPageLimit: expected integer between 1 and 100, received ${matchmaking.matchHistoryPageLimit}.`
+    );
+  }
+
+  if (
+    typeof matchmaking.maxMatchHistoryPageLimit !== 'number' ||
+    !Number.isInteger(matchmaking.maxMatchHistoryPageLimit) ||
+    matchmaking.maxMatchHistoryPageLimit < matchmaking.matchHistoryPageLimit ||
+    matchmaking.maxMatchHistoryPageLimit > 100
+  ) {
+    throw new MultiplayerConfigError(
+      `Invalid matchmaking.maxMatchHistoryPageLimit: expected integer between ${matchmaking.matchHistoryPageLimit} and 100, received ${matchmaking.maxMatchHistoryPageLimit}.`
+    );
+  }
+
+  if (
     typeof matchmaking.guestRankedErrorMessage !== 'string' ||
     matchmaking.guestRankedErrorMessage.trim().length === 0
   ) {
@@ -650,6 +674,8 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     clockSyncJitterThresholdMs: 1500,
     reconcileEloBatchLimit: 5,
     reconcileCooldownMs: 10 * 60 * 1000,
+    matchHistoryPageLimit: 10,
+    maxMatchHistoryPageLimit: 50,
     guestRankedErrorMessage: 'Guests cannot play in ranked games. Please sign in to play ranked matches.',
     guestRankedNoticeTitle: 'Account Required',
     guestRankedNoticeMessage: 'Guests cannot play in ranked games. Please sign in or create an account to challenge the host, or watch as a spectator.',

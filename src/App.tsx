@@ -34,6 +34,8 @@ const AuthModal = lazy(() => import('./components/auth/AuthModal').then((m) => (
 const ProfileModal = lazy(() => import('./components/auth/ProfileModal').then((m) => ({ default: m.ProfileModal })));
 const FriendsDrawer = lazy(() => import('./components/friends/FriendsDrawer').then((m) => ({ default: m.FriendsDrawer })));
 const CustomGameModal = lazy(() => import('./components/lobby/CustomGameModal').then((m) => ({ default: m.CustomGameModal })));
+const MatchHistoryView = lazy(() => import('./components/history/MatchHistoryView').then((m) => ({ default: m.MatchHistoryView })));
+const AnalysisRoomView = lazy(() => import('./components/game/AnalysisRoomView').then((m) => ({ default: m.AnalysisRoomView })));
 
 import { createInitialGameState } from './core/schada/engine';
 import { calculateEloUpdate } from './core/elo/eloService';
@@ -47,6 +49,9 @@ import {
   joinGame,
   findOpenWaitingGame,
   reconcilePendingElo,
+  generateGameId,
+  localGameStore,
+  type GameRoom,
 } from './services/firebase/gameService';
 import { MULTIPLAYER_SCALE_CONFIG } from './services/firebase/multiplayerConfig';
 import { SECURITY_CONFIG } from './core/security/securityConfig';
@@ -153,7 +158,7 @@ const MainApp: React.FC = () => {
         else if (computerModalOpen) setComputerModalOpen(false);
         else if (createRoomOpen) setCreateRoomOpen(false);
       },
-      isInGameMatch: () => location.pathname.startsWith('/game/') || Boolean(activeMatch),
+      isInGameMatch: () => location.pathname.startsWith('/game/') || location.pathname.startsWith('/analysis/') || Boolean(activeMatch),
       navigateBack: () => navigate(-1),
       isAtRootPlayTab: () => location.pathname === '/' && currentTab === 'play',
     });
@@ -419,9 +424,9 @@ const MainApp: React.FC = () => {
     }
   };
 
-  // Game completion handler (updates Elo and records if ranked)
+  // Game completion handler (records match history and updates Elo if ranked)
   const handleGameComplete = async (finalState: BoardState) => {
-    if (!activeMatch || !activeMatch.isRanked || !finalState.result) return;
+    if (!activeMatch || !finalState.result) return;
 
     const { winner } = finalState.result;
     const outcome = winner === 'draw' ? 'draw' : winner;
@@ -431,6 +436,40 @@ const MainApp: React.FC = () => {
       activeMatch.timeControlMinutes || 0,
       activeMatch.incrementSeconds || 0
     );
+
+    // Save completed local / bot match so players can inspect and analyze it
+    if (finalState.moveHistory.length > 0) {
+      try {
+        const localGameId = generateGameId();
+        const playerIds = [activeMatch.whitePlayer.id, activeMatch.blackPlayer.id].filter(
+          (id): id is string => Boolean(id)
+        );
+        const completedRoom: GameRoom = {
+          id: localGameId,
+          hostId: activeMatch.whitePlayer.id,
+          whitePlayer: activeMatch.whitePlayer,
+          blackPlayer: activeMatch.blackPlayer,
+          status: 'completed',
+          boardState: finalState,
+          mode: category,
+          playerIds,
+          isComputer: activeMatch.isComputer,
+          botLevel: activeMatch.botLevel,
+          timeControlMinutes: activeMatch.timeControlMinutes || 0,
+          incrementSeconds: activeMatch.incrementSeconds || 0,
+          isRanked: activeMatch.isRanked,
+          winner: finalState.result.winner,
+          winReason: finalState.result.winReason,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        localGameStore.set(completedRoom);
+      } catch (saveErr) {
+        console.warn('Failed to save local completed match to store:', saveErr);
+      }
+    }
+
+    if (!activeMatch.isRanked) return;
 
     const whiteGames =
       activeMatch.whitePlayer.gamesPlayed ??
@@ -497,7 +536,10 @@ const MainApp: React.FC = () => {
     setActiveMatch(null);
   };
 
-  const isMatchActive = Boolean(activeMatch) || location.pathname.startsWith('/game/');
+  const isMatchActive =
+    Boolean(activeMatch) ||
+    location.pathname.startsWith('/game/') ||
+    location.pathname.startsWith('/analysis/');
 
   return (
     <div className={`app-container ${isMatchActive ? 'in-match' : ''}`}>
@@ -538,6 +580,9 @@ const MainApp: React.FC = () => {
       >
         <Routes>
           <Route path="/game/:gameId" element={<GameRoomView />} />
+          <Route path="/matches" element={<MatchHistoryView />} />
+          <Route path="/matches/:targetUserId" element={<MatchHistoryView />} />
+          <Route path="/analysis/:gameId" element={<AnalysisRoomView />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />

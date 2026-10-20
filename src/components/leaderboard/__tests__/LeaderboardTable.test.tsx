@@ -4,6 +4,10 @@ import { LeaderboardTable } from '../LeaderboardTable';
 import { isHumanLeaderboardEligible, type UserProfile } from '@/services/firebase/localProvider';
 import { MULTIPLAYER_SCALE_CONFIG } from '@/services/firebase/multiplayerConfig';
 
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+}));
+
 class StorageMock {
   private store: Record<string, string> = {};
 
