@@ -16,9 +16,9 @@ import { SCHADA_VECTORS, squareToColRow, colRowToSquare } from '../vectors';
 import type { Square } from '../types';
 
 describe('Schada Game Engine', () => {
-  it('should initialize exactly 14 legal moves from the opening position for Blue', () => {
+  it('should initialize exactly 14 legal moves from the opening position for White', () => {
     const state = createInitialGameState();
-    const legalMoves = getAllLegalMoves(state.board, 'blue');
+    const legalMoves = getAllLegalMoves(state.board, 'white');
     expect(legalMoves.length).toBe(14);
 
     // Verify Field Officers moving forward over pawns
@@ -37,12 +37,12 @@ describe('Schada Game Engine', () => {
     expect(e2Moves.length).toBe(2);
   });
 
-  it('should initialize exactly 14 legal moves from the opening position for Green', () => {
+  it('should initialize exactly 14 legal moves from the opening position for Black', () => {
     const state = createInitialGameState();
-    const legalMoves = getAllLegalMoves(state.board, 'green');
+    const legalMoves = getAllLegalMoves(state.board, 'black');
     expect(legalMoves.length).toBe(14);
 
-    // Verify Green Field Officers moving forward (b8, d8, f8, h8)
+    // Verify Black Field Officers moving forward (b8, d8, f8, h8)
     const foMoves = legalMoves.filter((m) => m.piece.type === 'field_officer');
     expect(foMoves.length).toBe(4);
     expect(foMoves.map((m) => `${m.from}->${m.to}`).sort()).toEqual(
@@ -57,16 +57,16 @@ describe('Schada Game Engine', () => {
     board['a2'] = {
       id: 'p1',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
 
-    // Blue Field Officer on a1 (vector: [0, 2] over a2 to a3)
+    // White Field Officer on a1 (vector: [0, 2] over a2 to a3)
     board['a1'] = {
       id: 'fo1',
       type: 'field_officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -78,7 +78,7 @@ describe('Schada Game Engine', () => {
     board['a1'] = {
       id: 'o1',
       type: 'officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -93,16 +93,16 @@ describe('Schada Game Engine', () => {
     board['a2'] = {
       id: 'ep1',
       type: 'pawn',
-      color: 'green',
+      color: 'black',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
 
-    // Blue Field Officer on a1
+    // White Field Officer on a1
     board['a1'] = {
       id: 'fo1',
       type: 'field_officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -118,7 +118,7 @@ describe('Schada Game Engine', () => {
     board['c2'] = {
       id: 'o1',
       type: 'officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
@@ -131,7 +131,7 @@ describe('Schada Game Engine', () => {
     board['c2'] = {
       id: 'p1',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
@@ -142,66 +142,66 @@ describe('Schada Game Engine', () => {
   it('prevents high pieces in goal line from being captured (invulnerability)', () => {
     const board = createEmptyBoard();
 
-    // Blue Field Officer safely inside its goal line (rank 8, e.g. a8)
+    // White Field Officer safely inside its goal line (rank 8, e.g. a8)
     board['a8'] = {
-      id: 'fo_blue',
+      id: 'fo_white',
       type: 'field_officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: true,
     };
 
-    // Green piece that could move to a8 (e.g. green piece on b8 with [-1, 0] vector)
+    // Black piece that could move to a8 (e.g. black piece on b8 with [-1, 0] vector)
     board['b8'] = {
-      id: 'p_green',
+      id: 'p_black',
       type: 'pawn',
-      color: 'green',
+      color: 'black',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
 
-    const greenMoves = getLegalMovesForSquare(board, 'b8');
+    const blackMoves = getLegalMovesForSquare(board, 'b8');
     // Cannot capture the high piece inside its goal line!
-    expect(greenMoves.some((m) => m.to === 'a8')).toBe(false);
+    expect(blackMoves.some((m) => m.to === 'a8')).toBe(false);
   });
 
   it('calculates score breakdown correctly and resolves tiebreakers', () => {
     const board = createEmptyBoard();
 
-    // Blue: 1 FO in goal (2 pts) + 1 Officer on rank 5 (outside goal: 1 pt + 4/7 distance)
+    // White: 1 FO in goal (2 pts) + 1 Officer on rank 5 (outside goal: 1 pt + 4/7 distance)
     board['a8'] = {
       id: 'fo1',
       type: 'field_officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: true,
     };
     board['c5'] = {
       id: 'o1',
       type: 'officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
 
-    const blueScore = calculateScoreBreakdown(board, 'blue');
-    expect(blueScore.goalScore).toBe(2);
-    expect(blueScore.outsideGoalHighPiecesScore).toBe(1);
+    const whiteScore = calculateScoreBreakdown(board, 'white');
+    expect(whiteScore.goalScore).toBe(2);
+    expect(whiteScore.outsideGoalHighPiecesScore).toBe(1);
 
     const result = evaluateGameResult(board, 'goal_reached');
-    expect(result.winner).toBe('blue');
+    expect(result.winner).toBe('white');
   });
 
   it('executes move, captures piece, and toggles turns', () => {
     let state = createInitialGameState();
 
-    // Blue plays a2-c4
+    // White plays a2-c4
     const legalMoves = getLegalMovesForSquare(state.board, 'a2');
     const move = legalMoves.find((m) => m.to === 'c4')!;
     expect(move).toBeDefined();
 
     state = executeMove(state, move);
-    expect(state.currentTurn).toBe('green');
+    expect(state.currentTurn).toBe('black');
     expect(state.board['a2']).toBeNull();
     expect(state.board['c4']).toBeDefined();
     expect(state.board['c4']?.type).toBe('pawn');
@@ -215,7 +215,7 @@ describe('Schada Game Engine', () => {
     board['a5'] = {
       id: 'p_a5',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
@@ -230,7 +230,7 @@ describe('Schada Game Engine', () => {
     board['h4'] = {
       id: 'p_h4',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
@@ -245,7 +245,7 @@ describe('Schada Game Engine', () => {
     board['h3'] = {
       id: 'p_h3',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
@@ -260,7 +260,7 @@ describe('Schada Game Engine', () => {
     board['a6'] = {
       id: 'p_a6',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
@@ -275,7 +275,7 @@ describe('Schada Game Engine', () => {
     board['f2'] = {
       id: 'p_f2',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -294,7 +294,7 @@ describe('Schada Game Engine', () => {
       board[sq] = {
         id: `test_pawn_${sq}`,
         type: 'pawn',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: true,
         hasReachedGoal: false,
       };
@@ -319,11 +319,11 @@ describe('Schada Game Engine', () => {
   it('prohibits moving or capturing when an enemy piece occupies an intermediate square', () => {
     const board = createEmptyBoard();
 
-    // Blue piece on f2 with vector targeting h1 via path [g2, h2]
+    // White piece on f2 with vector targeting h1 via path [g2, h2]
     board['f2'] = {
       id: 'p_f2',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -332,7 +332,7 @@ describe('Schada Game Engine', () => {
     board['g2'] = {
       id: 'ep_g2',
       type: 'pawn',
-      color: 'green',
+      color: 'black',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
@@ -348,7 +348,7 @@ describe('Schada Game Engine', () => {
     board['h2'] = {
       id: 'ep_h2',
       type: 'pawn',
-      color: 'green',
+      color: 'black',
       hasLeftBase: true,
       hasReachedGoal: false,
     };
@@ -361,11 +361,11 @@ describe('Schada Game Engine', () => {
   it('allows Field Officers to leap friendly pieces to complete full path without stopping on them', () => {
     const board = createEmptyBoard();
 
-    // Blue Field Officer on f2 targeting h1 via path [g2, h2]
+    // White Field Officer on f2 targeting h1 via path [g2, h2]
     board['f2'] = {
       id: 'fo_f2',
       type: 'field_officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -374,7 +374,7 @@ describe('Schada Game Engine', () => {
     board['h2'] = {
       id: 'p_h2',
       type: 'pawn',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     };
@@ -390,30 +390,30 @@ describe('Schada Game Engine', () => {
   describe('isSquareAttacked', () => {
     it('accurately detects when a square is attacked by an enemy piece', () => {
       const board = createEmptyBoard();
-      // Blue piece on a1 targeting a3 via a2 (vector [0, 2])
+      // White piece on a1 targeting a3 via a2 (vector [0, 2])
       board['a1'] = {
-        id: 'blue_fo',
+        id: 'white_fo',
         type: 'field_officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
 
-      // Path is open, a3 should be attacked by blue
-      expect(isSquareAttacked(board, 'a3', 'blue')).toBe(true);
+      // Path is open, a3 should be attacked by white
+      expect(isSquareAttacked(board, 'a3', 'white')).toBe(true);
       // a4 is not a destination for a1
-      expect(isSquareAttacked(board, 'a4', 'blue')).toBe(false);
-      // Green is not attacking a3
-      expect(isSquareAttacked(board, 'a3', 'green')).toBe(false);
+      expect(isSquareAttacked(board, 'a4', 'white')).toBe(false);
+      // Black is not attacking a3
+      expect(isSquareAttacked(board, 'a3', 'black')).toBe(false);
     });
 
     it('returns false when intermediate squares are blocked for pieces that cannot leap', () => {
       const board = createEmptyBoard();
-      // Blue officer on a1 (vector [0, 2])
+      // White officer on a1 (vector [0, 2])
       board['a1'] = {
-        id: 'blue_officer',
+        id: 'white_officer',
         type: 'officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
@@ -421,13 +421,13 @@ describe('Schada Game Engine', () => {
       board['a2'] = {
         id: 'blocker',
         type: 'pawn',
-        color: 'green',
+        color: 'black',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
 
       // Officer cannot jump enemy blocker
-      expect(isSquareAttacked(board, 'a3', 'blue')).toBe(false);
+      expect(isSquareAttacked(board, 'a3', 'white')).toBe(false);
     });
   });
 
@@ -440,19 +440,19 @@ describe('Schada Game Engine', () => {
 
     it('identifies an enemy piece threatened by an opposing piece', () => {
       const board = createEmptyBoard();
-      // Blue Field Officer on a1 (vector to a3)
+      // White Field Officer on a1 (vector to a3)
       board['a1'] = {
-        id: 'blue_fo',
+        id: 'white_fo',
         type: 'field_officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
-      // Green pawn on a3
+      // Black pawn on a3
       board['a3'] = {
-        id: 'green_pawn',
+        id: 'black_pawn',
         type: 'pawn',
-        color: 'green',
+        color: 'black',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
@@ -465,19 +465,19 @@ describe('Schada Game Engine', () => {
 
     it('excludes high pieces that safely reside in their goal line (immune to capture)', () => {
       const board = createEmptyBoard();
-      // Green piece threatening a8
+      // Black piece threatening a8
       board['a6'] = {
-        id: 'green_pawn',
+        id: 'black_pawn',
         type: 'pawn',
-        color: 'green',
+        color: 'black',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
-      // Blue Field Officer safely in its goal rank (rank 8 / row 7)
+      // White Field Officer safely in its goal rank (rank 8 / row 7)
       board['a8'] = {
-        id: 'blue_fo',
+        id: 'white_fo',
         type: 'field_officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: true,
         hasReachedGoal: true,
       };
@@ -490,35 +490,35 @@ describe('Schada Game Engine', () => {
 
     it('identifies attacked pieces for both sides simultaneously', () => {
       const board = createEmptyBoard();
-      // Blue Field Officer on a1 targeting a3
+      // White Field Officer on a1 targeting a3
       board['a1'] = {
-        id: 'blue_fo',
+        id: 'white_fo',
         type: 'field_officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
-      // Green pawn on a3 (targeted by a1)
+      // Black pawn on a3 (targeted by a1)
       board['a3'] = {
-        id: 'green_pawn',
+        id: 'black_pawn',
         type: 'pawn',
-        color: 'green',
+        color: 'black',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
-      // Green piece on h8 targeting h6
+      // Black piece on h8 targeting h6
       board['h8'] = {
-        id: 'green_officer',
+        id: 'black_officer',
         type: 'officer',
-        color: 'green',
+        color: 'black',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
-      // Blue pawn on h6 (targeted by h8)
+      // White pawn on h6 (targeted by h8)
       board['h6'] = {
-        id: 'blue_pawn',
+        id: 'white_pawn',
         type: 'pawn',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
@@ -534,35 +534,35 @@ describe('Schada Game Engine', () => {
     it('ends the game immediately with elimination when opponent has all pieces captured (0 legal moves)', () => {
       const board = createEmptyBoard();
 
-      // Blue has 1 Field Officer on a1 targeting b1 (vector [1, 0])
+      // White has 1 Field Officer on a1 targeting b1 (vector [1, 0])
       board['a1'] = {
-        id: 'blue_fo',
+        id: 'white_fo',
         type: 'field_officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
 
-      // Green has only 1 piece left (pawn on b1)
+      // Black has only 1 piece left (pawn on b1)
       board['b1'] = {
-        id: 'green_pawn',
+        id: 'black_pawn',
         type: 'pawn',
-        color: 'green',
+        color: 'black',
         hasLeftBase: true,
         hasReachedGoal: false,
       };
 
       const state = {
         board,
-        currentTurn: 'blue' as const,
+        currentTurn: 'white' as const,
         moveHistory: [],
-        capturedPieces: { blue: [], green: [] },
+        capturedPieces: { white: [], black: [] },
         positionHistory: ['initial'],
         isGameOver: false,
         result: null,
       };
 
-      // Move a1 -> b1 (capturing green_pawn)
+      // Move a1 -> b1 (capturing black_pawn)
       const moves = getLegalMovesForSquare(board, 'a1');
       const captureMove = moves.find((m) => m.to === 'b1')!;
       expect(captureMove).toBeDefined();
@@ -571,59 +571,59 @@ describe('Schada Game Engine', () => {
 
       expect(nextState.isGameOver).toBe(true);
       expect(nextState.result?.winReason).toBe('elimination');
-      expect(nextState.result?.winner).toBe('blue');
+      expect(nextState.result?.winner).toBe('white');
     });
 
     it('ends the game immediately with elimination when next player is completely immobilized', () => {
       const board = createEmptyBoard();
 
-      // Blue has a piece on b1 (targeting a1 via vector [-1, 0])
+      // White has a piece on b1 (targeting a1 via vector [-1, 0])
       board['b1'] = {
-        id: 'blue_mover',
+        id: 'white_mover',
         type: 'pawn',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
 
-      // Green has only 1 piece on b8: Officer with hasLeftBase=true
+      // Black has only 1 piece on b8: Officer with hasLeftBase=true
       // On b8: vectors are [1, 0] -> c8, [-1, 0] -> a8, [0, -2] -> b6 via b7.
       // Because hasLeftBase is true, lateral moves to rank 8 (c8, a8) are forbidden!
       board['b8'] = {
-        id: 'green_officer',
+        id: 'black_officer',
         type: 'officer',
-        color: 'green',
+        color: 'black',
         hasLeftBase: true,
         hasReachedGoal: false,
       };
 
-      // Place Blue piece on b7 to block intermediate square for [0, -2]
+      // Place White piece on b7 to block intermediate square for [0, -2]
       board['b7'] = {
-        id: 'blue_blocker_b7',
+        id: 'white_blocker_b7',
         type: 'pawn',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: true,
         hasReachedGoal: false,
       };
 
       const state = {
         board,
-        currentTurn: 'blue' as const,
+        currentTurn: 'white' as const,
         moveHistory: [],
-        capturedPieces: { blue: [], green: [] },
+        capturedPieces: { white: [], black: [] },
         positionHistory: ['initial'],
         isGameOver: false,
         result: null,
       };
 
-      const blueMoves = getLegalMovesForSquare(board, 'b1');
-      const move = blueMoves.find((m) => m.to === 'a1')!;
+      const whiteMoves = getLegalMovesForSquare(board, 'b1');
+      const move = whiteMoves.find((m) => m.to === 'a1')!;
       expect(move).toBeDefined();
       const nextState = executeMove(state, move);
 
-      // Green has 0 legal moves
-      const greenMoves = getAllLegalMoves(nextState.board, 'green');
-      expect(greenMoves.length).toBe(0);
+      // Black has 0 legal moves
+      const blackMoves = getAllLegalMoves(nextState.board, 'black');
+      expect(blackMoves.length).toBe(0);
 
       expect(nextState.isGameOver).toBe(true);
       expect(nextState.result?.winReason).toBe('elimination');
@@ -632,73 +632,73 @@ describe('Schada Game Engine', () => {
     it('triggers goal_reached passively when opponent captures the last outside high piece', () => {
       const board = createEmptyBoard();
 
-      // Green has 1 Field Officer already safely on goal line (rank 1, e.g. h1)
+      // Black has 1 Field Officer already safely on goal line (rank 1, e.g. h1)
       board['h1'] = {
-        id: 'green_fo_goal',
+        id: 'black_fo_goal',
         type: 'field_officer',
-        color: 'green',
+        color: 'black',
         hasLeftBase: true,
         hasReachedGoal: true,
       };
 
-      // Green has 1 Officer outside goal on a3 (Rank 3 is outside Green's goal line Rank 1)
+      // Black has 1 Officer outside goal on a3 (Rank 3 is outside Black's goal line Rank 1)
       board['a3'] = {
-        id: 'green_o_outside',
+        id: 'black_o_outside',
         type: 'officer',
-        color: 'green',
+        color: 'black',
         hasLeftBase: true,
         hasReachedGoal: false,
       };
 
-      // Blue has Field Officer on a1 targeting a3 (vector [0, 2] via a2)
+      // White has Field Officer on a1 targeting a3 (vector [0, 2] via a2)
       board['a1'] = {
-        id: 'blue_fo',
+        id: 'white_fo',
         type: 'field_officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
 
       const state = {
         board,
-        currentTurn: 'blue' as const,
+        currentTurn: 'white' as const,
         moveHistory: [],
-        capturedPieces: { blue: [], green: [] },
+        capturedPieces: { white: [], black: [] },
         positionHistory: ['initial'],
         isGameOver: false,
         result: null,
       };
 
-      const blueMoves = getLegalMovesForSquare(board, 'a1');
-      const captureMove = blueMoves.find((m) => m.to === 'a3')!;
+      const whiteMoves = getLegalMovesForSquare(board, 'a1');
+      const captureMove = whiteMoves.find((m) => m.to === 'a3')!;
       expect(captureMove).toBeDefined();
 
-      // Blue captures Green's outside piece on a3.
-      // Now Green's remaining high pieces are ALL on the goal line (h1)!
+      // White captures Black's outside piece on a3.
+      // Now Black's remaining high pieces are ALL on the goal line (h1)!
       const nextState = executeMove(state, captureMove);
 
       expect(nextState.isGameOver).toBe(true);
       expect(nextState.result?.winReason).toBe('goal_reached');
-      // Green has 2 goal points, Blue has 0 goal points -> Green wins!
-      expect(nextState.result?.winner).toBe('green');
+      // Black has 2 goal points, White has 0 goal points -> Black wins!
+      expect(nextState.result?.winner).toBe('black');
     });
 
     it('triggers mutual_shuffle when both players make 6 consecutive high-piece lateral moves in base/goal lines', () => {
-      // We simulate 6 consecutive lateral moves by high pieces on Rank 1 (blue base) and Rank 8 (green base)
+      // We simulate 6 consecutive lateral moves by high pieces on Rank 1 (white base) and Rank 8 (black base)
       // Rank 1 vectors: lateral moves like a1<->b1 are not available directly unless vectors permit,
-      // so let's set up a clean board where Blue FO on a1 moves to c1 and Green FO on b8 moves to d8
+      // so let's set up a clean board where White FO on a1 moves to c1 and Black FO on b8 moves to d8
       const board = createEmptyBoard();
       board['a1'] = {
         id: 'b_fo1',
         type: 'field_officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
       board['b8'] = {
         id: 'g_fo1',
         type: 'field_officer',
-        color: 'green',
+        color: 'black',
         hasLeftBase: false,
         hasReachedGoal: false,
       };
@@ -720,40 +720,40 @@ describe('Schada Game Engine', () => {
     it('requires enemy pieces to obstruct high pieces to trigger the blocked condition', () => {
       const board = createEmptyBoard();
 
-      // Blue officer on a1 (vector [0, 2] -> a3 via a2)
+      // White officer on a1 (vector [0, 2] -> a3 via a2)
       board['a1'] = {
-        id: 'blue_o',
+        id: 'white_o',
         type: 'officer',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: true,
         hasReachedGoal: false,
       };
 
       // Blocked solely by a friendly pawn on a2
       board['a2'] = {
-        id: 'blue_pawn',
+        id: 'white_pawn',
         type: 'pawn',
-        color: 'blue',
+        color: 'white',
         hasLeftBase: true,
         hasReachedGoal: false,
       };
 
       // Should NOT be blocked because obstruction is purely friendly
-      expect(areNonGoalHighPiecesBlocked(board, 'blue')).toBe(false);
+      expect(areNonGoalHighPiecesBlocked(board, 'white')).toBe(false);
       expect(isPieceObstructedByEnemy(board, 'a1')).toBe(false);
 
-      // Now change the blocker on a2 to an enemy green pawn
+      // Now change the blocker on a2 to an enemy black pawn
       board['a2'] = {
-        id: 'green_pawn',
+        id: 'black_pawn',
         type: 'pawn',
-        color: 'green',
+        color: 'black',
         hasLeftBase: true,
         hasReachedGoal: false,
       };
 
       // Officer on a1 cannot jump enemy pawn on a2, so path to a3 is blocked by enemy
       expect(isPieceObstructedByEnemy(board, 'a1')).toBe(true);
-      expect(areNonGoalHighPiecesBlocked(board, 'blue')).toBe(true);
+      expect(areNonGoalHighPiecesBlocked(board, 'white')).toBe(true);
     });
   });
 });

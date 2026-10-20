@@ -456,10 +456,13 @@ export function isUserGameRoom(
 ): boolean {
   if (!room) return false;
 
+  const whitePlayer = room.whitePlayer;
+  const blackPlayer = room.blackPlayer;
+
   if (userId) {
     if (
-      room.bluePlayer?.id === userId ||
-      room.greenPlayer?.id === userId ||
+      whitePlayer?.id === userId ||
+      blackPlayer?.id === userId ||
       room.targetOpponent?.id === userId
     ) {
       return true;
@@ -468,8 +471,8 @@ export function isUserGameRoom(
 
   if (guestId) {
     if (
-      room.bluePlayer?.id === guestId ||
-      room.greenPlayer?.id === guestId ||
+      whitePlayer?.id === guestId ||
+      blackPlayer?.id === guestId ||
       room.targetOpponent?.id === guestId
     ) {
       return true;
@@ -478,8 +481,8 @@ export function isUserGameRoom(
 
   if (sessionToken) {
     if (
-      (room.bluePlayer?.sessionToken && room.bluePlayer.sessionToken === sessionToken) ||
-      (room.greenPlayer?.sessionToken && room.greenPlayer.sessionToken === sessionToken)
+      (whitePlayer?.sessionToken && whitePlayer.sessionToken === sessionToken) ||
+      (blackPlayer?.sessionToken && blackPlayer.sessionToken === sessionToken)
     ) {
       return true;
     }

@@ -1,6 +1,6 @@
 import type { BoardState, Move, PieceColor } from '../schada/types';
 import { createInitialGameState, executeMove } from '../schada/engine';
-import { FastBoard, type FastMove, BLUE_PAWN, GREEN_PAWN } from '../bot/fastBoard';
+import { FastBoard, type FastMove, WHITE_PAWN, BLACK_PAWN } from '../bot/fastBoard';
 import { getBotTier } from '../bot/botTiers';
 import { OPENING_BOOK, buildMoveSequenceKey } from '../bot/openingBook';
 import { searchMoveCandidates, type CandidateMoveEvaluation } from '../bot/search';
@@ -209,9 +209,9 @@ export function evaluateSinglePly(
   // 4. Sacrifice Detection for Brilliant Moves
   let isSacrifice = false;
   if (playedFastMove) {
-    const opponentColor: PieceColor = turn === 'blue' ? 'green' : 'blue';
+    const opponentColor: PieceColor = turn === 'white' ? 'black' : 'white';
     const isAttacked = fastBoard.isSquareAttacked(playedFastMove.to, opponentColor);
-    const isHighPiece = playedFastMove.piece !== BLUE_PAWN && playedFastMove.piece !== GREEN_PAWN;
+    const isHighPiece = playedFastMove.piece !== WHITE_PAWN && playedFastMove.piece !== BLACK_PAWN;
     if (isAttacked && (isHighPiece || playedFastMove.captured === 0)) {
       isSacrifice = true;
     }
@@ -220,11 +220,11 @@ export function evaluateSinglePly(
   // 5. Classify Move Quality
   const quality = classifyMoveQuality(evalDelta, bestScore, candidateScores, isSacrifice, isBook, config);
 
-  // Normalize eval score to point of view (positive = Blue advantage)
+  // Normalize eval score to point of view (positive = White advantage)
   const safeBestScore = Number.isFinite(bestScore) ? bestScore : 0;
   const safePlayedScore = Number.isFinite(playedScore) ? playedScore : safeBestScore;
-  const normalizedBefore = turn === 'blue' ? safeBestScore : -safeBestScore;
-  const normalizedAfter = turn === 'blue' ? safePlayedScore : -safePlayedScore;
+  const normalizedBefore = turn === 'white' ? safeBestScore : -safeBestScore;
+  const normalizedAfter = turn === 'white' ? safePlayedScore : -safePlayedScore;
 
   const evaluatedMove: EvaluatedMove = {
     ply: ply + 1,
@@ -326,18 +326,18 @@ export function analyzeGame(
   }
 
   // 7. Calculate Accuracy Breakdowns
-  const blueStats = calculatePlayerAccuracy(evaluatedMoves, 'blue', config);
-  const greenStats = calculatePlayerAccuracy(evaluatedMoves, 'green', config);
+  const whiteStats = calculatePlayerAccuracy(evaluatedMoves, 'white', config);
+  const blackStats = calculatePlayerAccuracy(evaluatedMoves, 'black', config);
 
   const durationMs = Math.round(performance.now() - startTime);
 
   return {
     metadata: parsedData.metadata,
     moves: evaluatedMoves,
-    blueAccuracy: blueStats.accuracy,
-    greenAccuracy: greenStats.accuracy,
-    blueBreakdown: blueStats.breakdown,
-    greenBreakdown: greenStats.breakdown,
+    whiteAccuracy: whiteStats.accuracy,
+    blackAccuracy: blackStats.accuracy,
+    whiteBreakdown: whiteStats.breakdown,
+    blackBreakdown: blackStats.breakdown,
     nextMove,
     isComplete: currentState.isGameOver,
     totalPlies: evaluatedMoves.length,

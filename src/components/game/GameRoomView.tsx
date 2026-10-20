@@ -180,22 +180,22 @@ export const GameRoomView: React.FC = () => {
 
     const isAlreadySeated = Boolean(
       (user &&
-        ((game.bluePlayer && game.bluePlayer.id === user.id) ||
-          (game.greenPlayer && game.greenPlayer.id === user.id))) ||
+        ((game.whitePlayer && game.whitePlayer.id === user.id) ||
+          (game.blackPlayer && game.blackPlayer.id === user.id))) ||
       (!game.isRanked &&
         ((existingToken &&
-          ((game.bluePlayer && game.bluePlayer.sessionToken === existingToken) ||
-            (game.greenPlayer && game.greenPlayer.sessionToken === existingToken))) ||
+          ((game.whitePlayer && game.whitePlayer.sessionToken === existingToken) ||
+            (game.blackPlayer && game.blackPlayer.sessionToken === existingToken))) ||
           (guestId &&
-            ((game.bluePlayer && game.bluePlayer.id === guestId) ||
-              (game.greenPlayer && game.greenPlayer.id === guestId)))))
+            ((game.whitePlayer && game.whitePlayer.id === guestId) ||
+              (game.blackPlayer && game.blackPlayer.id === guestId)))))
     );
 
     if (isAlreadySeated) {
-      if (user && game.bluePlayer?.id === user.id && game.bluePlayer.sessionToken) {
-        setLocalSessionToken(gameId, game.bluePlayer.sessionToken);
-      } else if (user && game.greenPlayer?.id === user.id && game.greenPlayer.sessionToken) {
-        setLocalSessionToken(gameId, game.greenPlayer.sessionToken);
+      if (user && game.whitePlayer?.id === user.id && game.whitePlayer.sessionToken) {
+        setLocalSessionToken(gameId, game.whitePlayer.sessionToken);
+      } else if (user && game.blackPlayer?.id === user.id && game.blackPlayer.sessionToken) {
+        setLocalSessionToken(gameId, game.blackPlayer.sessionToken);
       }
       setHasJoined(true);
       return;
@@ -296,40 +296,40 @@ export const GameRoomView: React.FC = () => {
   // For authenticated users, identity is strictly determined by user.id
   // For guests in casual games, fallback to session token or guest ID
   // In ranked games, guests can NEVER be seated players
-  const isBlue = user
-    ? Boolean(game?.bluePlayer && game.bluePlayer.id === user.id)
+  const isWhite = user
+    ? Boolean(game?.whitePlayer && game.whitePlayer.id === user.id)
     : !game?.isRanked
       ? Boolean(
-        (sessionToken && game?.bluePlayer && game.bluePlayer.sessionToken === sessionToken) ||
-        (guestId && game?.bluePlayer && game.bluePlayer.id === guestId)
+        (sessionToken && game?.whitePlayer && game.whitePlayer.sessionToken === sessionToken) ||
+        (guestId && game?.whitePlayer && game.whitePlayer.id === guestId)
       )
       : false;
-  const isGreen = user
-    ? Boolean(game?.greenPlayer && game.greenPlayer.id === user.id)
+  const isBlack = user
+    ? Boolean(game?.blackPlayer && game.blackPlayer.id === user.id)
     : !game?.isRanked
       ? Boolean(
-        (sessionToken && game?.greenPlayer && game.greenPlayer.sessionToken === sessionToken) ||
-        (guestId && game?.greenPlayer && game.greenPlayer.id === guestId)
+        (sessionToken && game?.blackPlayer && game.blackPlayer.sessionToken === sessionToken) ||
+        (guestId && game?.blackPlayer && game.blackPlayer.id === guestId)
       )
       : false;
 
   // Maintain local session token synchronization if seated player token exists in room document
   useEffect(() => {
     if (!gameId) return;
-    if (isBlue && game?.bluePlayer?.sessionToken && sessionToken !== game.bluePlayer.sessionToken) {
-      setLocalSessionToken(gameId, game.bluePlayer.sessionToken);
-    } else if (isGreen && game?.greenPlayer?.sessionToken && sessionToken !== game.greenPlayer.sessionToken) {
-      setLocalSessionToken(gameId, game.greenPlayer.sessionToken);
+    if (isWhite && game?.whitePlayer?.sessionToken && sessionToken !== game.whitePlayer.sessionToken) {
+      setLocalSessionToken(gameId, game.whitePlayer.sessionToken);
+    } else if (isBlack && game?.blackPlayer?.sessionToken && sessionToken !== game.blackPlayer.sessionToken) {
+      setLocalSessionToken(gameId, game.blackPlayer.sessionToken);
     }
-  }, [gameId, isBlue, isGreen, game?.bluePlayer?.sessionToken, game?.greenPlayer?.sessionToken, sessionToken]);
+  }, [gameId, isWhite, isBlack, game?.whitePlayer?.sessionToken, game?.blackPlayer?.sessionToken, sessionToken]);
 
-  const userColor: PieceColor | undefined = isBlue
-    ? 'blue'
-    : isGreen
-      ? 'green'
+  const userColor: PieceColor | undefined = isWhite
+    ? 'white'
+    : isBlack
+      ? 'black'
       : (!game?.isRanked ? (joinedColor || undefined) : undefined);
   const isSpectator = !userColor;
-  const isHost = isBlue || isGreen;
+  const isHost = isWhite || isBlack;
 
   // Set in-game presence context while player in an active match
   const userId = user?.id;
@@ -361,12 +361,15 @@ export const GameRoomView: React.FC = () => {
     ) {
       return;
     }
-    const isDc = userColor === 'blue' ? Boolean(game.blueDisconnectedAt) : Boolean(game.greenDisconnectedAt);
+    const isWhitePlayer = userColor === 'white';
+    const isDc = isWhitePlayer
+      ? Boolean(game.whiteDisconnectedAt)
+      : Boolean(game.blackDisconnectedAt);
     if (isDc) {
       disconnectReportedRef.current = false;
       setPlayerDisconnectedAction(gameId, userColor, false);
     }
-  }, [gameId, game?.blueDisconnectedAt, game?.greenDisconnectedAt, userColor, isSpectator, game?.status, game?.timeControlMinutes]);
+  }, [gameId, game?.whiteDisconnectedAt, game?.blackDisconnectedAt, userColor, isSpectator, game?.status, game?.timeControlMinutes]);
 
   // Mark player as disconnected when leaving or unmounting the room during an in-progress real-time game
   const userColorRef = useRef(userColor);
@@ -454,22 +457,25 @@ export const GameRoomView: React.FC = () => {
       if (!isGameOver || !outcome) return;
 
       // Player identity is strictly determined by user.id matching the seated player
-      const isUserBlue = game.bluePlayer?.id === user.id;
-      const isUserGreen = game.greenPlayer?.id === user.id;
+      const isUserWhite = game.whitePlayer?.id === user.id;
+      const isUserBlack = game.blackPlayer?.id === user.id;
 
-      if (!isUserBlue && !isUserGreen) return;
+      if (!isUserWhite && !isUserBlack) return;
 
       eloUpdatedRef.current = true;
 
-      const myColor: PieceColor = isUserBlue ? 'blue' : 'green';
+      const myColor: PieceColor = isUserWhite ? 'white' : 'black';
       const won = outcome === myColor;
       const isDraw = outcome === 'draw';
 
       let delta = 0;
-      if (game.isRanked && game.bluePlayer && game.greenPlayer) {
+      if (game.isRanked && game.whitePlayer && game.blackPlayer) {
         const eloRes = game.eloResult || computeRankedGameEloResult(game, outcome);
         if (eloRes) {
-          delta = myColor === 'blue' ? eloRes.blueDelta : eloRes.greenDelta;
+          delta =
+            myColor === 'white'
+              ? (eloRes.whiteDelta ?? 0)
+              : (eloRes.blackDelta ?? 0);
         }
       }
 
@@ -509,7 +515,7 @@ export const GameRoomView: React.FC = () => {
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '1rem' }}>
-        <Loader2 size={36} className="spin" color="var(--accent-blue)" />
+        <Loader2 size={36} className="spin" color="var(--accent-gold)" />
         <div style={{ color: 'var(--text-secondary)' }}>Connecting to game room...</div>
       </div>
     );
@@ -518,7 +524,7 @@ export const GameRoomView: React.FC = () => {
   if (error || !game) {
     return (
       <div style={{ maxWidth: '480px', margin: '4rem auto', padding: '2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-        <h3 style={{ margin: '0 0 1rem', color: 'var(--piece-green)' }}>Game Not Found</h3>
+        <h3 style={{ margin: '0 0 1rem', color: 'var(--piece-white)' }}>Game Not Found</h3>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
           {error || 'Unable to load game room.'}
         </p>
@@ -574,64 +580,87 @@ export const GameRoomView: React.FC = () => {
   // Compute live synchronized clocks
   const now = Date.now();
   const elapsed = game.lastTurnStartTimeMs && game.status === 'in_progress' ? Math.max(0, now - game.lastTurnStartTimeMs) : 0;
-  const currentBlueTime =
-    game.currentTurn === 'blue' && game.status === 'in_progress'
-      ? Math.max(0, game.blueTimeMs - elapsed)
-      : game.blueTimeMs;
-  const currentGreenTime =
-    game.currentTurn === 'green' && game.status === 'in_progress'
-      ? Math.max(0, game.greenTimeMs - elapsed)
-      : game.greenTimeMs;
+  const rawWhiteTime = game.whiteTimeMs ?? 0;
+  const rawBlackTime = game.blackTimeMs ?? 0;
+  const isWhiteTurn = game.currentTurn === 'white';
+  const isBlackTurn = game.currentTurn === 'black';
+  const currentWhiteTime =
+    isWhiteTurn && game.status === 'in_progress'
+      ? Math.max(0, rawWhiteTime - elapsed)
+      : rawWhiteTime;
+  const currentBlackTime =
+    isBlackTurn && game.status === 'in_progress'
+      ? Math.max(0, rawBlackTime - elapsed)
+      : rawBlackTime;
 
-  const eloResult = game.eloResult || (game.isRanked && game.winner && game.bluePlayer && game.greenPlayer
+  const gameWhitePlayer = game.whitePlayer;
+  const gameBlackPlayer = game.blackPlayer;
+
+  const eloResult = game.eloResult || (game.isRanked && game.winner && gameWhitePlayer && gameBlackPlayer
     ? computeRankedGameEloResult(game, game.winner)
     : null);
 
-  const blueElo: PlayerEloUpdate | undefined = eloResult
-    ? { newElo: eloResult.newBlueElo, delta: eloResult.blueDelta }
+  const whiteElo: PlayerEloUpdate | undefined = eloResult
+    ? { newElo: eloResult.newWhiteElo ?? ELO_CONFIG.defaultStartingRating, delta: eloResult.whiteDelta ?? 0 }
     : undefined;
-  const greenElo: PlayerEloUpdate | undefined = eloResult
-    ? { newElo: eloResult.newGreenElo, delta: eloResult.greenDelta }
+  const blackElo: PlayerEloUpdate | undefined = eloResult
+    ? { newElo: eloResult.newBlackElo ?? ELO_CONFIG.defaultStartingRating, delta: eloResult.blackDelta ?? 0 }
     : undefined;
 
   const modeCategory = game ? determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0) : 'blitz';
-  const blueGames = typeof game.bluePlayer?.gamesPlayed === 'number'
-    ? game.bluePlayer.gamesPlayed
-    : (game.bluePlayer?.id === user?.id ? getUserModeGamesPlayed(user, modeCategory) : 0);
+  const whiteGames = typeof gameWhitePlayer?.gamesPlayed === 'number'
+    ? gameWhitePlayer.gamesPlayed
+    : (gameWhitePlayer?.id === user?.id ? getUserModeGamesPlayed(user, modeCategory) : ELO_CONFIG.defaultAssumedGamesPlayed);
 
-  const greenGames = typeof game.greenPlayer?.gamesPlayed === 'number'
-    ? game.greenPlayer.gamesPlayed
-    : (game.greenPlayer?.id === user?.id ? getUserModeGamesPlayed(user, modeCategory) : 0);
+  const blackGames = typeof gameBlackPlayer?.gamesPlayed === 'number'
+    ? gameBlackPlayer.gamesPlayed
+    : (gameBlackPlayer?.id === user?.id ? getUserModeGamesPlayed(user, modeCategory) : ELO_CONFIG.defaultAssumedGamesPlayed);
 
-  const bluePlayer: ArenaPlayer = game.bluePlayer
+  const initialWhiteElo =
+    eloResult?.initialWhiteElo ??
+    (game.eloResult
+      ? gameWhitePlayer
+        ? gameWhitePlayer.elo - (game.eloResult.whiteDelta ?? 0)
+        : ELO_CONFIG.defaultStartingRating
+      : gameWhitePlayer?.elo ?? ELO_CONFIG.defaultStartingRating);
+
+  const initialBlackElo =
+    eloResult?.initialBlackElo ??
+    (game.eloResult
+      ? gameBlackPlayer
+        ? gameBlackPlayer.elo - (game.eloResult.blackDelta ?? 0)
+        : ELO_CONFIG.defaultStartingRating
+      : gameBlackPlayer?.elo ?? ELO_CONFIG.defaultStartingRating);
+
+  const whitePlayer: ArenaPlayer = gameWhitePlayer
     ? {
-      id: game.bluePlayer.id,
-      username: game.bluePlayer.username,
-      elo: eloResult?.initialBlueElo ?? (game.eloResult ? (game.bluePlayer.elo - game.eloResult.blueDelta) : game.bluePlayer.elo),
-      gamesPlayed: blueGames,
-      isPatron: isPatronUser(game.bluePlayer),
-      hasDonated: Boolean(game.bluePlayer.hasDonated || game.bluePlayer.isPatron),
-      patronTier: game.bluePlayer.patronTier,
-      patronExpiresAt: game.bluePlayer.patronExpiresAt,
-      patronSubscriptionStatus: game.bluePlayer.patronSubscriptionStatus,
+      id: gameWhitePlayer.id,
+      username: gameWhitePlayer.username,
+      elo: initialWhiteElo,
+      gamesPlayed: whiteGames,
+      isPatron: isPatronUser(gameWhitePlayer),
+      hasDonated: Boolean(gameWhitePlayer.hasDonated || gameWhitePlayer.isPatron),
+      patronTier: gameWhitePlayer.patronTier,
+      patronExpiresAt: gameWhitePlayer.patronExpiresAt,
+      patronSubscriptionStatus: gameWhitePlayer.patronSubscriptionStatus,
     }
-    : { id: 'blue', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
+    : { id: 'white', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
 
-  const greenPlayer: ArenaPlayer = game.greenPlayer
+  const blackPlayer: ArenaPlayer = gameBlackPlayer
     ? {
-      id: game.greenPlayer.id,
-      username: game.greenPlayer.username,
-      elo: eloResult?.initialGreenElo ?? (game.eloResult ? (game.greenPlayer.elo - game.eloResult.greenDelta) : game.greenPlayer.elo),
-      gamesPlayed: greenGames,
-      isPatron: isPatronUser(game.greenPlayer),
-      hasDonated: Boolean(game.greenPlayer.hasDonated || game.greenPlayer.isPatron),
-      patronTier: game.greenPlayer.patronTier,
-      patronExpiresAt: game.greenPlayer.patronExpiresAt,
-      patronSubscriptionStatus: game.greenPlayer.patronSubscriptionStatus,
+      id: gameBlackPlayer.id,
+      username: gameBlackPlayer.username,
+      elo: initialBlackElo,
+      gamesPlayed: blackGames,
+      isPatron: isPatronUser(gameBlackPlayer),
+      hasDonated: Boolean(gameBlackPlayer.hasDonated || gameBlackPlayer.isPatron),
+      patronTier: gameBlackPlayer.patronTier,
+      patronExpiresAt: gameBlackPlayer.patronExpiresAt,
+      patronSubscriptionStatus: gameBlackPlayer.patronSubscriptionStatus,
     }
-    : { id: 'green', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
+    : { id: 'black', username: 'Waiting for player...', elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultGuestRating };
 
-  const host = game.bluePlayer || game.greenPlayer;
+  const host = gameWhitePlayer || gameBlackPlayer;
 
   return (
     <div className="game-room-container">
@@ -640,18 +669,18 @@ export const GameRoomView: React.FC = () => {
       <Arena
         initialState={game.boardState}
         syncedGameState={game.boardState}
-        bluePlayer={bluePlayer}
-        greenPlayer={greenPlayer}
-        blueElo={blueElo}
-        greenElo={greenElo}
+        whitePlayer={whitePlayer}
+        blackPlayer={blackPlayer}
+        whiteElo={whiteElo}
+        blackElo={blackElo}
         timeControlMinutes={game.timeControlMinutes}
         incrementSeconds={game.incrementSeconds}
         isRanked={game.isRanked}
         userColor={userColor}
         isSpectator={isSpectator}
         isWaiting={game.status === 'waiting'}
-        syncedBlueTimeMs={currentBlueTime}
-        syncedGreenTimeMs={currentGreenTime}
+        syncedWhiteTimeMs={currentWhiteTime}
+        syncedBlackTimeMs={currentBlackTime}
         onMakeMove={async (move: Move) => {
           const currentGame = gameRef.current || game;
           if (!userColor || currentGame.status === 'waiting') return;
@@ -690,13 +719,13 @@ export const GameRoomView: React.FC = () => {
         onGameComplete={(completedState) => {
           applyUserEloUpdates(completedState);
         }}
-        blueDisconnected={
+        whiteDisconnected={
           game.timeControlMinutes < LOBBY_CONFIG.correspondenceCutoffMinutes &&
-          Boolean(game.blueDisconnectedAt)
+          Boolean(game.whiteDisconnectedAt)
         }
-        greenDisconnected={
+        blackDisconnected={
           game.timeControlMinutes < LOBBY_CONFIG.correspondenceCutoffMinutes &&
-          Boolean(game.greenDisconnectedAt)
+          Boolean(game.blackDisconnectedAt)
         }
         abandonCountdownSeconds={
           game.timeControlMinutes < LOBBY_CONFIG.correspondenceCutoffMinutes

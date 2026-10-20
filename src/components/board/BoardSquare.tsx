@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Shield } from 'lucide-react';
-import type { Square, Piece, Move } from '@/core/schada/types';
+import type { Square, Piece, Move, PieceColor } from '@/core/schada/types';
 import { squareToColRow } from '@/core/schada/vectors';
 import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 import { VectorOverlay } from './VectorOverlay';
@@ -13,7 +13,7 @@ interface BoardSquareProps {
   isLastMove: boolean;
   legalMoveTarget: Move | undefined;
   onClick: (square: Square) => void;
-  orientation?: 'blue' | 'green';
+  orientation?: PieceColor;
   isUnderAttack?: boolean;
 }
 
@@ -43,19 +43,20 @@ export const BoardSquare: React.FC<BoardSquareProps> = memo(({
   const isLight = (col + row) % 2 === 1;
 
   // Determine if coordinate labels should show on this square based on perspective
-  const isBlueOrientation = orientation === 'blue';
-  const showFile = isBlueOrientation
-    ? row === SCHADA_RULES_CONFIG.board.blueBaseRankIndex
-    : row === SCHADA_RULES_CONFIG.board.blueGoalRankIndex;
-  const showRank = isBlueOrientation
+  const isWhiteOrientation = orientation === 'white';
+  const showFile = isWhiteOrientation
+    ? row === SCHADA_RULES_CONFIG.board.whiteBaseRankIndex
+    : row === SCHADA_RULES_CONFIG.board.whiteGoalRankIndex;
+  const showRank = isWhiteOrientation
     ? col === 0
     : col === SCHADA_RULES_CONFIG.board.fileCount - 1;
 
   // Check if high piece is in goal line (immune to capture)
   const isHighPiece = piece && (piece.type === 'field_officer' || piece.type === 'officer');
-  const goalRank = piece?.color === 'blue'
-    ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex
-    : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
+  const isPieceWhite = piece?.color === 'white';
+  const goalRank = isPieceWhite
+    ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex
+    : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
   const isInvulnerableInGoal = isHighPiece && row === goalRank;
 
   const handleClick = React.useCallback(() => {

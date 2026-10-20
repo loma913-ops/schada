@@ -89,4 +89,17 @@ describe('RulesGuide Component', () => {
     expect(html).not.toContain('Golden Tactical Tip');
     expect(html).not.toContain('Hoofd-Officier (Dutch)');
   });
+
+  it('renders alternating light and dark square picker cells and styled zoom box in the Vector Inspector', () => {
+    const html = renderToStaticMarkup(<RulesGuide />);
+
+    // 32 light squares and 32 dark squares in 64-square picker grid
+    const lightMatches = html.match(/rules-picker-cell light/g) || [];
+    const darkMatches = html.match(/rules-picker-cell dark/g) || [];
+    expect(lightMatches.length).toBe(32);
+    expect(darkMatches.length).toBe(32);
+
+    // Initial selected square f2 is dark
+    expect(html).toContain('square-zoom-box dark');
+  });
 });

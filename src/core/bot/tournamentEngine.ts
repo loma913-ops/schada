@@ -29,10 +29,10 @@ export interface BotParticipant {
   wins: number;
   losses: number;
   draws: number;
-  blueWins: number;
-  blueGames: number;
-  greenWins: number;
-  greenGames: number;
+  whiteWins: number;
+  whiteGames: number;
+  blackWins: number;
+  blackGames: number;
   championships: number;
   winReasons: Record<string, number>;
   totalMovesPlayed: number;
@@ -44,18 +44,18 @@ export interface MatchSimulationResult {
   readonly matchId: number;
   readonly roundName: string;
   readonly isRematch: boolean;
-  readonly blueBotTier: number;
-  readonly blueBotName: string;
-  readonly greenBotTier: number;
-  readonly greenBotName: string;
-  readonly blueEloBefore: number;
-  readonly greenEloBefore: number;
+  readonly whiteBotTier: number;
+  readonly whiteBotName: string;
+  readonly blackBotTier: number;
+  readonly blackBotName: string;
+  readonly whiteEloBefore: number;
+  readonly blackEloBefore: number;
   readonly winnerColor: PieceColor | 'draw';
   readonly winnerTier: number;
   readonly winnerName: string;
   readonly winReason: WinReason;
-  readonly blueScore: number;
-  readonly greenScore: number;
+  readonly whiteScore: number;
+  readonly blackScore: number;
   readonly movesCount: number;
   readonly eloUpdate: EloCalculationResult;
   readonly notationText: string;
@@ -106,8 +106,8 @@ export interface SimulationSummary {
   readonly outputDir: string;
   readonly bots: readonly BotParticipant[];
   readonly tournamentRankings: readonly OverallTournamentRanking[];
-  readonly overallBlueWins: number;
-  readonly overallGreenWins: number;
+  readonly overallWhiteWins: number;
+  readonly overallBlackWins: number;
   readonly overallDraws: number;
   readonly winReasonsDistribution: Record<string, number>;
 }
@@ -220,10 +220,10 @@ export function initializeBotParticipants(
       wins: 0,
       losses: 0,
       draws: 0,
-      blueWins: 0,
-      blueGames: 0,
-      greenWins: 0,
-      greenGames: 0,
+      whiteWins: 0,
+      whiteGames: 0,
+      blackWins: 0,
+      blackGames: 0,
       championships: 0,
       winReasons: {
         goal_reached: 0,
@@ -257,16 +257,16 @@ export function formatNotationFileContent(
     tournamentId: number;
     roundName: string;
     matchId: number;
-    blueBot: BotParticipant;
-    greenBot: BotParticipant;
-    blueEloBefore: number;
-    greenEloBefore: number;
+    whiteBot: BotParticipant;
+    blackBot: BotParticipant;
+    whiteEloBefore: number;
+    blackEloBefore: number;
     eloUpdate: EloCalculationResult;
     winnerColor: PieceColor | 'draw';
     winnerName: string;
     winReason: WinReason;
-    blueScore: number;
-    greenScore: number;
+    whiteScore: number;
+    blackScore: number;
     durationMs: number;
   },
   moveHistory: Move[]
@@ -274,38 +274,38 @@ export function formatNotationFileContent(
   const lines: string[] = [];
   lines.push(`[Event "Schada Championship Tournament #${header.tournamentId}"]`);
   lines.push(`[Round "${header.roundName} Match ${header.matchId}"]`);
-  lines.push(`[Blue "${header.blueBot.name} (Tier ${header.blueBot.tier})"]`);
-  lines.push(`[Green "${header.greenBot.name} (Tier ${header.greenBot.tier})"]`);
-  lines.push(`[BlueEloBefore "${header.blueEloBefore}"]`);
-  lines.push(`[GreenEloBefore "${header.greenEloBefore}"]`);
-  const blueSign = header.eloUpdate.blueDelta >= 0 ? `+${header.eloUpdate.blueDelta}` : `${header.eloUpdate.blueDelta}`;
-  const greenSign = header.eloUpdate.greenDelta >= 0 ? `+${header.eloUpdate.greenDelta}` : `${header.eloUpdate.greenDelta}`;
-  lines.push(`[BlueEloAfter "${header.eloUpdate.newBlueRating} (${blueSign})"]`);
-  lines.push(`[GreenEloAfter "${header.eloUpdate.newGreenRating} (${greenSign})"]`);
+  lines.push(`[White "${header.whiteBot.name} (Tier ${header.whiteBot.tier})"]`);
+  lines.push(`[Black "${header.blackBot.name} (Tier ${header.blackBot.tier})"]`);
+  lines.push(`[WhiteEloBefore "${header.whiteEloBefore}"]`);
+  lines.push(`[BlackEloBefore "${header.blackEloBefore}"]`);
+  const whiteSign = header.eloUpdate.whiteDelta >= 0 ? `+${header.eloUpdate.whiteDelta}` : `${header.eloUpdate.whiteDelta}`;
+  const blackSign = header.eloUpdate.blackDelta >= 0 ? `+${header.eloUpdate.blackDelta}` : `${header.eloUpdate.blackDelta}`;
+  lines.push(`[WhiteEloAfter "${header.eloUpdate.newWhiteRating} (${whiteSign})"]`);
+  lines.push(`[BlackEloAfter "${header.eloUpdate.newBlackRating} (${blackSign})"]`);
 
   let resultScore = '1/2-1/2';
-  if (header.winnerColor === 'blue') resultScore = '1-0';
-  else if (header.winnerColor === 'green') resultScore = '0-1';
+  if (header.winnerColor === 'white') resultScore = '1-0';
+  else if (header.winnerColor === 'black') resultScore = '0-1';
 
   lines.push(`[Result "${resultScore}"]`);
   lines.push(`[Winner "${header.winnerName}"]`);
   lines.push(`[WinReason "${header.winReason}"]`);
-  lines.push(`[BlueFinalScore "${header.blueScore.toFixed(2)}"]`);
-  lines.push(`[GreenFinalScore "${header.greenScore.toFixed(2)}"]`);
+  lines.push(`[WhiteFinalScore "${header.whiteScore.toFixed(2)}"]`);
+  lines.push(`[BlackFinalScore "${header.blackScore.toFixed(2)}"]`);
   lines.push(`[TotalPlies "${moveHistory.length}"]`);
   lines.push(`[DurationMs "${header.durationMs}"]`);
   lines.push(`[Date "${new Date().toISOString()}"]`);
   lines.push('');
 
-  // Format moves in turns (turnNumber. BlueMove GreenMove)
+  // Format moves in turns (turnNumber. WhiteMove BlackMove)
   for (let i = 0; i < moveHistory.length; i += 2) {
     const turnNumber = Math.floor(i / 2) + 1;
-    const blueMove = moveHistory[i].notation ?? `${moveHistory[i].from}-${moveHistory[i].to}`;
-    const greenMove =
+    const whiteMove = moveHistory[i].notation ?? `${moveHistory[i].from}-${moveHistory[i].to}`;
+    const blackMove =
       i + 1 < moveHistory.length
         ? moveHistory[i + 1].notation ?? `${moveHistory[i + 1].from}-${moveHistory[i + 1].to}`
         : '';
-    lines.push(`${turnNumber.toString().padStart(3, ' ')}. ${blueMove.padEnd(12, ' ')} ${greenMove}`);
+    lines.push(`${turnNumber.toString().padStart(3, ' ')}. ${whiteMove.padEnd(12, ' ')} ${blackMove}`);
   }
 
   lines.push('');
@@ -314,7 +314,7 @@ export function formatNotationFileContent(
 }
 
 /**
- * Simulates a single head-to-head game between Blue and Green bots, updating Elo and game metrics.
+ * Simulates a single head-to-head game between White and Black bots, updating Elo and game metrics.
  *
  * Algorithmic Complexity:
  * - Time Complexity: O(M * T_search) where M <= maxMoves and T_search is bounded by timeLimitMs.
@@ -324,8 +324,8 @@ export function formatNotationFileContent(
  * - O(M) strictly linear in move length per match.
  */
 export function simulateSingleGame(
-  blueBot: BotParticipant,
-  greenBot: BotParticipant,
+  whiteBot: BotParticipant,
+  blackBot: BotParticipant,
   tournamentId: number,
   matchId: number,
   roundName: string,
@@ -339,7 +339,7 @@ export function simulateSingleGame(
   let moveCount = 0;
 
   while (!state.isGameOver && moveCount < maxMoves) {
-    const currentTier = state.currentTurn === 'blue' ? blueBot.tier : greenBot.tier;
+    const currentTier = state.currentTurn === 'white' ? whiteBot.tier : blackBot.tier;
     const move = selectTournamentMove(
       state.board,
       state.currentTurn,
@@ -351,7 +351,7 @@ export function simulateSingleGame(
     if (!move) {
       // Fallback: If no move could be generated, tactical resignation
       const resigningColor = state.currentTurn;
-      const winner = resigningColor === 'blue' ? 'green' : 'blue';
+      const winner = resigningColor === 'white' ? 'black' : 'white';
       const evaluated = evaluateGameResult(state.board, 'resignation');
       state = {
         ...state,
@@ -359,8 +359,8 @@ export function simulateSingleGame(
         result: {
           winner,
           winReason: 'resignation',
-          blueScore: evaluated.blueScore,
-          greenScore: evaluated.greenScore,
+          whiteScore: evaluated.whiteScore,
+          blackScore: evaluated.blackScore,
         },
       };
       break;
@@ -379,8 +379,8 @@ export function simulateSingleGame(
       result: {
         winner: evaluated.winner,
         winReason: 'timeout',
-        blueScore: evaluated.blueScore,
-        greenScore: evaluated.greenScore,
+        whiteScore: evaluated.whiteScore,
+        blackScore: evaluated.blackScore,
       },
     };
   }
@@ -388,87 +388,87 @@ export function simulateSingleGame(
   const durationMs = Date.now() - startTime;
   const winnerColor = state.result?.winner ?? 'draw';
   const winReason: WinReason = state.result?.winReason ?? 'timeout';
-  const blueScore = extractTotalScore(state.result?.blueScore);
-  const greenScore = extractTotalScore(state.result?.greenScore);
+  const whiteScore = extractTotalScore(state.result?.whiteScore);
+  const blackScore = extractTotalScore(state.result?.blackScore);
 
   let winnerTier = 0;
   let winnerName = 'Draw';
-  if (winnerColor === 'blue') {
-    winnerTier = blueBot.tier;
-    winnerName = blueBot.name;
-  } else if (winnerColor === 'green') {
-    winnerTier = greenBot.tier;
-    winnerName = greenBot.name;
+  if (winnerColor === 'white') {
+    winnerTier = whiteBot.tier;
+    winnerName = whiteBot.name;
+  } else if (winnerColor === 'black') {
+    winnerTier = blackBot.tier;
+    winnerName = blackBot.name;
   }
 
-  const blueEloBefore = blueBot.currentElo;
-  const greenEloBefore = greenBot.currentElo;
+  const whiteEloBefore = whiteBot.currentElo;
+  const blackEloBefore = blackBot.currentElo;
 
   // Calculate Elo update
-  const eloOutcome = winnerColor === 'blue' ? 'blue' : winnerColor === 'green' ? 'green' : 'draw';
+  const eloOutcome = winnerColor === 'white' ? 'white' : winnerColor === 'black' ? 'black' : 'draw';
   const eloUpdate = calculateEloUpdate(
-    { rating: blueEloBefore, gamesPlayed: blueBot.gamesPlayed },
-    { rating: greenEloBefore, gamesPlayed: greenBot.gamesPlayed },
+    { rating: whiteEloBefore, gamesPlayed: whiteBot.gamesPlayed },
+    { rating: blackEloBefore, gamesPlayed: blackBot.gamesPlayed },
     eloOutcome
   );
 
   // Update bot participant stats
-  blueBot.gamesPlayed++;
-  greenBot.gamesPlayed++;
-  blueBot.blueGames++;
-  greenBot.greenGames++;
-  blueBot.totalMovesPlayed += Math.ceil(moveCount / 2);
-  greenBot.totalMovesPlayed += Math.floor(moveCount / 2);
+  whiteBot.gamesPlayed++;
+  blackBot.gamesPlayed++;
+  whiteBot.whiteGames++;
+  blackBot.blackGames++;
+  whiteBot.totalMovesPlayed += Math.ceil(moveCount / 2);
+  blackBot.totalMovesPlayed += Math.floor(moveCount / 2);
 
-  blueBot.currentElo = eloUpdate.newBlueRating;
-  greenBot.currentElo = eloUpdate.newGreenRating;
+  whiteBot.currentElo = eloUpdate.newWhiteRating;
+  blackBot.currentElo = eloUpdate.newBlackRating;
 
-  if (blueBot.currentElo > blueBot.peakElo) blueBot.peakElo = blueBot.currentElo;
-  if (blueBot.currentElo < blueBot.lowestElo) blueBot.lowestElo = blueBot.currentElo;
-  if (greenBot.currentElo > greenBot.peakElo) greenBot.peakElo = greenBot.currentElo;
-  if (greenBot.currentElo < greenBot.lowestElo) greenBot.lowestElo = greenBot.currentElo;
+  if (whiteBot.currentElo > whiteBot.peakElo) whiteBot.peakElo = whiteBot.currentElo;
+  if (whiteBot.currentElo < whiteBot.lowestElo) whiteBot.lowestElo = whiteBot.currentElo;
+  if (blackBot.currentElo > blackBot.peakElo) blackBot.peakElo = blackBot.currentElo;
+  if (blackBot.currentElo < blackBot.lowestElo) blackBot.lowestElo = blackBot.currentElo;
 
-  if (winnerColor === 'blue') {
-    blueBot.wins++;
-    blueBot.blueWins++;
-    greenBot.losses++;
-    blueBot.winReasons[winReason] = (blueBot.winReasons[winReason] ?? 0) + 1;
-    blueBot.headToHead[greenBot.tier].wins++;
-    greenBot.headToHead[blueBot.tier].losses++;
-  } else if (winnerColor === 'green') {
-    greenBot.wins++;
-    greenBot.greenWins++;
-    blueBot.losses++;
-    greenBot.winReasons[winReason] = (greenBot.winReasons[winReason] ?? 0) + 1;
-    greenBot.headToHead[blueBot.tier].wins++;
-    blueBot.headToHead[greenBot.tier].losses++;
+  if (winnerColor === 'white') {
+    whiteBot.wins++;
+    whiteBot.whiteWins++;
+    blackBot.losses++;
+    whiteBot.winReasons[winReason] = (whiteBot.winReasons[winReason] ?? 0) + 1;
+    whiteBot.headToHead[blackBot.tier].wins++;
+    blackBot.headToHead[whiteBot.tier].losses++;
+  } else if (winnerColor === 'black') {
+    blackBot.wins++;
+    blackBot.blackWins++;
+    whiteBot.losses++;
+    blackBot.winReasons[winReason] = (blackBot.winReasons[winReason] ?? 0) + 1;
+    blackBot.headToHead[whiteBot.tier].wins++;
+    whiteBot.headToHead[blackBot.tier].losses++;
   } else {
-    blueBot.draws++;
-    greenBot.draws++;
-    blueBot.headToHead[greenBot.tier].draws++;
-    greenBot.headToHead[blueBot.tier].draws++;
+    whiteBot.draws++;
+    blackBot.draws++;
+    whiteBot.headToHead[blackBot.tier].draws++;
+    blackBot.headToHead[whiteBot.tier].draws++;
   }
 
   const padTourney = tournamentId.toString().padStart(config.defaultIdPaddingDigits, '0');
   const roundPrefix = roundName.toLowerCase().replace(/[^a-z0-9]/g, '');
   const rematchSuffix = isRematch ? '_rematch' : '';
-  const filename = `t${padTourney}_m${matchId}_${roundPrefix}_${blueBot.name.toLowerCase()}_vs_${greenBot.name.toLowerCase()}${rematchSuffix}.txt`;
+  const filename = `t${padTourney}_m${matchId}_${roundPrefix}_${whiteBot.name.toLowerCase()}_vs_${blackBot.name.toLowerCase()}${rematchSuffix}.txt`;
 
   const notationText = formatNotationFileContent(
     {
       tournamentId,
       roundName,
       matchId,
-      blueBot,
-      greenBot,
-      blueEloBefore,
-      greenEloBefore,
+      whiteBot,
+      blackBot,
+      whiteEloBefore,
+      blackEloBefore,
       eloUpdate,
       winnerColor,
       winnerName,
       winReason,
-      blueScore,
-      greenScore,
+      whiteScore,
+      blackScore,
       durationMs,
     },
     state.moveHistory
@@ -479,18 +479,18 @@ export function simulateSingleGame(
     matchId,
     roundName,
     isRematch,
-    blueBotTier: blueBot.tier,
-    blueBotName: blueBot.name,
-    greenBotTier: greenBot.tier,
-    greenBotName: greenBot.name,
-    blueEloBefore,
-    greenEloBefore,
+    whiteBotTier: whiteBot.tier,
+    whiteBotName: whiteBot.name,
+    blackBotTier: blackBot.tier,
+    blackBotName: blackBot.name,
+    whiteEloBefore,
+    blackEloBefore,
     winnerColor,
     winnerTier,
     winnerName,
     winReason,
-    blueScore,
-    greenScore,
+    whiteScore,
+    blackScore,
     movesCount: moveCount,
     eloUpdate,
     notationText,
@@ -520,17 +520,17 @@ export function playMatchWithDrawResolution(
   config: TournamentSimulationConfig = TOURNAMENT_SIMULATION_CONFIG
 ): { matchResults: MatchSimulationResult[]; winner: BotParticipant } {
   const matchResults: MatchSimulationResult[] = [];
-  let isAColorBlue = Math.random() < 0.5;
+  let isAColorWhite = Math.random() < 0.5;
   let attempts = 0;
 
   while (attempts <= config.maxDrawRematches) {
-    const blueBot = isAColorBlue ? botA : botB;
-    const greenBot = isAColorBlue ? botB : botA;
+    const whiteBot = isAColorWhite ? botA : botB;
+    const blackBot = isAColorWhite ? botB : botA;
     const isRematch = attempts > 0;
 
     const result = simulateSingleGame(
-      blueBot,
-      greenBot,
+      whiteBot,
+      blackBot,
       tournamentId,
       matchId,
       roundName,
@@ -542,22 +542,22 @@ export function playMatchWithDrawResolution(
     matchResults.push(result);
 
     if (result.winnerColor !== 'draw') {
-      const winner = result.winnerColor === 'blue' ? blueBot : greenBot;
+      const winner = result.winnerColor === 'white' ? whiteBot : blackBot;
       return { matchResults, winner };
     }
 
     // On draw, swap colors and attempt rematch
-    isAColorBlue = !isAColorBlue;
+    isAColorWhite = !isAColorWhite;
     attempts++;
   }
 
   // Safety fallback if consecutive draws reach maxDrawRematches: compare score or coin flip
   const lastResult = matchResults[matchResults.length - 1];
   let winner = botA;
-  if (lastResult.blueScore > lastResult.greenScore) {
-    winner = lastResult.blueBotTier === botA.tier ? botA : botB;
-  } else if (lastResult.greenScore > lastResult.blueScore) {
-    winner = lastResult.greenBotTier === botA.tier ? botA : botB;
+  if (lastResult.whiteScore > lastResult.blackScore) {
+    winner = lastResult.whiteBotTier === botA.tier ? botA : botB;
+  } else if (lastResult.blackScore > lastResult.whiteScore) {
+    winner = lastResult.blackBotTier === botA.tier ? botA : botB;
   } else {
     winner = Math.random() < 0.5 ? botA : botB;
   }
@@ -817,14 +817,14 @@ export function generateSummaryReports(
   const sortedByElo = [...bots].sort((a, b) => b.currentElo - a.currentElo);
   const overallTournamentRankings = computeOverallTournamentRankings(bots, totalTournaments, config);
 
-  let overallBlueWins = 0;
-  let overallGreenWins = 0;
+  let overallWhiteWins = 0;
+  let overallBlackWins = 0;
   let overallDraws = 0;
   const winReasonsDistribution: Record<string, number> = {};
 
   for (const bot of bots) {
-    overallBlueWins += bot.blueWins;
-    overallGreenWins += bot.greenWins;
+    overallWhiteWins += bot.whiteWins;
+    overallBlackWins += bot.blackWins;
     overallDraws += bot.draws;
     for (const [reason, count] of Object.entries(bot.winReasons)) {
       winReasonsDistribution[reason] = (winReasonsDistribution[reason] ?? 0) + count;
@@ -838,8 +838,8 @@ export function generateSummaryReports(
     totalTournaments,
     totalMatches,
     totalDurationSeconds: Number((totalDurationMs / msPerSecond).toFixed(2)),
-    overallBlueWins,
-    overallGreenWins,
+    overallWhiteWins,
+    overallBlackWins,
     overallDraws,
     winReasonsDistribution,
     tournamentRankings: overallTournamentRankings,
@@ -856,8 +856,8 @@ export function generateSummaryReports(
       losses: b.losses,
       draws: b.draws,
       winRatePct: Number(((b.wins / (b.gamesPlayed || 1)) * percentageMultiplier).toFixed(1)),
-      blueWinRatePct: Number(((b.blueWins / (b.blueGames || 1)) * percentageMultiplier).toFixed(1)),
-      greenWinRatePct: Number(((b.greenWins / (b.greenGames || 1)) * percentageMultiplier).toFixed(1)),
+      whiteWinRatePct: Number(((b.whiteWins / (b.whiteGames || 1)) * percentageMultiplier).toFixed(1)),
+      blackWinRatePct: Number(((b.blackWins / (b.blackGames || 1)) * percentageMultiplier).toFixed(1)),
       championships: b.championships,
       championshipPct: Number(((b.championships / (totalTournaments || 1)) * percentageMultiplier).toFixed(1)),
       averagePliesPerGame: Number(((b.totalMovesPlayed / (b.gamesPlayed || 1)) * 2).toFixed(1)),
@@ -873,7 +873,7 @@ export function generateSummaryReports(
   mdLines.push(`- **Total Games Played**: ${totalMatches.toLocaleString()}`);
   mdLines.push(`- **Total Duration**: ${(totalDurationMs / msPerSecond).toFixed(1)}s`);
   mdLines.push(`- **Starting Rating**: ${config.initialBotElo} Elo across all tiers`);
-  mdLines.push(`- **Side Win Split**: Blue ${overallBlueWins} (${((overallBlueWins / totalMatches) * percentageMultiplier).toFixed(1)}%) vs. Green ${overallGreenWins} (${((overallGreenWins / totalMatches) * percentageMultiplier).toFixed(1)}%)`);
+  mdLines.push(`- **Side Win Split**: White ${overallWhiteWins} (${((overallWhiteWins / totalMatches) * percentageMultiplier).toFixed(1)}%) vs. Black ${overallBlackWins} (${((overallBlackWins / totalMatches) * percentageMultiplier).toFixed(1)}%)`);
   mdLines.push('');
 
   mdLines.push('## Final Tournament Championship Standings (Across All Tournaments)');
@@ -890,19 +890,19 @@ export function generateSummaryReports(
   mdLines.push('');
   mdLines.push('## Elo Rating Standings & Rating Deltas');
   mdLines.push('');
-  mdLines.push('| Rank | Tier | Bot Name | Final Elo | Elo +/- | Peak / Low | W - L (D) | Win % | Blue Win % | Green Win % | Championships |');
+  mdLines.push('| Rank | Tier | Bot Name | Final Elo | Elo +/- | Peak / Low | W - L (D) | Win % | White Win % | Black Win % | Championships |');
   mdLines.push('|:---:|:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|');
 
   sortedByElo.forEach((b, idx) => {
     const delta = b.currentElo - config.initialBotElo;
     const deltaSign = delta >= 0 ? `+${delta}` : `${delta}`;
     const winPct = ((b.wins / (b.gamesPlayed || 1)) * percentageMultiplier).toFixed(1);
-    const blueWinPct = ((b.blueWins / (b.blueGames || 1)) * percentageMultiplier).toFixed(1);
-    const greenWinPct = ((b.greenWins / (b.greenGames || 1)) * percentageMultiplier).toFixed(1);
+    const whiteWinPct = ((b.whiteWins / (b.whiteGames || 1)) * percentageMultiplier).toFixed(1);
+    const blackWinPct = ((b.blackWins / (b.blackGames || 1)) * percentageMultiplier).toFixed(1);
     const champPct = ((b.championships / totalTournaments) * percentageMultiplier).toFixed(1);
 
     mdLines.push(
-      `| ${idx + 1} | ${b.tier} | **${b.name}** | **${b.currentElo}** | ${deltaSign} | ${b.peakElo} / ${b.lowestElo} | ${b.wins} - ${b.losses} (${b.draws}) | ${winPct}% | ${blueWinPct}% | ${greenWinPct}% | **${b.championships}** (${champPct}%) |`
+      `| ${idx + 1} | ${b.tier} | **${b.name}** | **${b.currentElo}** | ${deltaSign} | ${b.peakElo} / ${b.lowestElo} | ${b.wins} - ${b.losses} (${b.draws}) | ${winPct}% | ${whiteWinPct}% | ${blackWinPct}% | **${b.championships}** (${champPct}%) |`
     );
   });
 
@@ -972,9 +972,9 @@ export function generateSummaryReports(
   const bottomChamp = overallTournamentRankings[overallTournamentRankings.length - 1];
   mdLines.push(`- **Tournament Leader**: Tier ${topChamp.tier} **${topChamp.name}** captured **${topChamp.championships}** championship titles (${topChamp.championshipPct}%) with final Elo ${topChamp.finalElo}.`);
   mdLines.push(`- **Trailing Engine**: Tier ${bottomChamp.tier} **${bottomChamp.name}** finished with ${bottomChamp.championships} titles and Elo ${bottomChamp.finalElo}.`);
-  const blueTotalGames = overallBlueWins + overallGreenWins;
-  const blueBias = blueTotalGames > 0 ? (overallBlueWins / blueTotalGames) * percentageMultiplier : 50;
-  mdLines.push(`- **First-Move (Blue) Advantage**: Blue won ${blueBias.toFixed(1)}% of decisive matches.`);
+  const whiteTotalGames = overallWhiteWins + overallBlackWins;
+  const whiteBias = whiteTotalGames > 0 ? (overallWhiteWins / whiteTotalGames) * percentageMultiplier : 50;
+  mdLines.push(`- **First-Move (White) Advantage**: White won ${whiteBias.toFixed(1)}% of decisive matches.`);
 
   return {
     json: JSON.stringify(jsonSummary, null, 2),
@@ -1042,18 +1042,18 @@ export async function runTournamentSimulation(
             matchId: m.matchId,
             roundName: m.roundName,
             isRematch: m.isRematch,
-            blueBot: `${m.blueBotName} (${m.blueBotTier})`,
-            greenBot: `${m.greenBotName} (${m.greenBotTier})`,
+            whiteBot: `${m.whiteBotName} (${m.whiteBotTier})`,
+            blackBot: `${m.blackBotName} (${m.blackBotTier})`,
             winner: m.winnerName,
             winnerColor: m.winnerColor,
             winReason: m.winReason,
-            blueScore: m.blueScore,
-            greenScore: m.greenScore,
+            whiteScore: m.whiteScore,
+            blackScore: m.blackScore,
             movesCount: m.movesCount,
-            blueEloBefore: m.blueEloBefore,
-            greenEloBefore: m.greenEloBefore,
-            newBlueRating: m.eloUpdate.newBlueRating,
-            newGreenRating: m.eloUpdate.newGreenRating,
+            whiteEloBefore: m.whiteEloBefore,
+            blackEloBefore: m.blackEloBefore,
+            newWhiteRating: m.eloUpdate.newWhiteRating,
+            newBlackRating: m.eloUpdate.newBlackRating,
             notationFile: m.filename,
           })),
           finalRankings: tournamentResult.finalRankings,
@@ -1088,14 +1088,14 @@ export async function runTournamentSimulation(
   fs.writeFileSync(path.join(outputDir, config.filenames.summaryJson), reports.json, 'utf-8');
   fs.writeFileSync(path.join(outputDir, config.filenames.summaryMd), reports.markdown, 'utf-8');
 
-  let overallBlueWins = 0;
-  let overallGreenWins = 0;
+  let overallWhiteWins = 0;
+  let overallBlackWins = 0;
   let overallDraws = 0;
   const winReasonsDistribution: Record<string, number> = {};
 
   for (const bot of bots) {
-    overallBlueWins += bot.blueWins;
-    overallGreenWins += bot.greenWins;
+    overallWhiteWins += bot.whiteWins;
+    overallBlackWins += bot.blackWins;
     overallDraws += bot.draws;
     for (const [reason, count] of Object.entries(bot.winReasons)) {
       winReasonsDistribution[reason] = (winReasonsDistribution[reason] ?? 0) + count;
@@ -1109,8 +1109,8 @@ export async function runTournamentSimulation(
     outputDir,
     bots,
     tournamentRankings,
-    overallBlueWins,
-    overallGreenWins,
+    overallWhiteWins,
+    overallBlackWins,
     overallDraws,
     winReasonsDistribution,
   };

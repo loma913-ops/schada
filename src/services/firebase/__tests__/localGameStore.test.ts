@@ -109,13 +109,13 @@ describe('LocalGameStore multi-tab synchronization and memory storage', () => {
     timeControlMinutes: 5,
     incrementSeconds: 0,
     isRanked: false,
-    creatorColorPref: 'blue',
-    bluePlayer: { id: 'u_blue', username: 'BluePlayer', elo: 1500, sessionToken: 'token_blue' },
-    greenPlayer: { id: 'u_green', username: 'GreenPlayer', elo: 1500, sessionToken: 'token_green' },
+    creatorColorPref: 'white',
+    whitePlayer: { id: 'u_white', username: 'whitePlayer', elo: 1500, sessionToken: 'token_white' },
+    blackPlayer: { id: 'u_black', username: 'blackPlayer', elo: 1500, sessionToken: 'token_black' },
     boardState: initialBoardState,
-    currentTurn: 'blue',
-    blueTimeMs: 300000,
-    greenTimeMs: 300000,
+    currentTurn: 'white',
+    whiteTimeMs: 300000,
+    blackTimeMs: 300000,
     lastTurnStartTimeMs: Date.now(),
   };
 
@@ -138,7 +138,7 @@ describe('LocalGameStore multi-tab synchronization and memory storage', () => {
     const retrievedA = storeA.get('game_tab_123');
     expect(retrievedA).not.toBeNull();
     expect(retrievedA?.id).toBe('game_tab_123');
-    expect(retrievedA?.currentTurn).toBe('blue');
+    expect(retrievedA?.currentTurn).toBe('white');
 
     const rawAll = storeA.getAll();
     expect(rawAll['game_tab_123']).toBeDefined();
@@ -167,14 +167,14 @@ describe('LocalGameStore multi-tab synchronization and memory storage', () => {
           {
             from: 'b2',
             to: 'b3',
-            piece: { id: 'b_p1', type: 'pawn', color: 'blue', hasLeftBase: false, hasReachedGoal: false },
+            piece: { id: 'w_p1', type: 'pawn', color: 'white', hasLeftBase: false, hasReachedGoal: false },
             intermediateSquares: [],
             notation: 'b2-b3',
           },
         ],
-        currentTurn: 'green',
+        currentTurn: 'black',
       },
-      currentTurn: 'green',
+      currentTurn: 'black',
     };
 
     storeA.set(updatedGame);
@@ -182,12 +182,12 @@ describe('LocalGameStore multi-tab synchronization and memory storage', () => {
     // Subscriber in storeB should be called immediately
     expect(subscriberMock).toHaveBeenCalledTimes(1);
     expect(peerReceivedGame).not.toBeNull();
-    expect((peerReceivedGame as unknown as GameRoom)?.currentTurn).toBe('green');
+    expect((peerReceivedGame as unknown as GameRoom)?.currentTurn).toBe('black');
 
     // storeB's memoryStore must contain the updated game
     const storeBMemory = (storeB as unknown as { memoryStore: Record<string, GameRoom> }).memoryStore;
     expect(storeBMemory['game_tab_123']).toBeDefined();
-    expect(storeBMemory['game_tab_123'].currentTurn).toBe('green');
+    expect(storeBMemory['game_tab_123'].currentTurn).toBe('black');
   });
 
   it('synchronizes GAME_DELETED across tabs and cleans memoryStore in peer store', () => {

@@ -29,15 +29,15 @@ vi.mock('@/services/device/haptics', () => ({
 
 describe('GameOverModal - Rated Games Elo Display', () => {
   const mockResult: GameResult = {
-    winner: 'blue',
+    winner: 'white',
     winReason: 'resignation',
-    blueScore: {
+    whiteScore: {
       goalScore: 0,
       outsideGoalHighPiecesScore: 12,
       rankDistanceScore: 0,
       totalScore: 12,
     },
-    greenScore: {
+    blackScore: {
       goalScore: 0,
       outsideGoalHighPiecesScore: 12,
       rankDistanceScore: 0.5714,
@@ -67,20 +67,20 @@ describe('GameOverModal - Rated Games Elo Display', () => {
         React.createElement(GameOverModal, {
           result: mockResult,
           isRanked: true,
-          bluePlayer: { elo: 1200, gamesPlayed: 20 },
-          greenPlayer: { elo: 1200, gamesPlayed: 20 },
+          whitePlayer: { elo: 1200, gamesPlayed: 20 },
+          blackPlayer: { elo: 1200, gamesPlayed: 20 },
           onHome: vi.fn(),
         })
       );
 
-      // Blue won against equally rated player (K=20): delta = +10, new = 1210
-      // Green lost: delta = -10, new = 1190
+      // White won against equally rated player (K=20): delta = +10, new = 1210
+      // Black lost: delta = -10, new = 1190
       expect(html).toContain('1210');
       expect(html).toContain('(+10)');
       expect(html).toContain('1190');
       expect(html).toContain('(-10)');
-      expect(html).toContain('Blue');
-      expect(html).toContain('Green');
+      expect(html).toContain('White');
+      expect(html).toContain('Black');
     });
 
     it('renders exact requested format ELO (GAIN/LOSS) when provided directly', () => {
@@ -88,8 +88,8 @@ describe('GameOverModal - Rated Games Elo Display', () => {
         React.createElement(GameOverModal, {
           result: mockResult,
           isRanked: true,
-          blueElo: { newElo: 1256, delta: 12 },
-          greenElo: { newElo: 1142, delta: -11 },
+          whiteElo: { newElo: 1256, delta: 12 },
+          blackElo: { newElo: 1142, delta: -11 },
           onHome: vi.fn(),
         })
       );
@@ -100,17 +100,17 @@ describe('GameOverModal - Rated Games Elo Display', () => {
       expect(html).toContain('(-11)');
     });
 
-    it('prioritizes authoritative blueElo and greenElo without recalculating from player cards', () => {
-      // Even if bluePlayer and greenPlayer reflect already-updated ratings or differing provisional games,
-      // blueElo and greenElo must be rendered directly and authoritatively.
+    it('prioritizes authoritative whiteElo and blackElo without recalculating from player cards', () => {
+      // Even if whitePlayer and blackPlayer reflect already-updated ratings or differing provisional games,
+      // whiteElo and blackElo must be rendered directly and authoritatively.
       const html = renderToStaticMarkup(
         React.createElement(GameOverModal, {
           result: mockResult,
           isRanked: true,
-          bluePlayer: { elo: 1230, gamesPlayed: 0 },
-          greenPlayer: { elo: 1170, gamesPlayed: 20 },
-          blueElo: { newElo: 1216, delta: 16 },
-          greenElo: { newElo: 1184, delta: -16 },
+          whitePlayer: { elo: 1230, gamesPlayed: 0 },
+          blackPlayer: { elo: 1170, gamesPlayed: 20 },
+          whiteElo: { newElo: 1216, delta: 16 },
+          blackElo: { newElo: 1184, delta: -16 },
           onHome: vi.fn(),
         })
       );
@@ -135,8 +135,8 @@ describe('GameOverModal - Rated Games Elo Display', () => {
         React.createElement(GameOverModal, {
           result: drawResult,
           isRanked: true,
-          bluePlayer: { elo: 1200, gamesPlayed: 20 },
-          greenPlayer: { elo: 1200, gamesPlayed: 20 },
+          whitePlayer: { elo: 1200, gamesPlayed: 20 },
+          blackPlayer: { elo: 1200, gamesPlayed: 20 },
           onHome: vi.fn(),
         })
       );
@@ -152,32 +152,32 @@ describe('GameOverModal - Rated Games Elo Display', () => {
         React.createElement(GameOverModal, {
           result: mockResult,
           isRanked: false,
-          bluePlayer: { elo: 1200, gamesPlayed: 20 },
-          greenPlayer: { elo: 1200, gamesPlayed: 20 },
+          whitePlayer: { elo: 1200, gamesPlayed: 20 },
+          blackPlayer: { elo: 1200, gamesPlayed: 20 },
           onHome: vi.fn(),
         })
       );
 
       expect(html).not.toContain('(+10)');
       expect(html).not.toContain('(-10)');
-      expect(html).toContain('Blue');
-      expect(html).toContain('Green');
+      expect(html).toContain('White');
+      expect(html).toContain('Black');
     });
 
     it('does NOT render Elo when isRanked is undefined (default false)', () => {
       const html = renderToStaticMarkup(
         React.createElement(GameOverModal, {
           result: mockResult,
-          bluePlayer: { elo: 1200, gamesPlayed: 20 },
-          greenPlayer: { elo: 1200, gamesPlayed: 20 },
+          whitePlayer: { elo: 1200, gamesPlayed: 20 },
+          blackPlayer: { elo: 1200, gamesPlayed: 20 },
           onHome: vi.fn(),
         })
       );
 
       expect(html).not.toContain('(+10)');
       expect(html).not.toContain('(-10)');
-      expect(html).toContain('Blue');
-      expect(html).toContain('Green');
+      expect(html).toContain('White');
+      expect(html).toContain('Black');
     });
 
     it('uses theme tokens supporting both light and dark mode', () => {
@@ -185,18 +185,16 @@ describe('GameOverModal - Rated Games Elo Display', () => {
         React.createElement(GameOverModal, {
           result: mockResult,
           isRanked: true,
-          blueElo: { newElo: 1256, delta: 12 },
-          greenElo: { newElo: 1142, delta: -11 },
+          whiteElo: { newElo: 1256, delta: 12 },
+          blackElo: { newElo: 1142, delta: -11 },
           onHome: vi.fn(),
         })
       );
 
-      // Verify semantic CSS variables are applied
-      expect(html).toContain('var(--piece-blue)');
-      expect(html).toContain('var(--piece-green)');
+      // Verify semantic CSS variables are applied for theme-adaptive light and dark mode support
+      expect(html).toContain('var(--text-primary)');
       expect(html).toContain('var(--accent-green)');
       expect(html).toContain('var(--accent-red)');
-      expect(html).toContain('var(--text-primary)');
       expect(html).toContain('var(--font-mono)');
     });
 
@@ -248,9 +246,9 @@ describe('GameOverModal - Rated Games Elo Display', () => {
       const mockReport = {
         metadata: {},
         moves: [],
-        blueAccuracy: 77.7,
-        greenAccuracy: 85.8,
-        blueBreakdown: {
+        whiteAccuracy: 77.7,
+        blackAccuracy: 85.8,
+        whiteBreakdown: {
           brilliant: 0,
           great: 0,
           best: 7,
@@ -262,7 +260,7 @@ describe('GameOverModal - Rated Games Elo Display', () => {
           miss: 2,
           blunder: 0,
         },
-        greenBreakdown: {
+        blackBreakdown: {
           brilliant: 0,
           great: 0,
           best: 5,
@@ -283,8 +281,8 @@ describe('GameOverModal - Rated Games Elo Display', () => {
       const html = renderToStaticMarkup(
         React.createElement(GameOverModal, {
           result: mockResult,
-          bluePlayer: { elo: 1200, username: 'SchadaBot' },
-          greenPlayer: { elo: 1200, username: 'Guest' },
+          whitePlayer: { elo: 1200, username: 'SchadaBot' },
+          blackPlayer: { elo: 1200, username: 'Guest' },
           analysisReport: mockReport,
           onHome: vi.fn(),
           onClose: vi.fn(),
@@ -314,9 +312,9 @@ describe('GameOverModal - Rated Games Elo Display', () => {
       expect(html).toContain('Blunder');
 
       // Verify counts from mock report
-      expect(html).toContain('7'); // Blue best moves
-      expect(html).toContain('5'); // Green best moves
-      expect(html).toContain('3'); // Green mistakes
+      expect(html).toContain('7'); // White best moves
+      expect(html).toContain('5'); // Black best moves
+      expect(html).toContain('3'); // Black mistakes
 
       // Verify accuracy values
       expect(html).toContain('77.7%');

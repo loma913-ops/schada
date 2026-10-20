@@ -42,7 +42,7 @@ Configuration over hardcoding:
 * **Deny by Default**: Any collection or field not explicitly authorized must be rejected.  
 * **Field-Level Mutation Guards**: Never use `allow update: if isOwner(...)` without restricting the mutable keys. Always use `.diff(resource.data).affectedKeys()` to explicitly permit only expected fields.  
 * **PII Segregation**: Never store private user data (such as email addresses, IP logs, or payment metadata) in documents that are publicly readable. Public profile data (`username`, `eloRating`, `avatar`, `stats`) must be strictly segregated from private user account documents.  
-* **Immutable Fields Protection**: Critical fields (such as `id`, `createdAt`, `isRanked`, `bluePlayer.id`, `greenPlayer.id`) must be strictly immutable once created.  
+* **Immutable Fields Protection**: Critical fields (such as `id`, `createdAt`, `isRanked`, `whitePlayer.id`, `blackPlayer.id`) must be strictly immutable once created.  
 * **Payload & Resource Limits**: Prevent Resource Exhaustion and Denial-of-Wallet attacks by enforcing string length bounds, array length caps, and type checks on every create/update operation.  
 * **Configuration Over Hardcoding**: Store all security limits (max usernames, rate bounds, timeout windows, token lengths) in central configuration files (e.g. `securityConfig.ts`), throwing explicit errors on missing values.
 

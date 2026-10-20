@@ -53,7 +53,10 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
 
     // Live presence polling & event synchronization
     const interval = setInterval(refreshData, MULTIPLAYER_SCALE_CONFIG.presence.friendsPollIntervalMs);
-    const handleStatusOrStorage = () => refreshData();
+    const handleStatusOrStorage = () => {
+      if (!user || (typeof document !== 'undefined' && document.hidden)) return;
+      getFriendsList(user.id).then(setFriends).catch(console.error);
+    };
 
     window.addEventListener('storage', handleStatusOrStorage);
     window.addEventListener(LOCAL_CONFIG.events.userStatusChanged, handleStatusOrStorage);

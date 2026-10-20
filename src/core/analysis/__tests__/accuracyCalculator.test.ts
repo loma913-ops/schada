@@ -16,7 +16,7 @@ function createMockMove(from: Square, to: Square, notation: string): Move {
     piece: {
       id: `piece_${from}`,
       type: 'field_officer',
-      color: 'blue',
+      color: 'white',
       hasLeftBase: false,
       hasReachedGoal: false,
     },
@@ -56,7 +56,7 @@ describe('Accuracy Calculator', () => {
     const dummyMoves: EvaluatedMove[] = [
       {
         ply: 1,
-        turn: 'blue',
+        turn: 'white',
         moveNumber: 1,
         playedMove: move1,
         playedNotation: 'Fe1-e3',
@@ -69,7 +69,7 @@ describe('Accuracy Calculator', () => {
       },
       {
         ply: 2,
-        turn: 'green',
+        turn: 'black',
         moveNumber: 1,
         playedMove: move2,
         playedNotation: 'Pc7-e5',
@@ -82,7 +82,7 @@ describe('Accuracy Calculator', () => {
       },
       {
         ply: 3,
-        turn: 'blue',
+        turn: 'white',
         moveNumber: 2,
         playedMove: move3,
         playedNotation: 'Fc1-c3',
@@ -95,16 +95,16 @@ describe('Accuracy Calculator', () => {
       },
     ];
 
-    const blueStats = calculatePlayerAccuracy(dummyMoves, 'blue');
-    expect(blueStats.moveCount).toBe(2);
-    expect(blueStats.accuracy).toBe(100);
-    expect(blueStats.breakdown.book).toBe(1);
-    expect(blueStats.breakdown.best).toBe(1);
+    const whiteStats = calculatePlayerAccuracy(dummyMoves, 'white');
+    expect(whiteStats.moveCount).toBe(2);
+    expect(whiteStats.accuracy).toBe(100);
+    expect(whiteStats.breakdown.book).toBe(1);
+    expect(whiteStats.breakdown.best).toBe(1);
 
-    const greenStats = calculatePlayerAccuracy(dummyMoves, 'green');
-    expect(greenStats.moveCount).toBe(1);
-    expect(greenStats.accuracy).toBe(100);
-    expect(greenStats.breakdown.book).toBe(1);
+    const blackStats = calculatePlayerAccuracy(dummyMoves, 'black');
+    expect(blackStats.moveCount).toBe(1);
+    expect(blackStats.accuracy).toBe(100);
+    expect(blackStats.breakdown.book).toBe(1);
   });
 
   it('throws AnalysisConfigError if a move ply references an invalid weight index', () => {
@@ -112,7 +112,7 @@ describe('Accuracy Calculator', () => {
     const corruptMoves: EvaluatedMove[] = [
       {
         ply: 999, // Out of bounds ply
-        turn: 'blue',
+        turn: 'white',
         moveNumber: 1,
         playedMove: move1,
         playedNotation: 'Fe1-e3',
@@ -125,13 +125,13 @@ describe('Accuracy Calculator', () => {
       },
     ];
 
-    expect(() => calculatePlayerAccuracy(corruptMoves, 'blue')).toThrow(
+    expect(() => calculatePlayerAccuracy(corruptMoves, 'white')).toThrow(
       /Missing volatility weight at ply 999/
     );
   });
 
   it('returns perfectAccuracy when player has zero moves', () => {
-    const stats = calculatePlayerAccuracy([], 'blue');
+    const stats = calculatePlayerAccuracy([], 'white');
     expect(stats.accuracy).toBe(100);
     expect(stats.moveCount).toBe(0);
   });
@@ -155,10 +155,10 @@ describe('Accuracy Calculator', () => {
     const report = createEmptyAnalysisReport();
     expect(report.moves).toHaveLength(0);
     expect(report.totalPlies).toBe(0);
-    expect(report.blueAccuracy).toBe(100);
-    expect(report.greenAccuracy).toBe(100);
-    expect(report.blueBreakdown.best).toBe(0);
-    expect(report.greenBreakdown.blunder).toBe(0);
+    expect(report.whiteAccuracy).toBe(100);
+    expect(report.blackAccuracy).toBe(100);
+    expect(report.whiteBreakdown.best).toBe(0);
+    expect(report.blackBreakdown.blunder).toBe(0);
     expect(report.isComplete).toBe(true);
   });
 });

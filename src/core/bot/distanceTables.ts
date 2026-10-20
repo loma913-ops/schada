@@ -1,5 +1,6 @@
 import type { Square } from '../schada/types';
 import { SCHADA_VECTORS, colRowToSquare, squareToColRow } from '../schada/vectors';
+import { SCHADA_RULES_CONFIG } from '../schada/rulesConfig';
 
 export const UNREACHABLE_DISTANCE = 99;
 
@@ -35,20 +36,20 @@ export function indexToSquare(index: number): Square {
 /**
  * Precomputed BFS distance table:
  * distance[colorIndex][pieceTypeIndex][squareIndex]
- * colorIndex: 0 = blue (goal row 7), 1 = green (goal row 0)
+ * colorIndex: 0 = white (goal row 7), 1 = black (goal row 0)
  * pieceTypeIndex: 0 = sliding (officer/pawn), 1 = leaping (field_officer)
  * Value: shortest path (in moves) from squareIndex to reach the goal rank.
  * 99 (UNREACHABLE_DISTANCE) if unreachable (dead-end trap).
  */
 export interface DistanceTables {
-  /** Blue sliding distance to row 7 */
-  readonly blueSliding: Uint8Array;
-  /** Blue leaping (FO) distance to row 7 */
-  readonly blueLeaping: Uint8Array;
-  /** Green sliding distance to row 0 */
-  readonly greenSliding: Uint8Array;
-  /** Green leaping (FO) distance to row 0 */
-  readonly greenLeaping: Uint8Array;
+  /** White sliding distance to goal rank */
+  readonly whiteSliding: Uint8Array;
+  /** White leaping (FO) distance to goal rank */
+  readonly whiteLeaping: Uint8Array;
+  /** Black sliding distance to goal rank */
+  readonly blackSliding: Uint8Array;
+  /** Black leaping (FO) distance to goal rank */
+  readonly blackLeaping: Uint8Array;
   /** Out-degree of each square (reachable target count on empty board) */
   readonly outDegrees: Uint8Array;
   /** Square centrality score (higher towards center d4, e4, d5, e5) */
@@ -125,10 +126,10 @@ function computeBfsDistance(
  * - Auxiliary Space Complexity: O(|V|) = 64 bytes per array.
  */
 function buildDistanceTables(): DistanceTables {
-  const blueSliding = new Uint8Array(64);
-  const blueLeaping = new Uint8Array(64);
-  const greenSliding = new Uint8Array(64);
-  const greenLeaping = new Uint8Array(64);
+  const whiteSliding = new Uint8Array(64);
+  const whiteLeaping = new Uint8Array(64);
+  const blackSliding = new Uint8Array(64);
+  const blackLeaping = new Uint8Array(64);
   const outDegrees = new Uint8Array(64);
   const centrality = new Float32Array(64);
 
@@ -136,13 +137,13 @@ function buildDistanceTables(): DistanceTables {
     const sq = indexToSquare(idx);
     const [c, r] = squareToColRow(sq);
 
-    // Blue goal is row 7
-    blueSliding[idx] = computeBfsDistance(sq, 7, false);
-    blueLeaping[idx] = computeBfsDistance(sq, 7, true);
+    // White goal rank
+    whiteSliding[idx] = computeBfsDistance(sq, SCHADA_RULES_CONFIG.board.whiteGoalRankIndex, false);
+    whiteLeaping[idx] = computeBfsDistance(sq, SCHADA_RULES_CONFIG.board.whiteGoalRankIndex, true);
 
-    // Green goal is row 0
-    greenSliding[idx] = computeBfsDistance(sq, 0, false);
-    greenLeaping[idx] = computeBfsDistance(sq, 0, true);
+    // Black goal rank
+    blackSliding[idx] = computeBfsDistance(sq, SCHADA_RULES_CONFIG.board.blackGoalRankIndex, false);
+    blackLeaping[idx] = computeBfsDistance(sq, SCHADA_RULES_CONFIG.board.blackGoalRankIndex, true);
 
     // Out-degree
     const vectors = SCHADA_VECTORS[sq] || [];
@@ -163,10 +164,10 @@ function buildDistanceTables(): DistanceTables {
   }
 
   return {
-    blueSliding,
-    blueLeaping,
-    greenSliding,
-    greenLeaping,
+    whiteSliding,
+    whiteLeaping,
+    blackSliding,
+    blackLeaping,
     outDegrees,
     centrality,
   };

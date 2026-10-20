@@ -395,6 +395,20 @@ body {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.arena-turn-indicator {
+  color: var(--piece-white);
+}
+
+[data-theme='light'] .arena-turn-indicator {
+  color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .arena-turn-indicator {
+    color: var(--text-primary);
+  }
+}
+
 /* Player Bar Card */
 .player-bar {
   display: flex;
@@ -427,14 +441,16 @@ body {
   flex-shrink: 0;
 }
 
-.player-avatar.blue {
-  background: var(--piece-blue);
-  color: white;
+.player-avatar.white {
+  background: var(--piece-white);
+  color: #18181B;
+  border: 1px solid #71717a;
 }
 
-.player-avatar.green {
-  background: var(--piece-green);
-  color: white;
+.player-avatar.black {
+  background: var(--piece-black);
+  color: #F1EFE7;
+  border: 1px solid #3f3f46;
 }
 
 .player-meta {
@@ -678,8 +694,8 @@ body {
 }
 
 [data-theme='light'] .move-navigator-btn.has-unread-live-move {
-  color: var(--piece-blue);
-  background-color: rgba(30, 58, 138, 0.12);
+  color: var(--accent-gold);
+  background-color: rgba(212, 175, 55, 0.14);
 }
 
 .move-navigator-unread-dot {
@@ -695,8 +711,8 @@ body {
 }
 
 [data-theme='light'] .move-navigator-unread-dot {
-  background-color: var(--piece-blue);
-  box-shadow: 0 0 6px rgba(30, 58, 138, 0.6);
+  background-color: var(--accent-gold);
+  box-shadow: 0 0 6px rgba(212, 175, 55, 0.6);
 }
 
 @keyframes pulse-unread-dot {
@@ -977,16 +993,16 @@ body {
   font-weight: 700;
 }
 
-.action-btn.pref-blue {
-  color: var(--piece-blue);
+.action-btn.pref-white {
+  color: var(--text-primary);
 }
 
-.action-btn.pref-green {
-  color: var(--piece-green);
+.action-btn.pref-black {
+  color: var(--text-primary);
 }
 
-.action-btn.active.pref-blue,
-.action-btn.active.pref-green {
+.action-btn.active.pref-white,
+.action-btn.active.pref-black {
   background-color: var(--accent-gold);
   color: var(--accent-gold-text);
   border-color: var(--accent-gold);
@@ -2114,7 +2130,7 @@ body {
 
 .filter-checkbox-item input[type='checkbox']:checked+.custom-checkbox {
   background-color: #629924;
-  /* Green checkbox matching Lichess */
+  /* Green checkbox matching Schada */
   border-color: #629924;
 }
 
@@ -2353,8 +2369,8 @@ body {
   }
 }
 
-/* Lichess CTA Button */
-.lichess-cta-btn {
+/* Schada CTA Button */
+.schada-cta-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2371,14 +2387,14 @@ body {
   width: 100%;
 }
 
-.lichess-cta-btn:hover {
+.schada-cta-btn:hover {
   background-color: var(--bg-tertiary);
   border-color: var(--accent-green);
   color: var(--text-primary);
   box-shadow: var(--shadow-sm);
 }
 
-.lichess-cta-icon {
+.schada-cta-icon {
   color: #629924;
 }
 
@@ -2401,20 +2417,20 @@ body {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-/* Lichess Modal Styles */
-.lichess-modal {
+/* Schada Modal Styles */
+.schada-modal {
   background-color: var(--bg-secondary) !important;
   border: 1px solid var(--border-strong) !important;
   color: var(--text-primary);
 }
 
-.lichess-tabs-nav {
+.schada-tabs-nav {
   display: flex;
   border-bottom: 2px solid var(--border-subtle);
   margin-bottom: 1.25rem;
 }
 
-.lichess-tab-btn {
+.schada-tab-btn {
   flex: 1;
   background: transparent;
   border: none;
@@ -2427,15 +2443,15 @@ body {
   transition: color 0.15s ease;
 }
 
-.lichess-tab-btn:hover {
+.schada-tab-btn:hover {
   color: var(--text-primary);
 }
 
-.lichess-tab-btn.active {
+.schada-tab-btn.active {
   color: var(--text-primary);
 }
 
-.lichess-tab-btn.active::after {
+.schada-tab-btn.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
@@ -2446,14 +2462,14 @@ body {
   border-radius: 2px 2px 0 0;
 }
 
-.lichess-unlimited-text {
+.schada-unlimited-text {
   text-align: center;
   color: var(--text-secondary);
   font-size: 0.95rem;
   margin: 1.25rem 0;
 }
 
-.lichess-field-label {
+.schada-field-label {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-secondary);
@@ -2461,7 +2477,7 @@ body {
   margin-bottom: 0.5rem;
 }
 
-.lichess-segmented-strength {
+.schada-segmented-strength {
   display: flex;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
@@ -2469,7 +2485,7 @@ body {
   overflow: hidden;
 }
 
-.lichess-strength-btn {
+.schada-strength-btn {
   flex: 1;
   background: transparent;
   border: none;
@@ -2482,21 +2498,21 @@ body {
   transition: all 0.15s ease;
 }
 
-.lichess-strength-btn:last-child {
+.schada-strength-btn:last-child {
   border-right: none;
 }
 
-.lichess-strength-btn:hover {
+.schada-strength-btn:hover {
   background-color: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
 }
 
-.lichess-strength-btn.active {
+.schada-strength-btn.active {
   background-color: var(--accent-green);
   color: var(--text-on-accent);
 }
 
-.lichess-segmented-side {
+.schada-segmented-side {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   background-color: var(--bg-tertiary);
@@ -2505,7 +2521,7 @@ body {
   overflow: hidden;
 }
 
-.lichess-side-btn {
+.schada-side-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2522,16 +2538,16 @@ body {
   transition: all 0.15s ease;
 }
 
-.lichess-side-btn:last-child {
+.schada-side-btn:last-child {
   border-right: none;
 }
 
-.lichess-side-btn:hover {
+.schada-side-btn:hover {
   background-color: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
 }
 
-.lichess-side-btn.active {
+.schada-side-btn.active {
   background-color: var(--accent-green);
   color: var(--text-on-accent);
 }

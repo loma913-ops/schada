@@ -57,12 +57,12 @@ interface ComputerModalNavState {
   openComputerModal?: boolean;
   timeControlMinutes?: number;
   incrementSeconds?: number;
-  userColor?: 'random' | 'blue' | 'green';
+  userColor?: 'random' | 'white' | 'black';
 }
 
 interface ActiveMatch {
-  bluePlayer: ArenaPlayer;
-  greenPlayer: ArenaPlayer;
+  whitePlayer: ArenaPlayer;
+  blackPlayer: ArenaPlayer;
   timeControlMinutes: number;
   incrementSeconds?: number;
   isRanked: boolean;
@@ -116,7 +116,7 @@ const MainApp: React.FC = () => {
   const [computerModalSettings, setComputerModalSettings] = useState<{
     timeControlMinutes?: number;
     incrementSeconds?: number;
-    userColor?: 'random' | 'blue' | 'green';
+    userColor?: 'random' | 'white' | 'black';
   }>({});
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [toastNotification, setToastNotification] = useState<string | null>(null);
@@ -256,14 +256,14 @@ const MainApp: React.FC = () => {
   // Start a Pass and Play / Solo Sandbox game
   const handleStartPassAndPlay = () => {
     setActiveMatch({
-      bluePlayer: {
+      whitePlayer: {
         id: 'p1',
-        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.passAndPlayBlueName,
+        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.passAndPlayWhiteName,
         elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
       },
-      greenPlayer: {
+      blackPlayer: {
         id: 'p2',
-        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.passAndPlayGreenName,
+        username: MULTIPLAYER_SCALE_CONFIG.matchmaking.passAndPlayBlackName,
         elo: MULTIPLAYER_SCALE_CONFIG.matchmaking.defaultStartingRating,
       },
       timeControlMinutes: 0,
@@ -317,12 +317,13 @@ const MainApp: React.FC = () => {
         hasDonated: false,
       };
 
-    const bluePlayer = userColor === 'blue' ? currentUserPlayer : botOpponent;
-    const greenPlayer = userColor === 'blue' ? botOpponent : currentUserPlayer;
+    const isWhiteUser = userColor === 'white';
+    const whitePlayer = isWhiteUser ? currentUserPlayer : botOpponent;
+    const blackPlayer = isWhiteUser ? botOpponent : currentUserPlayer;
 
     setActiveMatch({
-      bluePlayer,
-      greenPlayer,
+      whitePlayer,
+      blackPlayer,
       timeControlMinutes,
       incrementSeconds,
       isRanked: false,
@@ -431,52 +432,52 @@ const MainApp: React.FC = () => {
       activeMatch.incrementSeconds || 0
     );
 
-    const blueGames =
-      activeMatch.bluePlayer.gamesPlayed ??
-      (activeMatch.bluePlayer.id === user?.id && user
+    const whiteGames =
+      activeMatch.whitePlayer.gamesPlayed ??
+      (activeMatch.whitePlayer.id === user?.id && user
         ? getUserModeGamesPlayed(user, category)
         : undefined) ??
       ELO_CONFIG.defaultAssumedGamesPlayed;
-    const greenGames =
-      activeMatch.greenPlayer.gamesPlayed ??
-      (activeMatch.greenPlayer.id === user?.id && user
+    const blackGames =
+      activeMatch.blackPlayer.gamesPlayed ??
+      (activeMatch.blackPlayer.id === user?.id && user
         ? getUserModeGamesPlayed(user, category)
         : undefined) ??
       ELO_CONFIG.defaultAssumedGamesPlayed;
 
     // Calculate Elo update
     const eloResult = calculateEloUpdate(
-      { rating: activeMatch.bluePlayer.elo, gamesPlayed: blueGames },
-      { rating: activeMatch.greenPlayer.elo, gamesPlayed: greenGames },
+      { rating: activeMatch.whitePlayer.elo, gamesPlayed: whiteGames },
+      { rating: activeMatch.blackPlayer.elo, gamesPlayed: blackGames },
       outcome
     );
 
-    const blueWon = outcome === 'blue';
-    const greenWon = outcome === 'green';
+    const whiteWon = outcome === 'white';
+    const blackWon = outcome === 'black';
     const isDraw = outcome === 'draw';
 
-    // Update Blue Player (e.g. host user)
-    const updatedBlue = await updateUserStats(
-      activeMatch.bluePlayer.id,
-      blueWon,
+    // Update White Player (e.g. host user)
+    const updatedWhite = await updateUserStats(
+      activeMatch.whitePlayer.id,
+      whiteWon,
       isDraw,
-      eloResult.blueDelta,
+      eloResult.whiteDelta,
       category
     );
 
-    // Update Green Player (e.g. challenged friend or opponent)
-    const updatedGreen = await updateUserStats(
-      activeMatch.greenPlayer.id,
-      greenWon,
+    // Update Black Player (e.g. challenged friend or opponent)
+    const updatedBlack = await updateUserStats(
+      activeMatch.blackPlayer.id,
+      blackWon,
       isDraw,
-      eloResult.greenDelta,
+      eloResult.blackDelta,
       category
     );
 
-    if (user && activeMatch.bluePlayer.id === user.id) {
-      refreshUser(updatedBlue);
-    } else if (user && activeMatch.greenPlayer.id === user.id) {
-      refreshUser(updatedGreen);
+    if (user && activeMatch.whitePlayer.id === user.id) {
+      refreshUser(updatedWhite);
+    } else if (user && activeMatch.blackPlayer.id === user.id) {
+      refreshUser(updatedBlack);
     } else {
       refreshUser();
     }
@@ -550,12 +551,12 @@ const MainApp: React.FC = () => {
                     <Arena
                       key={
                         activeMatch.userColor
-                          ? `match-${activeMatch.bluePlayer.id}-${activeMatch.greenPlayer.id}-${activeMatch.timeControlMinutes}-${activeMatch.incrementSeconds ?? 0}-${activeMatch.userColor}-${activeMatch.isComputer ? 'bot' : 'pvp'}`
+                          ? `match-${activeMatch.whitePlayer.id}-${activeMatch.blackPlayer.id}-${activeMatch.timeControlMinutes}-${activeMatch.incrementSeconds ?? 0}-${activeMatch.userColor}-${activeMatch.isComputer ? 'bot' : 'pvp'}`
                           : 'match-pass-and-play'
                       }
                       initialState={activeMatch.initialState}
-                      bluePlayer={activeMatch.bluePlayer}
-                      greenPlayer={activeMatch.greenPlayer}
+                      whitePlayer={activeMatch.whitePlayer}
+                      blackPlayer={activeMatch.blackPlayer}
                       timeControlMinutes={activeMatch.timeControlMinutes}
                       incrementSeconds={activeMatch.incrementSeconds || 0}
                       isRanked={activeMatch.isRanked}

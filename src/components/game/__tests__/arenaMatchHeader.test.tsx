@@ -33,15 +33,15 @@ vi.mock('@/core/bot/schadaBot', () => ({
 }));
 
 describe('Arena Match Header Time Limit Display', () => {
-  const mockBluePlayer: ArenaPlayer = {
-    id: 'user_blue',
-    username: 'BlueHero',
+  const mockwhitePlayer: ArenaPlayer = {
+    id: 'user_white',
+    username: 'WhiteHero',
     elo: 1500,
   };
 
-  const mockGreenPlayer: ArenaPlayer = {
-    id: 'user_green',
-    username: 'GreenRival',
+  const mockblackPlayer: ArenaPlayer = {
+    id: 'user_black',
+    username: 'BlackRival',
     elo: 1480,
   };
 
@@ -52,8 +52,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={2880}
           incrementSeconds={0}
           isRanked={false}
@@ -71,8 +71,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={1440}
           incrementSeconds={0}
           isRanked={false}
@@ -90,8 +90,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={10}
           incrementSeconds={0}
           isRanked={false}
@@ -105,8 +105,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={3}
           incrementSeconds={2}
           isRanked={false}
@@ -122,8 +122,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={initialBoard}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={0}
           incrementSeconds={0}
           isRanked={false}
@@ -139,10 +139,10 @@ describe('Arena Match Header Time Limit Display', () => {
       ...initialBoard,
       isGameOver: true,
       result: {
-        winner: 'blue' as const,
+        winner: 'white' as const,
         winReason: 'goal_reached' as const,
-        blueScore: { goalScore: 2, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 2 },
-        greenScore: { goalScore: 0, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 0 },
+        whiteScore: { goalScore: 2, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 2 },
+        blackScore: { goalScore: 0, outsideGoalHighPiecesScore: 0, rankDistanceScore: 0, totalScore: 0 },
       },
     };
 
@@ -151,8 +151,8 @@ describe('Arena Match Header Time Limit Display', () => {
       <GamePreferencesProvider>
         <Arena
           initialState={finishedGameState}
-          bluePlayer={mockBluePlayer}
-          greenPlayer={mockGreenPlayer}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
           timeControlMinutes={5}
           incrementSeconds={0}
           isRanked={false}
@@ -165,5 +165,46 @@ describe('Arena Match Header Time Limit Display', () => {
 
     expect(htmlFinished).toContain('move-history-analyze-btn');
     expect(htmlFinished).toContain('Analyze');
+  });
+
+  it('renders turn indicator with arena-turn-indicator class on white turn', () => {
+    const html = renderToStaticMarkup(
+      <GamePreferencesProvider>
+        <Arena
+          initialState={initialBoard}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
+          timeControlMinutes={5}
+          incrementSeconds={0}
+          isRanked={false}
+          onExit={vi.fn()}
+        />
+      </GamePreferencesProvider>
+    );
+
+    expect(html).toContain('Turn: <strong class="arena-turn-indicator">WHITE</strong>');
+  });
+
+  it('renders turn indicator with arena-turn-indicator class on black turn', () => {
+    const blackTurnState = {
+      ...initialBoard,
+      currentTurn: 'black' as const,
+    };
+
+    const html = renderToStaticMarkup(
+      <GamePreferencesProvider>
+        <Arena
+          initialState={blackTurnState}
+          whitePlayer={mockwhitePlayer}
+          blackPlayer={mockblackPlayer}
+          timeControlMinutes={5}
+          incrementSeconds={0}
+          isRanked={false}
+          onExit={vi.fn()}
+        />
+      </GamePreferencesProvider>
+    );
+
+    expect(html).toContain('Turn: <strong class="arena-turn-indicator">BLACK</strong>');
   });
 });

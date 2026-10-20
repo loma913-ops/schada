@@ -32,12 +32,12 @@ export interface MoveHistoryProps {
 
 interface MoveRowPair {
   readonly num: number;
-  readonly blueIndex: number;
-  readonly greenIndex: number;
-  readonly blue?: Move;
-  readonly green?: Move;
-  readonly blueQuality?: MoveQuality;
-  readonly greenQuality?: MoveQuality;
+  readonly whiteIndex: number;
+  readonly blackIndex: number;
+  readonly white?: Move;
+  readonly black?: Move;
+  readonly whiteQuality?: MoveQuality;
+  readonly blackQuality?: MoveQuality;
 }
 
 export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory({
@@ -60,20 +60,24 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
   validateAnalysisDisplayConfig(displayConfig);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Group moves into pairs (Blue, Green) with corresponding quality badges
+  // Group moves into pairs (White, Black) with corresponding quality badges
   const movePairs: readonly MoveRowPair[] = useMemo(() => {
     const pairs: MoveRowPair[] = [];
     for (let i = 0; i < history.length; i += 2) {
-      const blueIdx = i;
-      const greenIdx = i + 1;
+      const whiteIdx = i;
+      const blackIdx = i + 1;
+      const whiteMove = history[whiteIdx];
+      const blackMove = history[blackIdx];
+      const whiteQ = analyzedQualities?.[whiteIdx];
+      const blackQ = analyzedQualities?.[blackIdx];
       pairs.push({
         num: Math.floor(i / 2) + 1,
-        blueIndex: blueIdx,
-        greenIndex: greenIdx,
-        blue: history[blueIdx],
-        green: history[greenIdx],
-        blueQuality: analyzedQualities?.[blueIdx],
-        greenQuality: analyzedQualities?.[greenIdx],
+        whiteIndex: whiteIdx,
+        blackIndex: blackIdx,
+        white: whiteMove,
+        black: blackMove,
+        whiteQuality: whiteQ,
+        blackQuality: blackQ,
       });
     }
     return pairs;
@@ -166,24 +170,24 @@ export const MoveHistory: React.FC<MoveHistoryProps> = memo(function MoveHistory
             <div key={pair.num} className="move-row">
               <span className="move-num">{pair.num}.</span>
               <span
-                className={`move-cell ${currentMoveIndex === pair.blueIndex ? 'active' : ''}`}
-                onClick={() => onNavigateMove && onNavigateMove(pair.blueIndex)}
+                className={`move-cell ${currentMoveIndex === pair.whiteIndex ? 'active' : ''}`}
+                onClick={() => onNavigateMove && onNavigateMove(pair.whiteIndex)}
               >
-                <span className="move-notation-text">{pair.blue?.notation || ''}</span>
-                {pair.blueQuality && (
-                  <MoveQualityBadge quality={pair.blueQuality} config={displayConfig} />
+                <span className="move-notation-text">{pair.white?.notation || ''}</span>
+                {pair.whiteQuality && (
+                  <MoveQualityBadge quality={pair.whiteQuality} config={displayConfig} />
                 )}
               </span>
               <span
-                className={`move-cell ${pair.green && currentMoveIndex === pair.greenIndex ? 'active' : ''
+                className={`move-cell ${pair.black && currentMoveIndex === pair.blackIndex ? 'active' : ''
                   }`}
                 onClick={() =>
-                  pair.green && onNavigateMove && onNavigateMove(pair.greenIndex)
+                  pair.black && onNavigateMove && onNavigateMove(pair.blackIndex)
                 }
               >
-                <span className="move-notation-text">{pair.green?.notation || ''}</span>
-                {pair.greenQuality && (
-                  <MoveQualityBadge quality={pair.greenQuality} config={displayConfig} />
+                <span className="move-notation-text">{pair.black?.notation || ''}</span>
+                {pair.blackQuality && (
+                  <MoveQualityBadge quality={pair.blackQuality} config={displayConfig} />
                 )}
               </span>
             </div>

@@ -113,8 +113,8 @@ service cloud.firestore {
         request.resource.data.id == gameId &&
         ((!request.resource.data.isRanked) ||
         (isAuthenticated() && (
-          (request.resource.data.bluePlayer != null && request.resource.data.bluePlayer.id == request.auth.uid) ||
-          (request.resource.data.greenPlayer != null && request.resource.data.greenPlayer.id == request.auth.uid)
+          (request.resource.data.whitePlayer != null && request.resource.data.whitePlayer.id == request.auth.uid) ||
+          (request.resource.data.blackPlayer != null && request.resource.data.blackPlayer.id == request.auth.uid)
         )))
       ) && request.resource.data.status == 'waiting';
 
@@ -125,8 +125,8 @@ service cloud.firestore {
         (resource.data.status == 'waiting' && request.resource.data.status == 'in_progress' && (
           !resource.data.isRanked ||
           (isAuthenticated() && (
-            (resource.data.bluePlayer == null && request.resource.data.bluePlayer.id == request.auth.uid) ||
-            (resource.data.greenPlayer == null && request.resource.data.greenPlayer.id == request.auth.uid)
+            (resource.data.whitePlayer == null && request.resource.data.whitePlayer.id == request.auth.uid) ||
+            (resource.data.blackPlayer == null && request.resource.data.blackPlayer.id == request.auth.uid)
           ))
         )) ||
         // 3. In_progress -> in_progress / completed (moves, resignations, disconnect flags, timeouts)
@@ -134,8 +134,8 @@ service cloud.firestore {
           !resource.data.isRanked ||
           // Actions by seated players
           (isAuthenticated() && (
-            request.auth.uid == resource.data.bluePlayer.id ||
-            request.auth.uid == resource.data.greenPlayer.id
+            request.auth.uid == resource.data.whitePlayer.id ||
+            request.auth.uid == resource.data.blackPlayer.id
           )) ||
           // Clock timeout auto-resolution by any authenticated participant/watcher
           (isAuthenticated() && request.resource.data.status == 'completed' &&
@@ -145,8 +145,8 @@ service cloud.firestore {
         (resource.data.status == 'completed' && request.resource.data.status == 'completed' && (
           !resource.data.isRanked ||
           (isAuthenticated() && (
-            request.auth.uid == resource.data.bluePlayer.id ||
-            request.auth.uid == resource.data.greenPlayer.id
+            request.auth.uid == resource.data.whitePlayer.id ||
+            request.auth.uid == resource.data.blackPlayer.id
           ))
         ))
       );
@@ -166,13 +166,6 @@ service cloud.firestore {
     match /stats/{statId} {
       allow read: if true;
       allow write: if false;
-    }
-
-    // Matchmaking queue tickets
-    match /matchmaking_queue/{ticketId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
   }
 }

@@ -19,7 +19,7 @@ const EMPTY_VECTORS: readonly MoveVector[] = Object.freeze([]);
 const SAMPLE_FIELD_OFFICER: Piece = Object.freeze({
   id: 'sample_fo',
   type: 'field_officer',
-  color: 'blue',
+  color: 'white',
   hasLeftBase: false,
   hasReachedGoal: false,
 });
@@ -27,7 +27,7 @@ const SAMPLE_FIELD_OFFICER: Piece = Object.freeze({
 const SAMPLE_OFFICER: Piece = Object.freeze({
   id: 'sample_o',
   type: 'officer',
-  color: 'blue',
+  color: 'white',
   hasLeftBase: false,
   hasReachedGoal: false,
 });
@@ -35,7 +35,7 @@ const SAMPLE_OFFICER: Piece = Object.freeze({
 const SAMPLE_PAWN: Piece = Object.freeze({
   id: 'sample_p',
   type: 'pawn',
-  color: 'blue',
+  color: 'white',
   hasLeftBase: false,
   hasReachedGoal: false,
 });
@@ -76,8 +76,8 @@ export const RulesGuide: React.FC = () => {
     return Object.freeze(result);
   }, [board.rankCount, board.fileCount]);
 
-  const blueGoalRank = board.blueGoalRankIndex + 1;
-  const blueBaseRank = board.blueBaseRankIndex + 1;
+  const whiteGoalRank = board.whiteGoalRankIndex + 1;
+  const whiteBaseRank = board.whiteBaseRankIndex + 1;
 
   const foRankFraction = `${scoring.fieldOfficerRankDistanceNumerator}/${scoring.rankDistanceDenominator}`;
   const oRankFraction = `${scoring.officerRankDistanceNumerator}/${scoring.rankDistanceDenominator}`;
@@ -157,7 +157,7 @@ export const RulesGuide: React.FC = () => {
                 <div className="piece-count">{army.officersCount} pieces · High Piece</div>
               </div>
             </div>
-            <div className="piece-score-pill blue">
+            <div className="piece-score-pill silver">
               {scoring.officerGoalPoints} Point in Goal Line
             </div>
             <p className="piece-desc">
@@ -198,7 +198,7 @@ export const RulesGuide: React.FC = () => {
 
         <div className="rules-mechanic-list">
           <div className="rules-mechanic-item">
-            <strong>Reading Squares:</strong> Every square shows directional lines originating from a center point. Count the dots along a path — each dot represents 1 square of travel.
+            <strong>Reading Squares:</strong> Every square shows directional lines originating from a center point. Count the dots along a path; each dot represents 1 square of travel.
           </div>
           <div className="rules-mechanic-item">
             <strong>Full Distance Required:</strong> You must travel the <strong>entire designated distance</strong>. If a vector shows 2 or 3 dots, you cannot stop early on an intermediate square.
@@ -322,7 +322,7 @@ export const RulesGuide: React.FC = () => {
         <div className="zone-map-container">
           <div className="zone-row goal">
             <div className="zone-row-header">
-              <span className="zone-row-title">Goal Line (Rank {blueGoalRank} for Blue / Rank {blueBaseRank} for Green)</span>
+              <span className="zone-row-title">Goal Line (Rank {whiteGoalRank} for White / Rank {whiteBaseRank} for Black)</span>
               <span className="zone-row-tag gold">Immune to Capture</span>
             </div>
             <p className="zone-row-desc">
@@ -346,8 +346,8 @@ export const RulesGuide: React.FC = () => {
 
           <div className="zone-row base">
             <div className="zone-row-header">
-              <span className="zone-row-title">Base Line (Rank {blueBaseRank} for Blue / Rank {blueGoalRank} for Green)</span>
-              <span className="zone-row-tag blue">One-Way Exit</span>
+              <span className="zone-row-title">Base Line (Rank {whiteBaseRank} for White / Rank {whiteGoalRank} for Black)</span>
+              <span className="zone-row-tag silver">One-Way Exit</span>
             </div>
             <p className="zone-row-desc">
               Where High Pieces begin the match. Pieces may shuffle laterally along the base line before moving out into the field.

@@ -14,7 +14,6 @@ import {
   deleteField,
   runTransaction,
   serverTimestamp,
-  onSnapshot,
   writeBatch,
   collection,
   query,
@@ -144,9 +143,15 @@ export async function updateUserStats(
     if (auth.currentUser?.uid === userId) {
       try {
         const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, userId);
-        const snap = await getDoc(userDocRef);
-        if (snap.exists()) {
-          const data = snap.data() as UserProfile;
+        let baseProfile = getCachedAuthProfile();
+        if (!baseProfile || baseProfile.id !== userId) {
+          const snap = await getDoc(userDocRef);
+          if (snap.exists()) {
+            baseProfile = snap.data() as UserProfile;
+          }
+        }
+        if (baseProfile) {
+          const data = baseProfile;
           const currentPerMode = ensurePerModeStats(data.perModeStats);
           const currentMode = currentPerMode[category];
           const newModeElo = Math.max(ELO_CONFIG.minimumRating, currentMode.elo + eloDelta);
@@ -263,19 +268,8 @@ export async function updateUserStats(
 export async function reloadUserProfile(): Promise<UserProfile | null> {
   if (isFirebaseConfigured() && auth?.currentUser && db) {
     try {
-      const snap = await getDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, auth.currentUser.uid));
-      if (snap.exists()) {
-        const active = isCurrentClientActive();
-        const data = snap.data() as UserProfile;
-        const status = active ? (data.status === 'in-game' ? 'in-game' : 'online') : 'offline';
-        const authEmail = auth.currentUser?.email ?? data.email ?? SECURITY_CONFIG.emptyEmailFallback;
-        const profile: UserProfile = {
-          ...data,
-          email: authEmail,
-          status,
-          perModeStats: ensurePerModeStats(data.perModeStats),
-        };
-        persistCachedProfile(profile);
+      const profile = await fetchAndHydrateUserProfile(auth.currentUser.uid, auth.currentUser.email);
+      if (profile) {
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: profile })
@@ -367,6 +361,67 @@ export function getInitialAuthState(): { initialUser: UserProfile | null; initia
   };
 }
 
+// In-flight deduplication map for user profile hydration
+const inFlightProfileHydration = new Map<string, Promise<UserProfile | null>>();
+
+export async function fetchAndHydrateUserProfile(uid: string, fallbackEmail?: string | null): Promise<UserProfile | null> {
+  if (!db) return null;
+  const existingPromise = inFlightProfileHydration.get(uid);
+  if (existingPromise) return existingPromise;
+
+  const fetchPromise = (async () => {
+    try {
+      const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, uid);
+      const userSnap = await getDoc(userDocRef);
+      if (!userSnap.exists()) return null;
+
+      const data = userSnap.data() as UserProfile;
+      const active = isCurrentClientActive();
+      const currentStatus = active ? (data.status === 'in-game' ? 'in-game' : 'online') : 'offline';
+      const authEmail = auth?.currentUser?.email ?? fallbackEmail ?? data.email ?? SECURITY_CONFIG.emptyEmailFallback;
+
+      if ('email' in data && data.email !== undefined && !migratedEmailUids.has(uid)) {
+        migratedEmailUids.add(uid);
+        updateDoc(userDocRef, { email: deleteField() }).catch((err) => {
+          migratedEmailUids.delete(uid);
+          console.warn('Could not remove email from Firestore user doc:', err);
+        });
+      }
+
+      const rawCreatedAt = data.createdAt;
+      let createdAtStr: string;
+      if (
+        rawCreatedAt &&
+        typeof rawCreatedAt === 'object' &&
+        'toDate' in rawCreatedAt &&
+        typeof (rawCreatedAt as { toDate: () => Date }).toDate === 'function'
+      ) {
+        createdAtStr = (rawCreatedAt as { toDate: () => Date }).toDate().toISOString();
+      } else if (typeof rawCreatedAt === 'string') {
+        createdAtStr = rawCreatedAt;
+      } else {
+        createdAtStr = new Date().toISOString();
+      }
+
+      const profile: UserProfile = {
+        ...data,
+        createdAt: createdAtStr,
+        email: authEmail,
+        status: currentStatus,
+        perModeStats: ensurePerModeStats(data.perModeStats),
+      };
+
+      persistCachedProfile(profile);
+      return profile;
+    } finally {
+      inFlightProfileHydration.delete(uid);
+    }
+  })();
+
+  inFlightProfileHydration.set(uid, fetchPromise);
+  return fetchPromise;
+}
+
 export async function registerUser(
   email: string,
   pass: string,
@@ -389,7 +444,7 @@ export async function registerUser(
       throw new Error(`Username "${username}" is already taken.`);
     }
 
-    // 2. Create Auth User
+    // 2. Create Auth User and register in-flight hydration promise to prevent race in subscribeToAuthState
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     const uid = userCredential.user.uid;
 
@@ -406,18 +461,27 @@ export async function registerUser(
 
     const { email: _omitEmail, ...firestoreProfile } = userProfile;
 
-    // 3. Atomically write profile and reserve username (email omitted from public Firestore document)
-    await runTransaction(firestore, async (tx) => {
-      tx.set(usernameDocRef, { uid, createdAt: serverTimestamp() });
-      tx.set(doc(firestore, MULTIPLAYER_SCALE_CONFIG.collections.users, uid), {
-        ...firestoreProfile,
-        createdAt: serverTimestamp(),
-        lastSeen: serverTimestamp(),
+    const registrationPromise = (async () => {
+      await runTransaction(firestore, async (tx) => {
+        tx.set(usernameDocRef, { uid, createdAt: serverTimestamp() });
+        tx.set(doc(firestore, MULTIPLAYER_SCALE_CONFIG.collections.users, uid), {
+          ...firestoreProfile,
+          createdAt: serverTimestamp(),
+          lastSeen: serverTimestamp(),
+        });
       });
-    });
+      persistCachedProfile(userProfile);
+      return userProfile;
+    })();
+
+    inFlightProfileHydration.set(uid, registrationPromise);
+    try {
+      await registrationPromise;
+    } finally {
+      inFlightProfileHydration.delete(uid);
+    }
 
     markRemotePresenceSynced('online', true);
-    persistCachedProfile(userProfile);
     syncPresenceHeartbeat();
     return userProfile;
   }
@@ -433,30 +497,14 @@ export async function loginUser(email: string, pass: string): Promise<UserProfil
   if (isFirebaseConfigured() && auth && db) {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
     const uid = userCredential.user.uid;
-    const userDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.users, uid);
-    const userDoc = await getDoc(userDocRef);
+    const profile = await fetchAndHydrateUserProfile(uid, email);
 
-    if (!userDoc.exists()) {
+    if (!profile) {
       throw new Error('User profile record not found in Firestore.');
     }
 
-    const active = isCurrentClientActive();
-    const data = userDoc.data() as UserProfile;
-    const status = active ? (data.status === 'in-game' ? 'in-game' : 'online') : 'offline';
-    const authEmail = auth.currentUser?.email ?? email;
-    const createdAtStr = (data.createdAt as any)?.toDate?.()
-      ? (data.createdAt as any).toDate().toISOString()
-      : (typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString());
-    const profileWithStatus: UserProfile = {
-      ...data,
-      createdAt: createdAtStr,
-      email: authEmail,
-      status,
-      perModeStats: ensurePerModeStats(data.perModeStats),
-    };
-    persistCachedProfile(profileWithStatus);
     syncPresenceHeartbeat();
-    return profileWithStatus;
+    return profile;
   }
 
   const user = localBackend.login(email, pass);
@@ -540,6 +588,11 @@ export async function changeUsername(
       });
 
       persistCachedProfile(updatedProfile);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent(LOCAL_CONFIG.events.profileUpdated, { detail: updatedProfile })
+        );
+      }
       return updatedProfile;
     });
   }
@@ -624,48 +677,41 @@ export function subscribeToAuthState(callback: (user: UserProfile | null) => voi
           }
           syncPresenceHeartbeat();
 
-          unsubscribeDoc = onSnapshot(
-            userDocRef,
-            (userSnap) => {
-              if (userSnap.exists()) {
-                const currentActive = isCurrentClientActive();
-                const data = userSnap.data() as UserProfile;
-                const currentStatus = currentActive ? (data.status === 'in-game' ? 'in-game' : 'online') : 'offline';
-                const authEmail = firebaseUser.email ?? data.email ?? SECURITY_CONFIG.emptyEmailFallback;
-
-                // Migration: if Firestore user doc still contains email, delete it to protect PII.
-                // Deduplicated via migratedEmailUids to guarantee strictly <= 1 write operation.
-                if ('email' in data && data.email !== undefined && !migratedEmailUids.has(firebaseUser.uid)) {
-                  migratedEmailUids.add(firebaseUser.uid);
-                  updateDoc(userDocRef, { email: deleteField() }).catch((err) => {
-                    migratedEmailUids.delete(firebaseUser.uid);
-                    console.warn('Could not remove email from Firestore user doc:', err);
-                  });
-                }
-
-                const createdAtStr = (data.createdAt as any)?.toDate?.()
-                  ? (data.createdAt as any).toDate().toISOString()
-                  : (typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString());
-
-                const profile: UserProfile = {
-                  ...data,
-                  createdAt: createdAtStr,
-                  email: authEmail,
-                  status: currentStatus,
-                  perModeStats: ensurePerModeStats(data.perModeStats),
-                };
-                // Only dispatch callback when meaningful profile fields change (avoids lastSeen ping-pong loops)
-                if (hasMeaningfulProfileChanged(lastProfileSnapshot, profile)) {
-                  lastProfileSnapshot = profile;
-                  persistCachedProfile(profile);
-                  callback(profile);
-                }
-              }
-            },
-            (e) => {
-              console.error('Error listening to user profile changes:', e);
+          let lastFetchedProfileTime = Date.now();
+          const handleProfileHydration = (profile: UserProfile | null) => {
+            if (profile && hasMeaningfulProfileChanged(lastProfileSnapshot, profile)) {
+              lastProfileSnapshot = profile;
+              persistCachedProfile(profile);
+              callback(profile);
             }
-          );
+          };
+
+          fetchAndHydrateUserProfile(firebaseUser.uid, firebaseUser.email).then((profile) => {
+            handleProfileHydration(profile);
+          });
+
+          // Multi-device synchronization: re-sync on tab focus if stale beyond profileStaleThresholdMs
+          const handleVisibilitySync = () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+              const now = Date.now();
+              if (now - lastFetchedProfileTime >= MULTIPLAYER_SCALE_CONFIG.presence.profileStaleThresholdMs) {
+                lastFetchedProfileTime = now;
+                reloadUserProfile().then((refreshed) => {
+                  handleProfileHydration(refreshed);
+                });
+              }
+            }
+          };
+
+          if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', handleVisibilitySync);
+          }
+
+          unsubscribeDoc = () => {
+            if (typeof document !== 'undefined') {
+              document.removeEventListener('visibilitychange', handleVisibilitySync);
+            }
+          };
         } catch (e) {
           console.error('Error initializing user profile listener:', e);
           callback(null);

@@ -7,12 +7,12 @@ export interface GamePlayer extends ArenaPlayer {
 }
 
 export interface GameEloResult {
-  blueDelta: number;
-  greenDelta: number;
-  newBlueElo: number;
-  newGreenElo: number;
-  initialBlueElo?: number;
-  initialGreenElo?: number;
+  whiteDelta: number;
+  blackDelta: number;
+  newWhiteElo: number;
+  newBlackElo: number;
+  initialWhiteElo?: number;
+  initialBlackElo?: number;
 }
 
 export interface GameRoom {
@@ -24,20 +24,20 @@ export interface GameRoom {
   incrementSeconds: number;
   isRanked: boolean;
   creatorColorPref: PieceColor | 'random';
-  bluePlayer: GamePlayer | null;
-  greenPlayer: GamePlayer | null;
+  whitePlayer: GamePlayer | null;
+  blackPlayer: GamePlayer | null;
   boardState: BoardState;
   currentTurn: PieceColor;
-  blueTimeMs: number;
-  greenTimeMs: number;
+  whiteTimeMs: number;
+  blackTimeMs: number;
   lastTurnStartTimeMs: number | null;
   winner?: PieceColor | 'draw' | null;
   winReason?: string | null;
   eloResult?: GameEloResult | null;
   processedEloUserIds?: string[];
   abandonedAt?: number;
-  blueDisconnectedAt?: number | null;
-  greenDisconnectedAt?: number | null;
+  whiteDisconnectedAt?: number | null;
+  blackDisconnectedAt?: number | null;
   targetOpponent?: ArenaPlayer | null;
 }
 

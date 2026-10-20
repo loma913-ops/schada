@@ -43,8 +43,8 @@ export interface GameOverModalConfig {
     readonly goalScoreLabel: string;
     readonly outsideHighPiecesLabel: string;
     readonly rankDistanceLabel: string;
-    readonly defaultBluePlayerName: string;
-    readonly defaultGreenPlayerName: string;
+    readonly defaultWhitePlayerName: string;
+    readonly defaultBlackPlayerName: string;
     readonly winnerTitleSuffix: string;
     readonly winReasons: Record<WinReason, string>;
   };
@@ -137,8 +137,6 @@ export function validateGameOverModalConfig(config: GameOverModalConfig): void {
     'goalScoreLabel',
     'outsideHighPiecesLabel',
     'rankDistanceLabel',
-    'defaultBluePlayerName',
-    'defaultGreenPlayerName',
     'winnerTitleSuffix',
   ];
 
@@ -147,6 +145,20 @@ export function validateGameOverModalConfig(config: GameOverModalConfig): void {
     if (typeof val !== 'string' || val.trim().length === 0) {
       throw new GameOverModalConfigError(`Invalid copy.${key}: expected non-empty string.`);
     }
+  }
+
+  if (
+    typeof config.copy.defaultWhitePlayerName !== 'string' ||
+    config.copy.defaultWhitePlayerName.trim().length === 0
+  ) {
+    throw new GameOverModalConfigError('Invalid copy.defaultWhitePlayerName: expected non-empty string.');
+  }
+
+  if (
+    typeof config.copy.defaultBlackPlayerName !== 'string' ||
+    config.copy.defaultBlackPlayerName.trim().length === 0
+  ) {
+    throw new GameOverModalConfigError('Invalid copy.defaultBlackPlayerName: expected non-empty string.');
   }
 
   if (!config.copy.winReasons || typeof config.copy.winReasons !== 'object') {
@@ -213,8 +225,8 @@ export const GAME_OVER_MODAL_CONFIG: GameOverModalConfig = {
     goalScoreLabel: 'Goal Line Points',
     outsideHighPiecesLabel: 'Outside High Pieces',
     rankDistanceLabel: 'Rank Distance',
-    defaultBluePlayerName: 'Blue',
-    defaultGreenPlayerName: 'Green',
+    defaultWhitePlayerName: 'White',
+    defaultBlackPlayerName: 'Black',
     winnerTitleSuffix: 'Won',
     winReasons: {
       goal_reached: 'All remaining high pieces reached the goal line',

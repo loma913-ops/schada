@@ -278,8 +278,8 @@ export async function findOpenWaitingGame(
     for (const docSnap of snap.docs) {
       const game = docSnap.data() as GameRoom;
       const isHost =
-        (game.bluePlayer && game.bluePlayer.id === excludeUserId) ||
-        (game.greenPlayer && game.greenPlayer.id === excludeUserId);
+        (game.whitePlayer && game.whitePlayer.id === excludeUserId) ||
+        (game.blackPlayer && game.blackPlayer.id === excludeUserId);
       if (!isHost) {
         return game;
       }
@@ -293,8 +293,8 @@ export async function findOpenWaitingGame(
     if (r.timeControlMinutes !== timeControlMinutes || (r.incrementSeconds || 0) !== incrementSeconds) return false;
     if (typeof effectiveIsRanked === 'boolean' && r.isRanked !== effectiveIsRanked) return false;
     const isHost =
-      (r.bluePlayer && r.bluePlayer.id === excludeUserId) ||
-      (r.greenPlayer && r.greenPlayer.id === excludeUserId);
+      (r.whitePlayer && r.whitePlayer.id === excludeUserId) ||
+      (r.blackPlayer && r.blackPlayer.id === excludeUserId);
     return !isHost;
   });
   return match || null;

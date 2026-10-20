@@ -176,8 +176,9 @@
   color: var(--accent-gold);
 }
 
-.rules-score-val.blue {
-  color: var(--accent-blue);
+.rules-score-val.silver,
+.rules-score-val.white {
+  color: var(--text-primary);
 }
 
 .rules-score-val.muted {
@@ -308,6 +309,11 @@
   position: relative;
   background: var(--board-light);
   margin-bottom: 0.75rem;
+  color-scheme: only light;
+}
+
+.square-zoom-box.light {
+  background: var(--board-light);
 }
 
 .square-zoom-box.dark {
@@ -341,6 +347,7 @@
   border: 3px solid var(--board-border);
   border-radius: var(--radius-sm);
   background: var(--board-border);
+  color-scheme: only light;
 }
 
 .rules-picker-cell {
@@ -490,10 +497,11 @@
   border: 1px solid var(--accent-gold-border);
 }
 
-.piece-score-pill.blue {
-  background: rgba(54, 146, 231, 0.12);
-  color: var(--accent-blue);
-  border: 1px solid rgba(54, 146, 231, 0.25);
+.piece-score-pill.silver,
+.piece-score-pill.white {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .piece-score-pill.muted {
@@ -528,7 +536,7 @@
 }
 
 .zone-row.base {
-  border-left: 3px solid var(--accent-blue);
+  border-left: 3px solid var(--text-muted);
 }
 
 .zone-row.battlefield {
@@ -565,9 +573,10 @@
   border-color: var(--accent-gold-border);
 }
 
-.zone-row-tag.blue {
-  color: var(--accent-blue);
-  border-color: rgba(54, 146, 231, 0.35);
+.zone-row-tag.silver,
+.zone-row-tag.white {
+  color: var(--text-primary);
+  border-color: var(--border-color);
 }
 
 .zone-row-desc {

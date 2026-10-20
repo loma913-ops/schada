@@ -76,21 +76,21 @@ export const QuickPairingGrid: React.FC<QuickPairingGridProps> = ({
 
         <button
           type="button"
-          className="lichess-cta-btn"
+          className="schada-cta-btn"
           onClick={onOpenComputerModal}
           style={{ width: '100%', padding: '0.85rem 1.25rem', fontSize: '1.05rem', fontWeight: 600 }}
         >
-          <Cpu size={22} className="lichess-cta-icon" />
+          <Cpu size={22} className="schada-cta-icon" />
           <span>Play Against Computer</span>
         </button>
 
         <button
           type="button"
-          className="lichess-cta-btn"
+          className="schada-cta-btn"
           onClick={() => onOpenCustomModal('correspondence')}
           style={{ width: '100%', padding: '0.85rem 1.25rem', fontSize: '1.05rem', fontWeight: 600 }}
         >
-          <Mail size={22} className="lichess-cta-icon" />
+          <Mail size={22} className="schada-cta-icon" />
           <span>Correspondence</span>
         </button>
       </div>

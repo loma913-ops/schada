@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 def packageJsonFile = rootProject.file('../package.json')
-def appVersionName = "2.0.0"
+def appVersionName = "2.1.0"
 def appVersionCode = 20000
 
 if (packageJsonFile.exists()) {

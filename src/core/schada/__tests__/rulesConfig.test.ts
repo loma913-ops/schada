@@ -110,7 +110,7 @@ describe('SCHADA_RULES_CONFIG', () => {
       ...SCHADA_RULES_CONFIG,
       board: {
         ...SCHADA_RULES_CONFIG.board,
-        blueGoalRankIndex: 6, // invalid
+        whiteGoalRankIndex: 6, // invalid
       },
     };
     expect(() => validateRulesConfig(invalidRankIndicesConfig)).toThrowError(

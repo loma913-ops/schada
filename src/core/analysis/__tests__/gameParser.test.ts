@@ -38,8 +38,8 @@ describe('Game Parser', () => {
     const fullPgn = `
 [Event "Schada Championship Tournament #1"]
 [Round "Quarterfinals Match 1"]
-[Blue "Advanced (Tier 6)"]
-[Green "Intermediate (Tier 5)"]
+[White "Advanced (Tier 6)"]
+[Black "Intermediate (Tier 5)"]
 [Result "1-0"]
 
 1. Fe1-e3 Pc7-e5
@@ -47,8 +47,8 @@ describe('Game Parser', () => {
 `;
     const { metadata, bodyText } = extractHeadersAndBody(fullPgn);
     expect(metadata.Event).toBe('Schada Championship Tournament #1');
-    expect(metadata.Blue).toBe('Advanced (Tier 6)');
-    expect(metadata.Green).toBe('Intermediate (Tier 5)');
+    expect(metadata.White).toBe('Advanced (Tier 6)');
+    expect(metadata.Black).toBe('Intermediate (Tier 5)');
     expect(metadata.Result).toBe('1-0');
     expect(bodyText.includes('1. Fe1-e3 Pc7-e5')).toBe(true);
   });
@@ -60,18 +60,18 @@ describe('Game Parser', () => {
     expect(parsed.moves[0].from).toBe('e1');
     expect(parsed.moves[0].to).toBe('e3');
     expect(parsed.moves[0].piece.type).toBe('field_officer');
-    expect(parsed.moves[0].piece.color).toBe('blue');
+    expect(parsed.moves[0].piece.color).toBe('white');
 
     expect(parsed.moves[1].from).toBe('c7');
     expect(parsed.moves[1].to).toBe('e5');
-    expect(parsed.moves[1].piece.color).toBe('green');
+    expect(parsed.moves[1].piece.color).toBe('black');
   });
 
   it('supports JSON game match objects', () => {
     const jsonObj = {
       Event: 'Test Match',
-      Blue: 'Master',
-      Green: 'Expert',
+      White: 'Master',
+      Black: 'Expert',
       gameNotation: '1. Fe1-e3 Pc7-e5 2. Fc1-c3 Fb8-b6',
     };
 
@@ -86,7 +86,7 @@ describe('Game Parser', () => {
   });
 
   it('throws AnalysisConfigError when moving opponent piece or from empty square', () => {
-    // White/Blue on turn 1 tries to move Green's officer on b8
+    // White on turn 1 tries to move Black's officer on b8
     expect(() => parseGameInput('1. Fb8-b6')).toThrow(/does not contain an active player piece/);
     // Square e4 is initially empty
     expect(() => parseGameInput('1. e4-e5')).toThrow(/does not contain an active player piece/);

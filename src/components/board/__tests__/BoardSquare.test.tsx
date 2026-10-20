@@ -6,8 +6,8 @@ import type { Piece, Move } from '@/core/schada/types';
 describe('BoardSquare piece under attack badge', () => {
   it('renders red exclamation badge when a piece is under attack', () => {
     const piece: Piece = {
-      id: 'blue_pawn_a3',
-      color: 'blue',
+      id: 'white_pawn_a3',
+      color: 'white',
       type: 'pawn',
       hasLeftBase: true,
       hasReachedGoal: false,
@@ -32,8 +32,8 @@ describe('BoardSquare piece under attack badge', () => {
 
   it('does not render red exclamation badge when isUnderAttack is false', () => {
     const piece: Piece = {
-      id: 'blue_pawn_a3',
-      color: 'blue',
+      id: 'white_pawn_a3',
+      color: 'white',
       type: 'pawn',
       hasLeftBase: true,
       hasReachedGoal: false,
@@ -56,8 +56,8 @@ describe('BoardSquare piece under attack badge', () => {
 
   it('renders goal-invulnerable-badge with gold shield icon and never piece-under-attack-badge for high pieces in goal rank', () => {
     const goalPiece: Piece = {
-      id: 'blue_fo_a8',
-      color: 'blue',
+      id: 'white_fo_a8',
+      color: 'white',
       type: 'field_officer',
       hasLeftBase: true,
       hasReachedGoal: true,
@@ -81,10 +81,10 @@ describe('BoardSquare piece under attack badge', () => {
     expect(html).not.toContain('piece-under-attack-badge');
   });
 
-  it('renders gold shield badge for Officer reaching Green goal line (rank 1)', () => {
-    const greenOfficer: Piece = {
-      id: 'green_officer_d1',
-      color: 'green',
+  it('renders gold shield badge for Officer reaching Black goal line (rank 1)', () => {
+    const blackOfficer: Piece = {
+      id: 'black_officer_d1',
+      color: 'black',
       type: 'officer',
       hasLeftBase: true,
       hasReachedGoal: true,
@@ -93,7 +93,7 @@ describe('BoardSquare piece under attack badge', () => {
     const html = renderToString(
       <BoardSquare
         square="d1"
-        piece={greenOfficer}
+        piece={blackOfficer}
         isSelected={false}
         isLastMove={false}
         legalMoveTarget={undefined}
@@ -107,9 +107,9 @@ describe('BoardSquare piece under attack badge', () => {
   });
 
   it('does NOT render goal-invulnerable-badge for pawns in goal rank', () => {
-    const bluePawnInGoal: Piece = {
-      id: 'blue_pawn_a8',
-      color: 'blue',
+    const whitePawnInGoal: Piece = {
+      id: 'white_pawn_a8',
+      color: 'white',
       type: 'pawn',
       hasLeftBase: true,
       hasReachedGoal: false,
@@ -118,7 +118,7 @@ describe('BoardSquare piece under attack badge', () => {
     const html = renderToString(
       <BoardSquare
         square="a8"
-        piece={bluePawnInGoal}
+        piece={whitePawnInGoal}
         isSelected={false}
         isLastMove={false}
         legalMoveTarget={undefined}
@@ -132,9 +132,9 @@ describe('BoardSquare piece under attack badge', () => {
   });
 
   it('does NOT render goal-invulnerable-badge for high pieces outside goal rank', () => {
-    const blueOfficerMidfield: Piece = {
-      id: 'blue_officer_e4',
-      color: 'blue',
+    const whiteOfficerMidfield: Piece = {
+      id: 'white_officer_e4',
+      color: 'white',
       type: 'officer',
       hasLeftBase: true,
       hasReachedGoal: false,
@@ -143,7 +143,7 @@ describe('BoardSquare piece under attack badge', () => {
     const html = renderToString(
       <BoardSquare
         square="e4"
-        piece={blueOfficerMidfield}
+        piece={whiteOfficerMidfield}
         isSelected={false}
         isLastMove={false}
         legalMoveTarget={undefined}
@@ -158,8 +158,8 @@ describe('BoardSquare piece under attack badge', () => {
 
   it('renders threat exclamation above the red capture indicator in DOM hierarchy', () => {
     const targetPiece: Piece = {
-      id: 'blue_pawn_b3',
-      color: 'blue',
+      id: 'white_pawn_b3',
+      color: 'white',
       type: 'pawn',
       hasLeftBase: true,
       hasReachedGoal: false,
@@ -169,8 +169,8 @@ describe('BoardSquare piece under attack badge', () => {
       from: 'b1',
       to: 'b3',
       piece: {
-        id: 'green_pawn_b1',
-        color: 'green',
+        id: 'black_pawn_b1',
+        color: 'black',
         type: 'pawn',
         hasLeftBase: true,
         hasReachedGoal: false,
@@ -201,5 +201,61 @@ describe('BoardSquare piece under attack badge', () => {
     expect(captureRingIndex).toBeGreaterThan(-1);
     expect(attackBadgeIndex).toBeGreaterThan(-1);
     expect(captureRingIndex).toBeLessThan(attackBadgeIndex);
+  });
+
+  it('renders board-square with light class when (col + row) is odd (e.g. a2, b1)', () => {
+    const htmlA2 = renderToString(
+      <BoardSquare
+        square="a2"
+        piece={null}
+        isSelected={false}
+        isLastMove={false}
+        legalMoveTarget={undefined}
+        onClick={() => { }}
+        isUnderAttack={false}
+      />
+    );
+    expect(htmlA2).toContain('board-square light');
+
+    const htmlB1 = renderToString(
+      <BoardSquare
+        square="b1"
+        piece={null}
+        isSelected={false}
+        isLastMove={false}
+        legalMoveTarget={undefined}
+        onClick={() => { }}
+        isUnderAttack={false}
+      />
+    );
+    expect(htmlB1).toContain('board-square light');
+  });
+
+  it('renders board-square with dark class when (col + row) is even (e.g. a1, b2)', () => {
+    const htmlA1 = renderToString(
+      <BoardSquare
+        square="a1"
+        piece={null}
+        isSelected={false}
+        isLastMove={false}
+        legalMoveTarget={undefined}
+        onClick={() => { }}
+        isUnderAttack={false}
+      />
+    );
+    expect(htmlA1).toContain('board-square dark');
+
+    const htmlB2 = renderToString(
+      <BoardSquare
+        square="b2"
+        piece={null}
+        isSelected={false}
+        isLastMove={false}
+        legalMoveTarget={undefined}
+        onClick={() => { }}
+        isUnderAttack={false}
+      />
+    );
+    expect(htmlB2).toContain('board-square dark');
   });
 });

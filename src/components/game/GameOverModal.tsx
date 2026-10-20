@@ -44,10 +44,10 @@ export interface GameOverModalProps {
   readonly result: GameResult;
   readonly userColor?: PieceColor;
   readonly isRanked?: boolean;
-  readonly bluePlayer?: GameOverPlayerInfo;
-  readonly greenPlayer?: GameOverPlayerInfo;
-  readonly blueElo?: PlayerEloUpdate;
-  readonly greenElo?: PlayerEloUpdate;
+  readonly whitePlayer?: GameOverPlayerInfo;
+  readonly blackPlayer?: GameOverPlayerInfo;
+  readonly whiteElo?: PlayerEloUpdate;
+  readonly blackElo?: PlayerEloUpdate;
   readonly eloDelta?: number;
   readonly config?: GameOverModalConfig;
   readonly triggerEffects?: boolean;
@@ -80,10 +80,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   result,
   userColor,
   isRanked = false,
-  bluePlayer,
-  greenPlayer,
-  blueElo,
-  greenElo,
+  whitePlayer,
+  blackPlayer,
+  whiteElo,
+  blackElo,
   eloDelta,
   config = GAME_OVER_MODAL_CONFIG,
   triggerEffects = true,
@@ -138,29 +138,34 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
   const eloInfo = useMemo(() => {
     if (!isRanked) return null;
-    if (blueElo && greenElo) {
-      return { blue: blueElo, green: greenElo };
+    if (whiteElo && blackElo) {
+      return {
+        white: whiteElo,
+        black: blackElo,
+      };
     }
-    if (bluePlayer && greenPlayer && result.winner) {
+    if (whitePlayer && blackPlayer && result.winner) {
       const outcome = result.winner;
       const calculation = calculateEloUpdate(
         {
-          rating: bluePlayer.elo,
-          gamesPlayed: bluePlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+          rating: whitePlayer.elo,
+          gamesPlayed: whitePlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
         },
         {
-          rating: greenPlayer.elo,
-          gamesPlayed: greenPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
+          rating: blackPlayer.elo,
+          gamesPlayed: blackPlayer.gamesPlayed ?? ELO_CONFIG.defaultAssumedGamesPlayed,
         },
         outcome
       );
+      const wUpdate = { newElo: calculation.newWhiteRating, delta: calculation.whiteDelta };
+      const bUpdate = { newElo: calculation.newBlackRating, delta: calculation.blackDelta };
       return {
-        blue: { newElo: calculation.newBlueRating, delta: calculation.blueDelta },
-        green: { newElo: calculation.newGreenRating, delta: calculation.greenDelta },
+        white: wUpdate,
+        black: bUpdate,
       };
     }
     return null;
-  }, [isRanked, blueElo, greenElo, bluePlayer, greenPlayer, result.winner]);
+  }, [isRanked, whiteElo, blackElo, whitePlayer, blackPlayer, result.winner]);
 
   const effectsFiredRef = useRef(false);
 
@@ -197,13 +202,17 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     return config.copy.defaultGameCompletedText;
   };
 
-  const winnerPlayer = result.winner === 'blue' ? bluePlayer : result.winner === 'green' ? greenPlayer : null;
+  const isWhiteWinner = result.winner === 'white';
+  const isBlackWinner = result.winner === 'black';
+  const winnerPlayer = isWhiteWinner ? whitePlayer : isBlackWinner ? blackPlayer : null;
+  const defaultWhiteName = config.copy.defaultWhitePlayerName;
+  const defaultBlackName = config.copy.defaultBlackPlayerName;
   const winnerDisplayName =
     winnerPlayer?.username ||
-    (result.winner === 'blue'
-      ? config.copy.defaultBluePlayerName
-      : result.winner === 'green'
-        ? config.copy.defaultGreenPlayerName
+    (isWhiteWinner
+      ? defaultWhiteName
+      : isBlackWinner
+        ? defaultBlackName
         : null);
 
   const modalTitle = isWinner
@@ -272,7 +281,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             {isWinner ? (
               <Trophy size={48} color="var(--accent-gold)" style={{ margin: '0 auto' }} />
             ) : isDraw ? (
-              <Award size={48} color="var(--accent-blue)" style={{ margin: '0 auto' }} />
+              <Award size={48} color="var(--accent-gold)" style={{ margin: '0 auto' }} />
             ) : (
               <div style={{ fontSize: '2.5rem' }}>⚔️</div>
             )}
@@ -334,10 +343,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               <span>{config.copy.categoryHeader}</span>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', maxWidth: '100%' }}>
-                  <span style={{ color: 'var(--piece-blue)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {bluePlayer?.username || config.copy.defaultBluePlayerName}
+                  <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {whitePlayer?.username || defaultWhiteName}
                   </span>
-                  {isPatronUser(bluePlayer) && <PatronBadge size={12} style={{ flexShrink: 0 }} />}
+                  {isPatronUser(whitePlayer) && <PatronBadge size={12} style={{ flexShrink: 0 }} />}
                 </div>
                 {isRanked && eloInfo && (
                   <span
@@ -349,29 +358,29 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                       marginTop: '0.15rem',
                     }}
                   >
-                    <span style={{ color: 'var(--text-primary)' }}>{eloInfo.blue.newElo}</span>{' '}
+                    <span style={{ color: 'var(--text-primary)' }}>{eloInfo.white.newElo}</span>{' '}
                     <span
                       style={{
                         color:
-                          eloInfo.blue.delta > 0
+                          eloInfo.white.delta > 0
                             ? 'var(--accent-green)'
-                            : eloInfo.blue.delta < 0
+                            : eloInfo.white.delta < 0
                               ? 'var(--accent-red)'
                               : 'var(--text-muted)',
                         fontWeight: 700,
                       }}
                     >
-                      ({eloInfo.blue.delta >= 0 ? `+${eloInfo.blue.delta}` : eloInfo.blue.delta})
+                      ({eloInfo.white.delta >= 0 ? `+${eloInfo.white.delta}` : eloInfo.white.delta})
                     </span>
                   </span>
                 )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', maxWidth: '100%' }}>
-                  <span style={{ color: 'var(--piece-green)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {greenPlayer?.username || config.copy.defaultGreenPlayerName}
+                  <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {blackPlayer?.username || defaultBlackName}
                   </span>
-                  {isPatronUser(greenPlayer) && <PatronBadge size={12} style={{ flexShrink: 0 }} />}
+                  {isPatronUser(blackPlayer) && <PatronBadge size={12} style={{ flexShrink: 0 }} />}
                 </div>
                 {isRanked && eloInfo && (
                   <span
@@ -383,19 +392,19 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                       marginTop: '0.15rem',
                     }}
                   >
-                    <span style={{ color: 'var(--text-primary)' }}>{eloInfo.green.newElo}</span>{' '}
+                    <span style={{ color: 'var(--text-primary)' }}>{eloInfo.black.newElo}</span>{' '}
                     <span
                       style={{
                         color:
-                          eloInfo.green.delta > 0
+                          eloInfo.black.delta > 0
                             ? 'var(--accent-green)'
-                            : eloInfo.green.delta < 0
+                            : eloInfo.black.delta < 0
                               ? 'var(--accent-red)'
                               : 'var(--text-muted)',
                         fontWeight: 700,
                       }}
                     >
-                      ({eloInfo.green.delta >= 0 ? `+${eloInfo.green.delta}` : eloInfo.green.delta})
+                      ({eloInfo.black.delta >= 0 ? `+${eloInfo.black.delta}` : eloInfo.black.delta})
                     </span>
                   </span>
                 )}
@@ -410,8 +419,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               }}
             >
               <span style={{ color: 'var(--text-secondary)' }}>{config.copy.goalScoreLabel}</span>
-              <span>{result.blueScore.goalScore}</span>
-              <span>{result.greenScore.goalScore}</span>
+              <span>{result.whiteScore?.goalScore ?? 0}</span>
+              <span>{result.blackScore?.goalScore ?? 0}</span>
             </div>
             <div
               style={{
@@ -422,8 +431,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               }}
             >
               <span style={{ color: 'var(--text-secondary)' }}>{config.copy.outsideHighPiecesLabel}</span>
-              <span>{result.blueScore.outsideGoalHighPiecesScore}</span>
-              <span>{result.greenScore.outsideGoalHighPiecesScore}</span>
+              <span>{result.whiteScore?.outsideGoalHighPiecesScore ?? 0}</span>
+              <span>{result.blackScore?.outsideGoalHighPiecesScore ?? 0}</span>
             </div>
             <div
               style={{
@@ -434,8 +443,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               }}
             >
               <span style={{ color: 'var(--text-secondary)' }}>{config.copy.rankDistanceLabel}</span>
-              <span>{result.blueScore.rankDistanceScore}</span>
-              <span>{result.greenScore.rankDistanceScore}</span>
+              <span>{result.whiteScore?.rankDistanceScore ?? 0}</span>
+              <span>{result.blackScore?.rankDistanceScore ?? 0}</span>
             </div>
           </div>
 
@@ -461,11 +470,11 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               }}
             >
               <span style={{ textAlign: 'left' }}>{config.copy.classificationHeader}</span>
-              <span style={{ color: 'var(--piece-blue)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {bluePlayer?.username || config.copy.defaultBluePlayerName}
+              <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {whitePlayer?.username || defaultWhiteName}
               </span>
-              <span style={{ color: 'var(--piece-green)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {greenPlayer?.username || config.copy.defaultGreenPlayerName}
+              <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {blackPlayer?.username || defaultBlackName}
               </span>
             </div>
 
@@ -500,8 +509,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               <div style={{ padding: '0.2rem 0' }}>
                 {config.layout.distributionQualities.map((quality) => {
                   const badgeConfig = CANONICAL_ANALYSIS_CONFIG.badges[quality];
-                  const blueCount = effectiveReport?.blueBreakdown[quality] ?? 0;
-                  const greenCount = effectiveReport?.greenBreakdown[quality] ?? 0;
+                  const whiteCount = effectiveReport?.whiteBreakdown?.[quality] ?? 0;
+                  const blackCount = effectiveReport?.blackBreakdown?.[quality] ?? 0;
 
                   return (
                     <div
@@ -527,8 +536,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                           {badgeConfig.label}
                         </span>
                       </div>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{blueCount}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{greenCount}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{whiteCount}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{blackCount}</span>
                     </div>
                   );
                 })}
@@ -561,26 +570,26 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               <>
                 <span
                   style={{
-                    color: 'var(--piece-blue)',
+                    color: 'var(--text-primary)',
                     fontFamily: 'var(--font-mono)',
                     fontSize: '0.9rem',
                     fontWeight: 800,
                   }}
                 >
                   {effectiveReport
-                    ? `${effectiveReport.blueAccuracy.toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`
+                    ? `${(effectiveReport.whiteAccuracy ?? CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy).toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`
                     : `${CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy.toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`}
                 </span>
                 <span
                   style={{
-                    color: 'var(--piece-green)',
+                    color: 'var(--text-primary)',
                     fontFamily: 'var(--font-mono)',
                     fontSize: '0.9rem',
                     fontWeight: 800,
                   }}
                 >
                   {effectiveReport
-                    ? `${effectiveReport.greenAccuracy.toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`
+                    ? `${(effectiveReport.blackAccuracy ?? CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy).toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`
                     : `${CANONICAL_ANALYSIS_CONFIG.accuracy.perfectAccuracy.toFixed(CANONICAL_ANALYSIS_CONFIG.accuracy.accuracyDecimals)}%`}
                 </span>
               </>

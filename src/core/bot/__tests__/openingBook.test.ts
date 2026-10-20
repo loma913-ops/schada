@@ -12,40 +12,40 @@ import { BotConfigError } from '../botConfig';
 import { getBotThinkingDelayMs } from '../schadaBot';
 
 describe('Schada Opening Book & Rapid Turn Transitions', () => {
-  it('provides legal opening moves from the initial starting board for Blue', () => {
+  it('provides legal opening moves from the initial starting board for White', () => {
     const state = createInitialGameState();
-    const bookMove = getOpeningBookMove(state.board, 'blue', 3, []);
+    const bookMove = getOpeningBookMove(state.board, 'white', 3, []);
 
     expect(bookMove).not.toBeNull();
-    expect(bookMove?.piece.color).toBe('blue');
+    expect(bookMove?.piece.color).toBe('white');
     expect([
       'a1', 'c1', 'e1', 'g1',
       'a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2'
     ]).toContain(bookMove?.from);
   });
 
-  it('provides legal responses for Green on ply 1', () => {
+  it('provides legal responses for Black on ply 1', () => {
     const state = createInitialGameState();
-    const blueMove = getOpeningBookMove(state.board, 'blue', 3, []);
-    expect(blueMove).not.toBeNull();
+    const whiteMove = getOpeningBookMove(state.board, 'white', 3, []);
+    expect(whiteMove).not.toBeNull();
 
-    const stateAfterBlue = executeMove(state, blueMove!);
-    const greenResponse = getOpeningBookMove(
-      stateAfterBlue.board,
-      'green',
+    const stateAfterWhite = executeMove(state, whiteMove!);
+    const blackResponse = getOpeningBookMove(
+      stateAfterWhite.board,
+      'black',
       3,
-      stateAfterBlue.moveHistory
+      stateAfterWhite.moveHistory
     );
 
-    expect(greenResponse).not.toBeNull();
-    expect(greenResponse?.piece.color).toBe('green');
+    expect(blackResponse).not.toBeNull();
+    expect(blackResponse?.piece.color).toBe('black');
   });
 
   it('Level 1 (Novice 100 Elo) completely bypasses the opening book', () => {
     const state = createInitialGameState();
     expect(shouldTierUseOpeningBook(1, [])).toBe(false);
 
-    const bookMove = getOpeningBookMove(state.board, 'blue', 1, []);
+    const bookMove = getOpeningBookMove(state.board, 'white', 1, []);
     expect(bookMove).toBeNull();
   });
 
@@ -76,7 +76,7 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
     const offBookKey = buildMoveSequenceKey(offBookMoves);
     expect(OPENING_BOOK[offBookKey]).toBeUndefined();
 
-    const bookMove = getOpeningBookMove(state.board, 'blue', 3, offBookMoves);
+    const bookMove = getOpeningBookMove(state.board, 'white', 3, offBookMoves);
     expect(bookMove).toBeNull();
   });
 
@@ -116,7 +116,7 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
     }
   });
 
-  it('verifies that OPENING_BOOK is tree-closed and complete for both Blue and Green up to ply 4', () => {
+  it('verifies that OPENING_BOOK is tree-closed and complete for both White and Black up to ply 4', () => {
     for (const [key, candidates] of Object.entries(OPENING_BOOK)) {
       const currentPly = key === '' ? 0 : key.split(' ').length;
       if (currentPly < 3) {
@@ -162,7 +162,7 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
 
   it('getOpeningBookMove defaults to BOT_ENGINE_CONFIG.defaultLevel if level is omitted', () => {
     const state = createInitialGameState();
-    const move = getOpeningBookMove(state.board, 'blue');
+    const move = getOpeningBookMove(state.board, 'white');
     // Level 1 is defaultLevel and bypasses book, returning null
     expect(move).toBeNull();
   });
@@ -179,11 +179,11 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
 
   it('verifies that no candidate move falls into vector hanging traps', () => {
     // Specifically verify known vector traps are eliminated:
-    // 1. After 1. a1-a3 (which attacks d6 via [3,3] beam), Green must not play d8-d6
+    // 1. After 1. a1-a3 (which attacks d6 via [3,3] beam), Black must not play d8-d6
     const a1a3Candidates = OPENING_BOOK['a1-a3'];
     expect(a1a3Candidates.some((c) => c.from === 'd8' && c.to === 'd6')).toBe(false);
 
-    // 2. After 1. ... h8-h6 (which attacks e3 via [-3,-3] beam), Blue must not play e1-e3
+    // 2. After 1. ... h8-h6 (which attacks e3 via [-3,-3] beam), White must not play e1-e3
     const h8h6Responses = Object.entries(OPENING_BOOK).filter(([k]) => k.includes('h8-h6'));
     for (const [key, cands] of h8h6Responses) {
       if (key.endsWith('h8-h6')) {
@@ -192,7 +192,7 @@ describe('Schada Opening Book & Rapid Turn Transitions', () => {
     }
   });
 
-  it('verifies that all 14 legal Blue opening moves are included in OPENING_BOOK[""]', () => {
+  it('verifies that all 14 legal White opening moves are included in OPENING_BOOK[""]', () => {
     const rootCandidates = OPENING_BOOK[''];
     expect(rootCandidates).toBeDefined();
     expect(rootCandidates.length).toBe(14);

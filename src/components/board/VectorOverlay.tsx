@@ -1,17 +1,18 @@
 import React, { memo } from 'react';
-import type { Square } from '@/core/schada/types';
+import type { PieceColor, Square } from '@/core/schada/types';
 import { BOARD_VISUALS } from '@/core/schada/board_visual_data';
+import { SCHADA_RULES_CONFIG } from '@/core/schada/rulesConfig';
 
 interface VectorOverlayProps {
   square: Square;
   isSelected?: boolean;
-  orientation?: 'blue' | 'green';
+  orientation?: PieceColor;
 }
 
 export const VectorOverlay: React.FC<VectorOverlayProps> = memo(({
   square,
   isSelected,
-  orientation = 'blue',
+  orientation = SCHADA_RULES_CONFIG.board.defaultOrientation,
 }) => {
   const visual = BOARD_VISUALS[square];
   if (!visual) return null;
@@ -21,7 +22,7 @@ export const VectorOverlay: React.FC<VectorOverlayProps> = memo(({
   const centerFill = isSelected ? '#10b981' : 'var(--sq-vector-dot)';
   const strokeW = isSelected ? 2.4 : 1.8;
 
-  const isFlipped = orientation === 'green';
+  const isFlipped = orientation === 'black';
 
   return (
     <svg viewBox="0 0 100 100" className="square-vector-svg">

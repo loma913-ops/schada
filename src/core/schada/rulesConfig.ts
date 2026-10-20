@@ -45,12 +45,12 @@ export interface SchadaRulesConfig {
     readonly rankCount: number;
     readonly fileCount: number;
     readonly totalSquares: number;
-    readonly blueBaseRankIndex: number;
-    readonly blueGoalRankIndex: number;
-    readonly greenBaseRankIndex: number;
-    readonly greenGoalRankIndex: number;
+    readonly whiteBaseRankIndex: number;
+    readonly whiteGoalRankIndex: number;
+    readonly blackBaseRankIndex: number;
+    readonly blackGoalRankIndex: number;
     readonly openingLegalMoveCount: number;
-    readonly defaultOrientation: 'blue' | 'green';
+    readonly defaultOrientation: 'white' | 'black';
   };
   readonly endConditions: {
     readonly threefoldRepetitionThreshold: number;
@@ -112,9 +112,9 @@ export function validateRulesConfig(config: SchadaRulesConfig): void {
     );
   }
 
-  if (board.defaultOrientation !== 'blue' && board.defaultOrientation !== 'green') {
+  if (board.defaultOrientation !== 'white' && board.defaultOrientation !== 'black') {
     throw new SchadaRulesConfigError(
-      `Invalid board defaultOrientation: expected "blue" or "green", received ${String(board?.defaultOrientation)}.`
+      `Invalid board defaultOrientation: expected "white" or "black", received ${String(board?.defaultOrientation)}.`
     );
   }
 
@@ -125,17 +125,17 @@ export function validateRulesConfig(config: SchadaRulesConfig): void {
   }
 
   if (
-    typeof board.blueBaseRankIndex !== 'number' ||
-    typeof board.blueGoalRankIndex !== 'number' ||
-    typeof board.greenBaseRankIndex !== 'number' ||
-    typeof board.greenGoalRankIndex !== 'number' ||
-    board.blueBaseRankIndex !== 0 ||
-    board.blueGoalRankIndex !== 7 ||
-    board.greenBaseRankIndex !== 7 ||
-    board.greenGoalRankIndex !== 0
+    typeof board.whiteBaseRankIndex !== 'number' ||
+    typeof board.whiteGoalRankIndex !== 'number' ||
+    typeof board.blackBaseRankIndex !== 'number' ||
+    typeof board.blackGoalRankIndex !== 'number' ||
+    board.whiteBaseRankIndex !== 0 ||
+    board.whiteGoalRankIndex !== 7 ||
+    board.blackBaseRankIndex !== 7 ||
+    board.blackGoalRankIndex !== 0
   ) {
     throw new SchadaRulesConfigError(
-      'Invalid board base/goal rank indices: expected Blue base=0/goal=7 and Green base=7/goal=0.'
+      'Invalid board base/goal rank indices: expected White base=0/goal=7 and Black base=7/goal=0.'
     );
   }
 
@@ -184,12 +184,12 @@ export const SCHADA_RULES_CONFIG: SchadaRulesConfig = Object.freeze({
     rankCount: 8,
     fileCount: 8,
     totalSquares: 64,
-    blueBaseRankIndex: 0, // Rank 1
-    blueGoalRankIndex: 7, // Rank 8
-    greenBaseRankIndex: 7, // Rank 8
-    greenGoalRankIndex: 0, // Rank 1
+    whiteBaseRankIndex: 0, // Rank 1
+    whiteGoalRankIndex: 7, // Rank 8
+    blackBaseRankIndex: 7, // Rank 8
+    blackGoalRankIndex: 0, // Rank 1
     openingLegalMoveCount: 14,
-    defaultOrientation: 'blue' as const,
+    defaultOrientation: 'white' as const,
   },
   endConditions: {
     threefoldRepetitionThreshold: 3,

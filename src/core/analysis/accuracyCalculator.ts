@@ -9,7 +9,7 @@ import type { PieceColor } from '../schada/types';
 
 /**
  * Computes subjective winning chances [-1, +1] from centipoint evaluation.
- * Clamped to configured evalCeiling with empirical multiplier (Lichess model).
+ * Clamped to configured evalCeiling with empirical multiplier (Schada model).
  *
  * Algorithmic Complexity:
  * - Time Complexity: O(1) constant time mathematical operation.
@@ -67,7 +67,7 @@ export function evaluationToWinPercent(
 
 /**
  * Calculates accuracy percentage [0, 100] for an individual move based on
- * win percentage lost relative to the best engine move, using Lichess's
+ * win percentage lost relative to the best engine move, using Schada's
  * calibrated exponential model:
  * Accuracy% = a * exp(-k * winDiff) + b + uncertaintyBonus
  *
@@ -127,7 +127,7 @@ function calculateStandardDeviation(values: readonly number[]): number {
 
 /**
  * Computes overall accuracy and move classification breakdown for a specific player color
- * using Lichess's game accuracy algorithm:
+ * using Schada's game accuracy algorithm:
  * 1. Compute sliding-window volatility weights from position Win% values.
  * 2. Calculate the volatility-weighted mean of per-move accuracies.
  * 3. Calculate the harmonic mean of per-move accuracies to penalize blunders appropriately.
@@ -163,7 +163,7 @@ export function calculatePlayerAccuracy(
     breakdown[m.quality]++;
   }
 
-  // 1. Build all-ply Win% timeline (from Blue POV), starting with initial board (0 cp)
+  // 1. Build all-ply Win% timeline (from White POV), starting with initial board (0 cp)
   const allWinPercents: number[] = [evaluationToWinPercent(0, config)];
   for (let i = 0; i < evaluatedMoves.length; i++) {
     allWinPercents.push(evaluationToWinPercent(evaluatedMoves[i].evalAfter, config));
@@ -195,9 +195,7 @@ export function calculatePlayerAccuracy(
       acc = config.accuracy.perfectAccuracy;
     } else {
       // Perspective-corrected scores:
-      // In evaluatedMoves, evalBefore and evalAfter are normalized to Blue POV.
-      // Active player's POV before the move:
-      const beforeCp = color === 'blue' ? m.evalBefore : -m.evalBefore;
+      const beforeCp = color === 'white' ? m.evalBefore : -m.evalBefore;
       // Active player's POV after playing the move:
       const afterCp = beforeCp - m.evalDelta;
       acc = calculateMoveAccuracy(beforeCp, afterCp, config);
@@ -278,13 +276,14 @@ export function createEmptyAnalysisReport(
   config: AnalysisConfig = CANONICAL_ANALYSIS_CONFIG
 ): GameAnalysisReport {
   validateAnalysisConfig(config);
+  const emptyBreakdown = createEmptyQualityBreakdown();
   return {
     metadata: {},
     moves: [],
-    blueAccuracy: config.accuracy.perfectAccuracy,
-    greenAccuracy: config.accuracy.perfectAccuracy,
-    blueBreakdown: createEmptyQualityBreakdown(),
-    greenBreakdown: createEmptyQualityBreakdown(),
+    whiteAccuracy: config.accuracy.perfectAccuracy,
+    blackAccuracy: config.accuracy.perfectAccuracy,
+    whiteBreakdown: emptyBreakdown,
+    blackBreakdown: emptyBreakdown,
     isComplete,
     totalPlies: 0,
     analyzedAt: new Date().toISOString(),

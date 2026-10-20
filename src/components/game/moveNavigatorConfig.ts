@@ -185,7 +185,7 @@ export const CANONICAL_MOVE_NAVIGATOR_CONFIG: MoveNavigatorConfig = Object.freez
       previousMove: 'Previous move',
       nextMove: 'Next move',
       endOfGame: 'End of game',
-      unreadLiveMove: 'Live move played — Jump to latest position',
+      unreadLiveMove: 'Live move played - Jump to latest position',
     }),
   }),
   tooltips: Object.freeze({
@@ -193,7 +193,7 @@ export const CANONICAL_MOVE_NAVIGATOR_CONFIG: MoveNavigatorConfig = Object.freez
     previousMove: 'Previous move',
     nextMove: 'Next move',
     endOfGame: 'End of game',
-    unreadLiveMove: 'Live move played — Jump to latest position',
+    unreadLiveMove: 'Live move played - Jump to latest position',
   }),
   keyboardShortcuts: Object.freeze({
     previous: Object.freeze(['ArrowLeft']),

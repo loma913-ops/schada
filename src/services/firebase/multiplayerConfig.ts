@@ -35,6 +35,7 @@ export interface PresenceConfig {
   readonly statsInitialFallbackDelayMs: number;
   readonly statsFallbackPollIntervalMs: number;
   readonly friendFreshnessThresholdMs: number;
+  readonly profileStaleThresholdMs: number;
   readonly staleGuestPruneIntervalMs: number;
   readonly staleGuestCutoffMs: number;
   readonly friendsPollIntervalMs: number;
@@ -52,8 +53,8 @@ export interface MatchmakingConfig {
   readonly defaultGuestRating: number;
   readonly defaultGuestName: string;
   readonly defaultGuestHostName: string;
-  readonly passAndPlayBlueName: string;
-  readonly passAndPlayGreenName: string;
+  readonly passAndPlayWhiteName: string;
+  readonly passAndPlayBlackName: string;
   readonly botBaseElo: number;
   readonly botEloStepPerLevel: number;
   readonly defaultCleanupIntervalMs: number;
@@ -184,6 +185,12 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
   if (typeof presence.friendFreshnessThresholdMs !== 'number' || presence.friendFreshnessThresholdMs <= 0) {
     throw new MultiplayerConfigError(
       `Invalid presence.friendFreshnessThresholdMs: expected positive number, received ${presence.friendFreshnessThresholdMs}.`
+    );
+  }
+
+  if (typeof presence.profileStaleThresholdMs !== 'number' || presence.profileStaleThresholdMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.profileStaleThresholdMs: expected positive number, received ${presence.profileStaleThresholdMs}.`
     );
   }
 
@@ -333,15 +340,17 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
     );
   }
 
-  if (typeof matchmaking.passAndPlayBlueName !== 'string' || matchmaking.passAndPlayBlueName.trim().length === 0) {
+  const whiteName = matchmaking.passAndPlayWhiteName;
+  if (typeof whiteName !== 'string' || whiteName.trim().length === 0) {
     throw new MultiplayerConfigError(
-      `Invalid matchmaking.passAndPlayBlueName: expected non-empty string, received "${matchmaking.passAndPlayBlueName}".`
+      `Invalid matchmaking.passAndPlayWhiteName: expected non-empty string, received "${whiteName}".`
     );
   }
 
-  if (typeof matchmaking.passAndPlayGreenName !== 'string' || matchmaking.passAndPlayGreenName.trim().length === 0) {
+  const blackName = matchmaking.passAndPlayBlackName;
+  if (typeof blackName !== 'string' || blackName.trim().length === 0) {
     throw new MultiplayerConfigError(
-      `Invalid matchmaking.passAndPlayGreenName: expected non-empty string, received "${matchmaking.passAndPlayGreenName}".`
+      `Invalid matchmaking.passAndPlayBlackName: expected non-empty string, received "${blackName}".`
     );
   }
 
@@ -589,12 +598,13 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     statsPollIntervalMs: 12_000,
     statsPollJitterMs: 3_000,
     statsInitialFallbackDelayMs: 2_000,
-    statsFallbackPollIntervalMs: 120_000,
-    friendFreshnessThresholdMs: 45_000,
+    statsFallbackPollIntervalMs: 300_000,
+    friendFreshnessThresholdMs: 65_000,
+    profileStaleThresholdMs: 300_000,
     staleGuestPruneIntervalMs: 15 * 60 * 1000,
     staleGuestCutoffMs: 15 * 60 * 1000,
-    friendsPollIntervalMs: 30_000,
-    friendsCacheTtlMs: 25_000,
+    friendsPollIntervalMs: 60_000,
+    friendsCacheTtlMs: 55_000,
     usernameSearchCacheTtlMs: 60_000,
     serverCountsCooldownMs: 10_000,
     storageKeys: Object.freeze({
@@ -623,8 +633,8 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     defaultGuestRating: 1200,
     defaultGuestName: 'Guest',
     defaultGuestHostName: 'Guest Host',
-    passAndPlayBlueName: 'Player 1 (Blue)',
-    passAndPlayGreenName: 'Player 2 (Green)',
+    passAndPlayWhiteName: 'Player 1 (White)',
+    passAndPlayBlackName: 'Player 2 (Black)',
     botBaseElo: 1000,
     botEloStepPerLevel: 80,
     defaultCleanupIntervalMs: 60_000,
@@ -634,7 +644,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     liveRoomsPollIntervalMs: 60_000,
     friendBatchLookupSize: 30,
     leaderboardLimit: 50,
-    leaderboardCacheTtlMs: 5 * 60 * 1000,
+    leaderboardCacheTtlMs: 10 * 60 * 1000,
     botExcludedPrefixes: Object.freeze(['guest_', 'mock-', 'bot_']),
     minGamesPlayedForLeaderboard: 1,
     clockSyncJitterThresholdMs: 1500,

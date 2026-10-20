@@ -22,7 +22,7 @@ describe('Analyze Game CLI Script', () => {
     );
     const parsed = JSON.parse(stdout);
     expect(parsed.totalPlies).toBe(2);
-    expect(parsed.blueAccuracy).toBe(100);
+    expect(parsed.whiteAccuracy).toBe(100);
     expect(parsed.moves[0].quality).toBe('book');
   }, 30000);
 
@@ -70,7 +70,7 @@ describe('Analyze Game CLI Script', () => {
     expect(lossHeaderPos).toBeGreaterThan(evalHeaderPos);
 
     // Verify each move row has matching column alignments for Eval and Loss
-    const moveRows = lines.filter((l) => /^\d+(\.\.\.|\.)\s+(blue|green)\s+/.test(l.trim()));
+    const moveRows = lines.filter((l) => /^\d+(\.\.\.|\.)\s+(white|black)\s+/.test(l.trim()));
     expect(moveRows.length).toBeGreaterThanOrEqual(2);
 
     for (const row of moveRows) {

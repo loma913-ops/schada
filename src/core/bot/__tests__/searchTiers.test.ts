@@ -11,9 +11,9 @@ describe('8-Tier Search Engine Validation', () => {
     const state = createInitialGameState();
 
     for (let level = 1; level <= 8; level++) {
-      const move = selectBotMove(state.board, 'blue', level, []);
+      const move = selectBotMove(state.board, 'white', level, []);
       expect(move).not.toBeNull();
-      expect(move?.piece.color).toBe('blue');
+      expect(move?.piece.color).toBe('white');
       expect(move?.from).toBeDefined();
       expect(move?.to).toBeDefined();
     }
@@ -23,7 +23,7 @@ describe('8-Tier Search Engine Validation', () => {
     const dummyHistory = new Array(5).fill({
       from: 'a1',
       to: 'a2',
-      piece: { id: 'p', type: 'pawn', color: 'blue', hasLeftBase: true, hasReachedGoal: false },
+      piece: { id: 'p', type: 'pawn', color: 'white', hasLeftBase: true, hasReachedGoal: false },
       intermediateSquares: [],
       notation: 'a1-a2',
     });
@@ -38,7 +38,7 @@ describe('8-Tier Search Engine Validation', () => {
     const state = createInitialGameState();
     const move = await botWorkerClient.requestBotMove(
       state.board,
-      'blue',
+      'white',
       3,
       [],
       5000,
@@ -46,12 +46,12 @@ describe('8-Tier Search Engine Validation', () => {
     );
 
     expect(move).not.toBeNull();
-    expect(move?.piece.color).toBe('blue');
+    expect(move?.piece.color).toBe('white');
   });
 
   it('produces finite, non-NaN candidate evaluations during deep searches (depths 7 through 20)', () => {
     const state = createInitialGameState();
-    const fastBoard = FastBoard.fromBoardMatrix(state.board, 'blue');
+    const fastBoard = FastBoard.fromBoardMatrix(state.board, 'white');
     const tier = getBotTier(8);
 
     for (const testDepth of [7, 8, 10, 16, 20]) {

@@ -3,12 +3,12 @@ import { SCHADA_RULES_CONFIG } from '../schada/rulesConfig';
 import {
   FastBoard,
   EMPTY,
-  BLUE_FO,
-  BLUE_O,
-  BLUE_PAWN,
-  GREEN_FO,
-  GREEN_O,
-  GREEN_PAWN,
+  WHITE_FO,
+  WHITE_O,
+  WHITE_PAWN,
+  BLACK_FO,
+  BLACK_O,
+  BLACK_PAWN,
   FLAG_REACHED_GOAL,
 } from './fastBoard';
 import { DISTANCE_TABLES, UNREACHABLE_DISTANCE } from './distanceTables';
@@ -32,9 +32,9 @@ export interface ScoreBreakdownFast {
  * - Auxiliary Space Complexity: O(1) constant auxiliary space.
  */
 export function calculateFastScore(board: FastBoard, color: PieceColor): ScoreBreakdownFast {
-  const isBlue = color === 'blue';
-  const goalRank = isBlue ? SCHADA_RULES_CONFIG.board.blueGoalRankIndex : SCHADA_RULES_CONFIG.board.greenGoalRankIndex;
-  const baseRank = isBlue ? SCHADA_RULES_CONFIG.board.blueBaseRankIndex : SCHADA_RULES_CONFIG.board.greenBaseRankIndex;
+  const isWhite = color === 'white';
+  const goalRank = isWhite ? SCHADA_RULES_CONFIG.board.whiteGoalRankIndex : SCHADA_RULES_CONFIG.board.blackGoalRankIndex;
+  const baseRank = isWhite ? SCHADA_RULES_CONFIG.board.whiteBaseRankIndex : SCHADA_RULES_CONFIG.board.blackBaseRankIndex;
   const scoring = SCHADA_RULES_CONFIG.scoring;
 
   let goalScore = 0;
@@ -44,11 +44,11 @@ export function calculateFastScore(board: FastBoard, color: PieceColor): ScoreBr
   for (let idx = 0; idx < 64; idx++) {
     const piece = board.squares[idx];
     if (piece === EMPTY) continue;
-    if ((piece <= 3) !== isBlue) continue;
+    if ((piece <= 3) !== isWhite) continue;
 
     const row = Math.floor(idx / 8);
-    const isFO = piece === BLUE_FO || piece === GREEN_FO;
-    const isO = piece === BLUE_O || piece === GREEN_O;
+    const isFO = piece === WHITE_FO || piece === BLACK_FO;
+    const isO = piece === WHITE_O || piece === BLACK_O;
 
     if (isFO) {
       if (row === goalRank) {
@@ -86,22 +86,22 @@ export function calculateFastScore(board: FastBoard, color: PieceColor): ScoreBr
  * - Auxiliary Space Complexity: O(1).
  */
 export function evaluateTerminalWin(board: FastBoard, evalColor: PieceColor, ply: number): number {
-  const blueScore = calculateFastScore(board, 'blue');
-  const greenScore = calculateFastScore(board, 'green');
+  const whiteScore = calculateFastScore(board, 'white');
+  const blackScore = calculateFastScore(board, 'black');
 
   let winner: PieceColor | 'draw' = 'draw';
-  if (blueScore.goalScore > greenScore.goalScore) {
-    winner = 'blue';
-  } else if (greenScore.goalScore > blueScore.goalScore) {
-    winner = 'green';
-  } else if (blueScore.outsideHighScore > greenScore.outsideHighScore) {
-    winner = 'blue';
-  } else if (greenScore.outsideHighScore > blueScore.outsideHighScore) {
-    winner = 'green';
-  } else if (blueScore.rankDistanceScore > greenScore.rankDistanceScore + 0.001) {
-    winner = 'blue';
-  } else if (greenScore.rankDistanceScore > blueScore.rankDistanceScore + 0.001) {
-    winner = 'green';
+  if (whiteScore.goalScore > blackScore.goalScore) {
+    winner = 'white';
+  } else if (blackScore.goalScore > whiteScore.goalScore) {
+    winner = 'black';
+  } else if (whiteScore.outsideHighScore > blackScore.outsideHighScore) {
+    winner = 'white';
+  } else if (blackScore.outsideHighScore > whiteScore.outsideHighScore) {
+    winner = 'black';
+  } else if (whiteScore.rankDistanceScore > blackScore.rankDistanceScore + 0.001) {
+    winner = 'white';
+  } else if (blackScore.rankDistanceScore > whiteScore.rankDistanceScore + 0.001) {
+    winner = 'black';
   } else {
     winner = 'draw';
   }
@@ -133,11 +133,11 @@ export function evaluateBoard(
   tier: BotTierConfig,
   ply: number = 0
 ): number {
-  const isEvalBlue = evalColor === 'blue';
+  const isEvalWhite = evalColor === 'white';
   const weights = BOT_ENGINE_CONFIG.evaluationWeights;
 
   // 1. Terminal evaluation if all remaining high pieces of either army reached goal
-  if (board.haveAllRemainingHighPiecesReachedGoal('blue') || board.haveAllRemainingHighPiecesReachedGoal('green')) {
+  if (board.haveAllRemainingHighPiecesReachedGoal('white') || board.haveAllRemainingHighPiecesReachedGoal('black')) {
     return evaluateTerminalWin(board, evalColor, ply);
   }
 
@@ -160,14 +160,14 @@ export function evaluateBoard(
     const piece = board.squares[idx];
     if (piece === EMPTY) continue;
 
-    const isPieceBlue = piece <= 3;
-    const isFriendly = isPieceBlue === isEvalBlue;
+    const isPieceWhite = piece <= 3;
+    const isFriendly = isPieceWhite === isEvalWhite;
     const flags = board.flags[idx];
     const inGoal = (flags & FLAG_REACHED_GOAL) !== 0;
 
-    const isFO = piece === BLUE_FO || piece === GREEN_FO;
-    const isO = piece === BLUE_O || piece === GREEN_O;
-    const isP = piece === BLUE_PAWN || piece === GREEN_PAWN;
+    const isFO = piece === WHITE_FO || piece === BLACK_FO;
+    const isO = piece === WHITE_O || piece === BLACK_O;
+    const isP = piece === WHITE_PAWN || piece === BLACK_PAWN;
 
     // Material & Goal Security
     if (isFO) {
@@ -194,10 +194,10 @@ export function evaluateBoard(
     // Distance to Goal for high pieces outside goal (Levels 3+)
     if (tier.level >= BOT_ENGINE_CONFIG.searchParameters.distanceHeuristicsMinTier && (isFO || isO) && !inGoal) {
       let dist = 0;
-      if (isPieceBlue) {
-        dist = isFO ? DISTANCE_TABLES.blueLeaping[idx] : DISTANCE_TABLES.blueSliding[idx];
+      if (isPieceWhite) {
+        dist = isFO ? DISTANCE_TABLES.whiteLeaping[idx] : DISTANCE_TABLES.whiteSliding[idx];
       } else {
-        dist = isFO ? DISTANCE_TABLES.greenLeaping[idx] : DISTANCE_TABLES.greenSliding[idx];
+        dist = isFO ? DISTANCE_TABLES.blackLeaping[idx] : DISTANCE_TABLES.blackSliding[idx];
       }
 
       const distWeight = isFO ? weights.fieldOfficerDistanceWeight : weights.officerDistanceWeight;
@@ -238,13 +238,13 @@ export function evaluateBoard(
   // Pacing Paradox Awareness (Levels 5–8):
   if (tier.usePacingAwareness) {
     const myScore = calculateFastScore(board, evalColor);
-    const oppColor = isEvalBlue ? 'green' : 'blue';
+    const oppColor = isEvalWhite ? 'black' : 'white';
     const oppScore = calculateFastScore(board, oppColor);
     const pointMargin = myScore.totalScore - oppScore.totalScore;
 
-    const myHighRemaining = isEvalBlue
-      ? board.blueHighTotal - board.blueHighInGoal
-      : board.greenHighTotal - board.greenHighInGoal;
+    const myHighRemaining = isEvalWhite
+      ? board.whiteHighTotal - board.whiteHighInGoal
+      : board.blackHighTotal - board.blackHighInGoal;
 
     if (myHighRemaining === 1 && pointMargin < 0) {
       score -= weights.pacingTrailingPenalty;
@@ -256,7 +256,7 @@ export function evaluateBoard(
   // Fractional tiebreaker bonus for Expert/Master (Levels 7-8)
   if (tier.level >= BOT_ENGINE_CONFIG.searchParameters.fractionalTiebreakMinTier) {
     const myScore = calculateFastScore(board, evalColor);
-    const oppColor = isEvalBlue ? 'green' : 'blue';
+    const oppColor = isEvalWhite ? 'black' : 'white';
     const oppScore = calculateFastScore(board, oppColor);
     score += (myScore.rankDistanceScore - oppScore.rankDistanceScore) * weights.fractionalTiebreakMultiplier;
   }

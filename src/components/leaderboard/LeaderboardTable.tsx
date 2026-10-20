@@ -292,7 +292,7 @@ export const LeaderboardTable: React.FC = () => {
 
                 {/* Player info */}
                 <div className="leaderboard-col-player">
-                  <div className="leaderboard-player-avatar player-avatar blue">
+                  <div className="leaderboard-player-avatar player-avatar white">
                     {p.username.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', minWidth: 0, overflow: 'hidden' }}>
