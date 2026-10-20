@@ -466,6 +466,15 @@ export async function makeGameMove(
       game = snap.data() as GameRoom;
     }
     const updatePayload = computeMoveTransition(game, move, playerColor, now);
+    if (!game.mode) {
+      updatePayload.mode = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
+    }
+    if (!game.playerIds) {
+      const pids = [game.whitePlayer?.id, game.blackPlayer?.id].filter(Boolean) as string[];
+      if (pids.length > 0) {
+        updatePayload.playerIds = pids;
+      }
+    }
     await updateDoc(docRef, sanitize(updatePayload));
     return;
   }
@@ -476,6 +485,15 @@ export async function makeGameMove(
   }
 
   const updatePayload = computeMoveTransition(game, move, playerColor, now);
+  if (!game.mode) {
+    updatePayload.mode = determineTimeCategory(game.timeControlMinutes, game.incrementSeconds || 0);
+  }
+  if (!game.playerIds) {
+    const pids = [game.whitePlayer?.id, game.blackPlayer?.id].filter(Boolean) as string[];
+    if (pids.length > 0) {
+      updatePayload.playerIds = pids;
+    }
+  }
   localGameStore.set({ ...game, ...updatePayload });
 }
 

@@ -14,10 +14,10 @@ service cloud.firestore {
       return request.resource.data.id == resource.data.id &&
              request.resource.data.createdAt == resource.data.createdAt &&
              request.resource.data.isRanked == resource.data.isRanked &&
-             request.resource.data.mode == resource.data.mode &&
+             (!('mode' in resource.data) || request.resource.data.mode == resource.data.mode) &&
              request.resource.data.timeControlMinutes == resource.data.timeControlMinutes &&
              request.resource.data.incrementSeconds == resource.data.incrementSeconds &&
-             request.resource.data.creatorColorPref == resource.data.creatorColorPref;
+             (!('creatorColorPref' in resource.data) || request.resource.data.creatorColorPref == resource.data.creatorColorPref);
     }
 
     function isValidInitialModeStats(stats) {
@@ -124,7 +124,7 @@ service cloud.firestore {
       allow update: if gameId.size() == 9 && gameId.matches('^[0-9a-zA-Z]{9}$') && isGameImmutablePreserved() && (
         // 1. Waiting -> abandoned (host cancel or lobby cleanup watcher)
         (resource.data.status == 'waiting' && request.resource.data.status == 'abandoned' &&
-          request.resource.data.playerIds == resource.data.playerIds) ||
+          (!('playerIds' in resource.data) || request.resource.data.playerIds == resource.data.playerIds)) ||
         // 2. Waiting -> in_progress (join open seat)
         (resource.data.status == 'waiting' && request.resource.data.status == 'in_progress' &&
           request.resource.data.playerIds is list && request.resource.data.playerIds.size() >= 1 && request.resource.data.playerIds.size() <= 2 && (
@@ -136,7 +136,7 @@ service cloud.firestore {
         )) ||
         // 3. In_progress -> in_progress / completed (moves, resignations, disconnect flags, timeouts)
         (resource.data.status == 'in_progress' &&
-          request.resource.data.playerIds == resource.data.playerIds && (
+          (!('playerIds' in resource.data) || request.resource.data.playerIds == resource.data.playerIds) && (
           !resource.data.isRanked ||
           // Actions by seated players
           (isAuthenticated() && (
@@ -149,7 +149,7 @@ service cloud.firestore {
         )) ||
         // 4. Completed -> completed (markGameEloProcessed array append)
         (resource.data.status == 'completed' && request.resource.data.status == 'completed' &&
-          request.resource.data.playerIds == resource.data.playerIds && (
+          (!('playerIds' in resource.data) || request.resource.data.playerIds == resource.data.playerIds) && (
           !resource.data.isRanked ||
           (isAuthenticated() && (
             request.auth.uid == resource.data.whitePlayer.id ||
