@@ -59,7 +59,7 @@ In Schada, **the board squares dictate piece movement**, rather than the pieces 
 - **Per-Mode Elo & Performance Statistics**: Independent Elo ratings and match records for Bullet, Blitz, Rapid, Classical, and Correspondence modes across in-game play, profiles, and human-only leaderboards with instant stale-while-revalidate local caching.
 - **Mobile Portrait Orientation Lock**: Orientation detection and overlay for optimal vertical board aspect ratio.
 - **Zero-Cache Deployment & Session Recovery**: Immediate cache bypass, background service worker updates, and seamless auto-recovery without hard reload.
-- **Optimized Firestore CRUD Architecture**: Minimal billable reads and writes via presence sync gating, in-flight deduplication, session reconciliation cooldowns, and cached subscriptions.
+- **Optimized Firestore CRUD Architecture**: Minimal billable reads and writes via single-read profile hydration, zero-read room creation, deduplicated match resolution writes, in-game count poll pause, and cached subscriptions.
 - **PWA & Offline-First Architecture**: Service worker and local storage provider for guest and offline play.
 - **Configuration-Over-Hardcoding Architecture**: Centralized, strictly validated configuration modules for bot heuristics, matchmaking, time controls, audio, and rules.
 - **Threat Detection Indicators**: Real-time visual attack badges on vulnerable pieces with toggleable player preferences.
@@ -532,6 +532,7 @@ Schada employs an authoritative defense-in-depth security model:
 - **Canonical Game Identifier Hardening**: 9-character alphanumeric (case-sensitive, Base62) game identifiers generated via cryptographically secure pseudo-random values (`crypto.getRandomValues`), atomic collision-prevention transactions in Firestore, and strict regex schema enforcement in `firestore.rules`.
 - **Client Storage & Telemetry Hardening**: Local storage setters protected against format string injection vulnerabilities and unencrypted PII exposure with granular quota exhaustion recovery and inline security audit suppression.
 - **Cryptographically Secure Random Generation (CSPRNG)**: Full elimination of weak PRNG (`Math.random`) across all sensitive identity and authorization vectors—including guest user identifiers, client presence session IDs, player session tokens, and local account IDs—in favor of authoritative Web Crypto API (`crypto.getRandomValues`) with rejection sampling to eliminate modulo bias.
+- **Optimized Database Access Controls & Quota Protection**: Single-read authentication profile hydration with window focus re-synchronization; zero-read game room creation leveraging 9-character CSPRNG entropy; and deduplicated match completion writes avoiding redundant document reads and writes.
 
 ---
 

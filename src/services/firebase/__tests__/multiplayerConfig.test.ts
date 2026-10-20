@@ -156,6 +156,17 @@ describe('MultiplayerScaleConfig validation', () => {
       /Invalid presence.friendFreshnessThresholdMs/
     );
 
+    const invalidProfileStale: MultiplayerScaleConfig = {
+      ...MULTIPLAYER_SCALE_CONFIG,
+      presence: {
+        ...MULTIPLAYER_SCALE_CONFIG.presence,
+        profileStaleThresholdMs: 0,
+      },
+    };
+    expect(() => validateMultiplayerScaleConfig(invalidProfileStale)).toThrowError(
+      /Invalid presence.profileStaleThresholdMs/
+    );
+
     const invalidFriendBatchSize: MultiplayerScaleConfig = {
       ...MULTIPLAYER_SCALE_CONFIG,
       matchmaking: {

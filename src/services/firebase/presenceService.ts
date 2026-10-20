@@ -10,9 +10,6 @@ import {
   serverTimestamp,
   getCountFromServer,
   Timestamp,
-  getDocs,
-  limit,
-  writeBatch,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { localBackend } from './localProvider';
@@ -293,7 +290,6 @@ export function resetPresenceStateForTesting(): void {
   lastServerCountsRefreshTime = 0;
   inFlightRefreshPromise = null;
   guestCountIndexUnavailable = false;
-  lastStaleGuestPruneTime = 0;
 }
 
 /**
@@ -550,14 +546,12 @@ export function startPresenceTracking(): () => void {
       window.removeEventListener('beforeunload', onUnload);
     };
 
-    // Initial heartbeat & stale session sanitation
+    // Initial heartbeat
     syncPresenceHeartbeat();
-    pruneStaleGuestSessions().catch(() => {});
 
     // Heartbeat loop
     heartbeatIntervalId = setInterval(() => {
       syncPresenceHeartbeat();
-      pruneStaleGuestSessions().catch(() => {});
     }, HEARTBEAT_INTERVAL_MS);
   }
 
@@ -798,47 +792,17 @@ function notifyStatsSubscribers(): void {
   }
 }
 
-let lastStaleGuestPruneTime = 0;
-const STALE_GUEST_PRUNE_INTERVAL_MS = MULTIPLAYER_SCALE_CONFIG.presence.staleGuestPruneIntervalMs;
-const STALE_GUEST_CUTOFF_MS = MULTIPLAYER_SCALE_CONFIG.presence.staleGuestCutoffMs;
 
 /**
- * Opportunistically purges orphan guest sessions older than 15 minutes to keep Firestore clean.
+ * Opportunistically purges orphan guest sessions (no-op on client; managed via lifecycle or TTL).
  *
  * Algorithmic Complexity (Big O):
- * - Time Complexity: O(B) where B <= maxCleanupBatchSize (B <= 50) for batch retrieval and atomic commit.
- * - Auxiliary Space Complexity: O(B) for document snapshot handles within batch buffer.
- * - Network / Database Complexity: O(1) query read plus 1 atomic batch deletion commit, strictly gated to
- *   at most once per staleGuestPruneIntervalMs.
+ * - Time Complexity: O(1) constant resolved promise.
+ * - Auxiliary Space Complexity: O(1) constant auxiliary space.
+ * - Growth Rate: O(1) constant.
  */
 export async function pruneStaleGuestSessions(): Promise<void> {
-  if (!db || !isFirebaseConfigured() || guestCountIndexUnavailable) return;
-  // If the current tab/client is not active, or if it is already a registered user, skip pruning
-  if (!isCurrentClientActive() || isCurrentClientRegistered().isRegistered) return;
-  const now = Date.now();
-  if (now - lastStaleGuestPruneTime < STALE_GUEST_PRUNE_INTERVAL_MS) return;
-  lastStaleGuestPruneTime = now;
-
-  try {
-    const cutoff = new Date(now - STALE_GUEST_CUTOFF_MS);
-    const staleQuery = query(
-      collection(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions),
-      where('lastSeen', '<', Timestamp.fromDate(cutoff)),
-      limit(MULTIPLAYER_SCALE_CONFIG.matchmaking.maxCleanupBatchSize)
-    );
-    const snap = await getDocs(staleQuery);
-    if (!snap.empty) {
-      const batch = writeBatch(db);
-      for (const d of snap.docs) {
-        batch.delete(d.ref);
-      }
-      await batch.commit();
-    }
-  } catch (err: unknown) {
-    if (isFailedPreconditionError(err)) {
-      guestCountIndexUnavailable = true;
-    }
-  }
+  return Promise.resolve();
 }
 
 let detachStatsWatchers: (() => void) | null = null;
@@ -908,6 +872,7 @@ export function subscribeToLobbyStats(callback: (stats: LobbyStats) => void): ()
         const refreshServerCounts = async (force: boolean = false): Promise<void> => {
           if (!db) return;
           if (typeof document !== 'undefined' && document.hidden) return;
+          if (getCurrentActivityContext() === 'in-game') return;
           const now = Date.now();
           if (!force && inFlightRefreshPromise) return inFlightRefreshPromise;
           if (!force && now - lastServerCountsRefreshTime < MULTIPLAYER_SCALE_CONFIG.presence.serverCountsCooldownMs) return;

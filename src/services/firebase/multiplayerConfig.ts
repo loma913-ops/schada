@@ -35,6 +35,7 @@ export interface PresenceConfig {
   readonly statsInitialFallbackDelayMs: number;
   readonly statsFallbackPollIntervalMs: number;
   readonly friendFreshnessThresholdMs: number;
+  readonly profileStaleThresholdMs: number;
   readonly staleGuestPruneIntervalMs: number;
   readonly staleGuestCutoffMs: number;
   readonly friendsPollIntervalMs: number;
@@ -184,6 +185,12 @@ export function validateMultiplayerScaleConfig(config: MultiplayerScaleConfig): 
   if (typeof presence.friendFreshnessThresholdMs !== 'number' || presence.friendFreshnessThresholdMs <= 0) {
     throw new MultiplayerConfigError(
       `Invalid presence.friendFreshnessThresholdMs: expected positive number, received ${presence.friendFreshnessThresholdMs}.`
+    );
+  }
+
+  if (typeof presence.profileStaleThresholdMs !== 'number' || presence.profileStaleThresholdMs <= 0) {
+    throw new MultiplayerConfigError(
+      `Invalid presence.profileStaleThresholdMs: expected positive number, received ${presence.profileStaleThresholdMs}.`
     );
   }
 
@@ -591,12 +598,13 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     statsPollIntervalMs: 12_000,
     statsPollJitterMs: 3_000,
     statsInitialFallbackDelayMs: 2_000,
-    statsFallbackPollIntervalMs: 120_000,
-    friendFreshnessThresholdMs: 45_000,
+    statsFallbackPollIntervalMs: 300_000,
+    friendFreshnessThresholdMs: 65_000,
+    profileStaleThresholdMs: 300_000,
     staleGuestPruneIntervalMs: 15 * 60 * 1000,
     staleGuestCutoffMs: 15 * 60 * 1000,
-    friendsPollIntervalMs: 30_000,
-    friendsCacheTtlMs: 25_000,
+    friendsPollIntervalMs: 60_000,
+    friendsCacheTtlMs: 55_000,
     usernameSearchCacheTtlMs: 60_000,
     serverCountsCooldownMs: 10_000,
     storageKeys: Object.freeze({
@@ -636,7 +644,7 @@ export const MULTIPLAYER_SCALE_CONFIG: MultiplayerScaleConfig = Object.freeze({
     liveRoomsPollIntervalMs: 60_000,
     friendBatchLookupSize: 30,
     leaderboardLimit: 50,
-    leaderboardCacheTtlMs: 5 * 60 * 1000,
+    leaderboardCacheTtlMs: 10 * 60 * 1000,
     botExcludedPrefixes: Object.freeze(['guest_', 'mock-', 'bot_']),
     minGamesPlayedForLeaderboard: 1,
     clockSyncJitterThresholdMs: 1500,

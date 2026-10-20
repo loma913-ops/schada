@@ -16,7 +16,6 @@ import { db, isFirebaseConfigured } from './config';
 import { localBackend, type UserProfile, type LocalFriendRequest } from './localProvider';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
 import { isPatronUser } from '@/components/common/PatronBadge';
-import { safeGetItem, safeSetItem } from '@/services/storage/storageCleanup';
 
 // ---------------------------------------------------------------------------
 // In-memory friends profile cache
@@ -255,74 +254,48 @@ export async function getFriendsList(userId: string): Promise<UserProfile[]> {
 async function _fetchFriendsList(userId: string): Promise<UserProfile[]> {
   if (!db) return [];
 
-  const MIGRATION_KEY = MULTIPLAYER_SCALE_CONFIG.presence.storageKeys.legacyFriendsMigratedPrefix + userId;
-  const alreadyMigrated = safeGetItem(MIGRATION_KEY) === '1';
-
   // Primary: read the userFriends subcollection (fast path)
   const friendsSnap = await getDocs(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends));
   const knownFriendIds = new Set(friendsSnap.docs.map((d) => d.id));
 
-  // Migration fallback: only check legacy friendRequests if no friends found AND not yet migrated
-  if (knownFriendIds.size === 0 && !alreadyMigrated) {
-    const [sentSnap, receivedSnap] = await Promise.all([
-      getDocs(query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('fromUserId', '==', userId), where('status', '==', 'accepted'))),
-      getDocs(query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.friendRequests), where('toUserId',   '==', userId), where('status', '==', 'accepted'))),
-    ]);
-
-    const backfillBatch = writeBatch(db!);
-    let backfillCount = 0;
-    for (const reqDoc of [...sentSnap.docs, ...receivedSnap.docs]) {
-      const data = reqDoc.data();
-      const friendId = data.fromUserId === userId ? data.toUserId : data.fromUserId;
-      if (!knownFriendIds.has(friendId)) {
-        knownFriendIds.add(friendId);
-        backfillBatch.set(
-          doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, userId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, friendId),
-          { since: serverTimestamp() }
-        );
-        backfillBatch.set(
-          doc(db!, MULTIPLAYER_SCALE_CONFIG.collections.users, friendId, MULTIPLAYER_SCALE_CONFIG.collections.userFriends, userId),
-          { since: serverTimestamp() }
-        );
-        backfillCount += 2;
-      }
-    }
-    if (backfillCount > 0) {
-      backfillBatch.commit().catch(console.error);
-    }
-    // Record migration as complete so subsequent polls skip the two legacy queries
-    safeSetItem(MIGRATION_KEY, '1');
-  }
-
   if (knownFriendIds.size === 0) return [];
 
-    // Fetch friend profiles in batched queries of up to friendBatchLookupSize IDs instead of N individual getDoc calls
-    const friendIdList = [...knownFriendIds];
-    const BATCH_SIZE = MULTIPLAYER_SCALE_CONFIG.matchmaking.friendBatchLookupSize;
-    const profileBatches: Promise<import('firebase/firestore').QuerySnapshot>[] = [];
+  // Fetch friend profiles in batched queries of up to friendBatchLookupSize IDs instead of N individual getDoc calls
+  const friendIdList = [...knownFriendIds];
+  const BATCH_SIZE = MULTIPLAYER_SCALE_CONFIG.matchmaking.friendBatchLookupSize;
+  const profileBatches: Promise<import('firebase/firestore').QuerySnapshot>[] = [];
 
-    for (let i = 0; i < friendIdList.length; i += BATCH_SIZE) {
-      const chunk = friendIdList.slice(i, i + BATCH_SIZE);
-      const batchQuery = query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.users), where(documentId(), 'in', chunk));
-      profileBatches.push(getDocs(batchQuery));
-    }
+  for (let i = 0; i < friendIdList.length; i += BATCH_SIZE) {
+    const chunk = friendIdList.slice(i, i + BATCH_SIZE);
+    const batchQuery = query(collection(db!, MULTIPLAYER_SCALE_CONFIG.collections.users), where(documentId(), 'in', chunk));
+    profileBatches.push(getDocs(batchQuery));
+  }
 
-    const batchSnaps = await Promise.all(profileBatches);
-    const now = Date.now();
-    const freshnessThresholdMs = MULTIPLAYER_SCALE_CONFIG.presence.friendFreshnessThresholdMs;
-    const profiles: UserProfile[] = [];
+  const batchSnaps = await Promise.all(profileBatches);
+  const now = Date.now();
+  const freshnessThresholdMs = MULTIPLAYER_SCALE_CONFIG.presence.friendFreshnessThresholdMs;
+  const profiles: UserProfile[] = [];
 
-    for (const snap of batchSnaps) {
-      for (const docSnap of snap.docs) {
-        const data = docSnap.data() as UserProfile;
-        const lastSeenMs = (data.lastSeen as any)?.toMillis
-          ? (data.lastSeen as any).toMillis()
-          : (data.lastSeen ? new Date(data.lastSeen as string).getTime() : 0);
-        const isFresh = now - lastSeenMs <= freshnessThresholdMs;
-        const effectiveStatus = (data.status !== 'offline' && isFresh) ? data.status : 'offline';
-        profiles.push({ ...data, status: effectiveStatus });
+  for (const snap of batchSnaps) {
+    for (const docSnap of snap.docs) {
+      const data = docSnap.data() as UserProfile;
+      const rawLastSeen = data.lastSeen;
+      let lastSeenMs = 0;
+      if (
+        rawLastSeen &&
+        typeof rawLastSeen === 'object' &&
+        'toMillis' in rawLastSeen &&
+        typeof (rawLastSeen as { toMillis: () => number }).toMillis === 'function'
+      ) {
+        lastSeenMs = (rawLastSeen as { toMillis: () => number }).toMillis();
+      } else if (typeof rawLastSeen === 'string' || typeof rawLastSeen === 'number') {
+        lastSeenMs = new Date(rawLastSeen).getTime();
       }
+      const isFresh = now - lastSeenMs <= freshnessThresholdMs;
+      const effectiveStatus = (data.status !== 'offline' && isFresh) ? data.status : 'offline';
+      profiles.push({ ...data, status: effectiveStatus });
     }
+  }
 
     return profiles;
 }

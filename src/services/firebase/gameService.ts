@@ -5,6 +5,7 @@ import {
   deleteDoc,
   onSnapshot,
   runTransaction,
+  setDoc,
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './config';
 import { MULTIPLAYER_SCALE_CONFIG } from './multiplayerConfig';
@@ -42,7 +43,7 @@ import {
   type JoinGameResult,
 } from './gameTypes';
 import { isGameTimedOut } from './gameClock';
-import { markGameEloProcessed } from './gameElo';
+import { markGameEloProcessed, clearReconcileCooldown } from './gameElo';
 import {
   computeMoveTransition,
   computeResignTransition,
@@ -175,18 +176,12 @@ export async function createGame(params: CreateGameParams): Promise<{ gameId: st
 
     if (isFirebaseConfigured() && db) {
       const docRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.games, candidateId);
-      const isCommitted = await runTransaction(db, async (tx) => {
-        const snap = await tx.get(docRef);
-        if (snap.exists()) {
-          return false;
-        }
-        tx.set(docRef, sanitize(newGame));
-        return true;
-      });
-
-      if (isCommitted) {
+      try {
+        await setDoc(docRef, sanitize(newGame));
         finalGameId = candidateId;
         break;
+      } catch {
+        // Collision or rules rejection: retry with new candidateId
       }
     } else {
       if (!localGameStore.get(candidateId)) {
@@ -509,7 +504,7 @@ export async function resignGameAction(
             isRankedGame ? resigningDelta : 0,
             gameCategory
           );
-          await markGameEloProcessed(gameId, resigningPlayerId);
+          clearReconcileCooldown(resigningPlayerId);
           return updated;
         } catch (e) {
           console.warn('Failed to update stats for resigning player:', e);
@@ -607,7 +602,7 @@ export async function timeoutGameAction(
             isRankedGame ? timeoutWinnerDelta : 0,
             gameCategory
           );
-          await markGameEloProcessed(gameId, timeoutWinnerPlayerId);
+          clearReconcileCooldown(timeoutWinnerPlayerId);
           return updated;
         } catch (e) {
           console.warn('Failed to update stats for winning player on timeout:', e);
@@ -623,7 +618,7 @@ export async function timeoutGameAction(
             isRankedGame ? timedOutDelta : 0,
             gameCategory
           );
-          await markGameEloProcessed(gameId, timedOutPlayerId);
+          clearReconcileCooldown(timedOutPlayerId);
           return updated;
         } catch (e) {
           console.warn('Failed to update stats for timed-out player:', e);
@@ -830,7 +825,7 @@ export async function abandonGameDueToDisconnectAction(
             isRankedGame ? winnerDelta : 0,
             gameCategory
           );
-          await markGameEloProcessed(gameId, winnerPlayerId);
+          clearReconcileCooldown(winnerPlayerId);
           return updated;
         } catch (e) {
           console.warn('Failed to update stats for winning player on abandonment:', e);
@@ -846,7 +841,7 @@ export async function abandonGameDueToDisconnectAction(
             isRankedGame ? abandonedDelta : 0,
             gameCategory
           );
-          await markGameEloProcessed(gameId, abandonedPlayerId);
+          clearReconcileCooldown(abandonedPlayerId);
           return updated;
         } catch (e) {
           console.warn('Failed to update stats for abandoning player:', e);
