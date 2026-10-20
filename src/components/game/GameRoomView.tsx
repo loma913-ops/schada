@@ -24,7 +24,7 @@ import {
 import { Arena, type ArenaPlayer } from './Arena';
 import type { PlayerEloUpdate } from './GameOverModal';
 import type { BoardState, Move, PieceColor } from '@/core/schada/types';
-import { Copy, Check, ArrowLeft, Loader2, Cpu, ShieldAlert, LogIn, Users } from 'lucide-react';
+import { Copy, Check, ArrowLeft, Loader2, Cpu, ShieldAlert, LogIn, Users, X } from 'lucide-react';
 import { ELO_CONFIG } from '@/core/elo/eloConfig';
 import { updateUserStats, getOrCreateGuestId } from '@/services/firebase/authService';
 import { setActivityContext } from '@/services/firebase/presenceService';
@@ -41,7 +41,11 @@ import { NATIVE_CONFIG } from '@/services/native/nativeConfig';
 
 const GAME_ID_REGEX = new RegExp(SECURITY_CONFIG.gameIdRegexPattern);
 
-export const GameRoomView: React.FC = () => {
+export interface GameRoomViewProps {
+  readonly initialGame?: GameRoom;
+}
+
+export const GameRoomView: React.FC<GameRoomViewProps> = ({ initialGame }) => {
   const { gameId } = useParams<{ gameId: string }>();
   const { user, isLoading: authLoading, refreshUser } = useAuth();
   const isGuest = isGuestUser(user);
@@ -49,8 +53,8 @@ export const GameRoomView: React.FC = () => {
 
   const isValidGameId = Boolean(gameId && GAME_ID_REGEX.test(gameId));
 
-  const [game, setGame] = useState<GameRoom | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [game, setGame] = useState<GameRoom | null>(initialGame || null);
+  const [loading, setLoading] = useState(!initialGame);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -568,7 +572,13 @@ export const GameRoomView: React.FC = () => {
     });
   };
 
-  const handleCancelAndReturn = async () => {
+  const handleReturnToLobby = () => {
+    setActivityContext('online', true);
+    window.scrollTo(0, 0);
+    navigate('/');
+  };
+
+  const handleCancelGame = async () => {
     if (gameId && isHost) {
       await abandonGame(gameId);
     }
@@ -838,23 +848,43 @@ export const GameRoomView: React.FC = () => {
                     <span>Play Against Computer</span>
                   </button>
 
-                  <button
-                    type="button"
-                    className="action-btn"
-                    onClick={handleCancelAndReturn}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.4rem',
-                      width: '100%',
-                      padding: '0.65rem 1rem',
-                      fontSize: '0.9rem',
-                    }}
-                  >
-                    <ArrowLeft size={16} />
-                    <span>Cancel & Return to Lobby</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={handleReturnToLobby}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        padding: '0.65rem 0.5rem',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      <ArrowLeft size={16} />
+                      <span>Return to Lobby</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="action-btn btn-danger"
+                      onClick={handleCancelGame}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        padding: '0.65rem 0.5rem',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      <X size={16} />
+                      <span>Cancel</span>
+                    </button>
+                  </div>
                 </div>
               </>
             ) : game.isRanked && isGuest ? (

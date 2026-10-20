@@ -1009,10 +1009,17 @@ body {
   border-color: var(--accent-gold);
 }
 
-.action-btn.danger:hover {
+.action-btn.danger:hover,
+.action-btn.btn-danger {
   background-color: var(--accent-red);
   color: var(--text-on-accent);
   border-color: var(--accent-red);
+}
+
+.action-btn.btn-danger:hover {
+  background-color: var(--accent-red-hover);
+  color: var(--text-on-accent);
+  border-color: var(--accent-red-hover);
 }
 
 .action-btn:disabled {
@@ -1402,6 +1409,30 @@ body {
 }
 
 .btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--accent-red);
+  border: 1px solid var(--accent-red);
+  color: var(--text-on-accent);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-danger:hover {
+  background-color: var(--accent-red-hover);
+  border-color: var(--accent-red-hover);
+  color: var(--text-on-accent);
+}
+
+.btn-danger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
