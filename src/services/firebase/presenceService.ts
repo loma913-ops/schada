@@ -57,6 +57,23 @@ let detachPresenceListeners: (() => void) | null = null;
 const statsSubscribers = new Set<(stats: LobbyStats) => void>();
 
 let inMemorySessionId: string | null = null;
+let detachStatsWatchers: (() => void) | null = null;
+
+// Remote sync and throttle state
+let lastRemoteHeartbeatTime = 0;
+let lastKnownRemoteStatus: 'online' | 'in-game' | 'offline' | null = null;
+let lastKnownRemoteActive: boolean | null = null;
+let hasRemoteGuestSession = false;
+let lastThrottleRecord = 0;
+let lastNotifiedStats: LobbyStats | null = null;
+
+// Server counts fallback and query deduplication state
+let firestoreRegisteredCount: number | null = null;
+let firestoreGuestsCount: number | null = null;
+let firestoreGamesCount: number | null = null;
+let lastServerCountsRefreshTime = 0;
+let inFlightRefreshPromise: Promise<void> | null = null;
+let guestCountIndexUnavailable = false;
 
 interface FirestoreErrorLike {
   readonly code?: string;
@@ -204,12 +221,6 @@ function updateUserStatusSync(userId: string, status: 'online' | 'in-game' | 'of
   localBackend.setUserStatus(userId, status);
   writeFirestoreUserStatus(userId, status);
 }
-// In-memory tab activity and remote sync state
-let lastRemoteHeartbeatTime = 0;
-let lastKnownRemoteStatus: 'online' | 'in-game' | 'offline' | null = null;
-let lastKnownRemoteActive: boolean | null = null;
-let lastThrottleRecord = 0;
-let lastNotifiedStats: LobbyStats | null = null;
 
 /**
  * Marks remote presence as synchronized to eliminate redundant startup/auth writes.
@@ -280,6 +291,7 @@ export function resetPresenceStateForTesting(): void {
   lastRemoteHeartbeatTime = 0;
   lastKnownRemoteStatus = null;
   lastKnownRemoteActive = null;
+  hasRemoteGuestSession = false;
   lastNotifiedStats = null;
   hiddenSince = null;
   currentActivityContext = 'online';
@@ -399,33 +411,65 @@ export function syncPresenceHeartbeat(forceRemote: boolean = false): void {
     localBackend.setUserStatus(userId, targetStatus);
   }
 
-  // Throttle live Firestore writes: only execute if forced, if heartbeat interval has elapsed, or if status transitioned
+  // Throttle live Firestore writes: only execute periodic heartbeats while active, or once upon state transitions
   const isHeartbeatDue = now - lastRemoteHeartbeatTime >= HEARTBEAT_INTERVAL_MS;
-  const guestActiveChanged = lastKnownRemoteActive !== active;
   const userStatusChanged = lastKnownRemoteStatus !== targetStatus;
-  const shouldWriteRemote = forceRemote || isHeartbeatDue || (!isRegistered && guestActiveChanged) || (isRegistered && userStatusChanged);
 
-  if (shouldWriteRemote && isFirebaseConfigured() && db) {
-    lastRemoteHeartbeatTime = now;
-    lastKnownRemoteActive = active;
-    lastKnownRemoteStatus = targetStatus;
-
-    if (!isRegistered) {
-      try {
-        const guestDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId);
-        if (active) {
-          setDoc(guestDocRef, {
-            lastSeen: serverTimestamp(),
-            updatedAt: now,
-          }).catch(() => {});
-        } else {
+  if (isFirebaseConfigured() && db) {
+    if (isRegistered) {
+      if (hasRemoteGuestSession) {
+        hasRemoteGuestSession = false;
+        try {
+          const guestDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId);
           deleteDoc(guestDocRef).catch(() => {});
+        } catch {
+          // Ignore
         }
-      } catch {
-        // Ignore
       }
-    } else if (userId && auth?.currentUser?.uid === userId) {
-      writeFirestoreUserStatus(userId, targetStatus);
+
+      const shouldWriteUser =
+        Boolean(userId && auth?.currentUser?.uid === userId) &&
+        (targetStatus !== 'offline'
+          ? forceRemote || userStatusChanged || isHeartbeatDue
+          : userStatusChanged && lastKnownRemoteStatus !== null);
+
+      if (shouldWriteUser && userId) {
+        lastRemoteHeartbeatTime = now;
+        lastKnownRemoteActive = active;
+        lastKnownRemoteStatus = targetStatus;
+        writeFirestoreUserStatus(userId, targetStatus);
+      } else {
+        lastKnownRemoteActive = active;
+        lastKnownRemoteStatus = targetStatus;
+      }
+    } else {
+      if (active) {
+        if (forceRemote || !hasRemoteGuestSession || isHeartbeatDue) {
+          lastRemoteHeartbeatTime = now;
+          lastKnownRemoteActive = true;
+          hasRemoteGuestSession = true;
+          try {
+            const guestDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId);
+            setDoc(guestDocRef, {
+              lastSeen: serverTimestamp(),
+              updatedAt: now,
+            }).catch(() => {});
+          } catch {
+            // Ignore
+          }
+        }
+      } else if (hasRemoteGuestSession) {
+        hasRemoteGuestSession = false;
+        lastKnownRemoteActive = false;
+        try {
+          const guestDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId);
+          deleteDoc(guestDocRef).catch(() => {});
+        } catch {
+          // Ignore
+        }
+      } else {
+        lastKnownRemoteActive = false;
+      }
     }
   }
 
@@ -467,16 +511,11 @@ export function cleanupCurrentTabSession(): void {
     // Ignore
   }
 
-  // Clean up guest session in Firestore if client was a guest
-  if (isFirebaseConfigured() && db && !isRegistered) {
+  // Clean up guest session in Firestore once if client had an active remote guest document
+  if (isFirebaseConfigured() && db && !isRegistered && hasRemoteGuestSession) {
+    hasRemoteGuestSession = false;
+    lastKnownRemoteActive = false;
     try {
-      // Send keepalive fetch to Firestore REST API for reliable tab-close deletion in modern browsers
-      const projectId = import.meta.env?.VITE_FIREBASE_PROJECT_ID;
-      if (projectId && typeof fetch !== 'undefined') {
-        const guestCollection = MULTIPLAYER_SCALE_CONFIG.collections.guestSessions;
-        const restUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${guestCollection}/${sessionId}`;
-        fetch(restUrl, { method: 'DELETE', keepalive: true }).catch(() => {});
-      }
       deleteDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId)).catch(() => {});
     } catch {
       // Ignore
@@ -645,13 +684,6 @@ export function getLocalActiveGamesCount(): number {
   }
 }
 
-let firestoreRegisteredCount: number | null = null;
-let firestoreGuestsCount: number | null = null;
-let firestoreGamesCount: number | null = null;
-let lastServerCountsRefreshTime = 0;
-let inFlightRefreshPromise: Promise<void> | null = null;
-let guestCountIndexUnavailable = false;
-
 const CACHED_LOBBY_STATS_TIME_KEY = `${CACHED_LOBBY_STATS_STORAGE_KEY}_time`;
 
 /**
@@ -804,8 +836,6 @@ function notifyStatsSubscribers(): void {
 export async function pruneStaleGuestSessions(): Promise<void> {
   return Promise.resolve();
 }
-
-let detachStatsWatchers: (() => void) | null = null;
 
 /**
  * Subscribes to real-time lobby statistics with 100% accuracy:

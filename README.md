@@ -114,6 +114,7 @@ Schada includes a standalone, command-line championship simulator (`scripts/simu
 > **100% Local & Offline**: The tournament simulator executes entirely in-memory using Node.js CPU workers and writes results directly to local disk. It **never connects to Firebase, requires zero network access, and never touches any database.**
 
 #### How It Works
+
 - **Championship Bracket**: Each tournament seeds all 8 bots in a single-elimination knockout bracket (4 Quarterfinals → 2 Semifinals → 1 Championship Final = 7 matches per tournament).
 - **Random Seeding & Colors**: Shuffles seeds every tournament to ensure a diverse spread of matchups across all tiers, and assigns White/Black colors randomly (50/50) per match to eliminate first-move bias.
 - **Draw Resolution**: In the rare event of a true draw (equal goal scores, surviving pieces, and rank distances), an immediate rematch is played with swapped colors until a decisive winner advances.
@@ -287,6 +288,7 @@ VITE_STRIPE_PAYMENT_LINK_LIFETIME=https://donate.stripe.com/test_...
 `VITE_FIREBASE_MEASUREMENT_ID` is required when Firebase is configured and analytics is enabled; startup throws a descriptive error if it is missing or malformed. Analytics behavior (enable flag, event names, privacy signals) is configured in `src/services/firebase/analyticsConfig.ts`. Transport resilience (forcing HTTP long-polling over TCP port 443 to mitigate QUIC network idle timeouts and antivirus stream buffering) is managed in `src/services/firebase/firebaseRuntimeConfig.ts`.
 
 To connect to the local Firebase Emulator Suite:
+
 ```bash
 VITE_USE_FIREBASE_EMULATOR=true
 ```
@@ -303,24 +305,222 @@ The live application is hosted on **Firebase Hosting** and backed by **Cloud Fir
 
 ---
 
-### Deployment Workflow
+### Pre-Flight Verification
 
-Always run the pre-deploy checks first, then deploy in the order below. Firestore must go first whenever rules or indexes change so new queries are backed by indexes before the hosting bundle lands.
+Before executing any deployment, verify the active Firebase project alias and ensure local checks pass:
 
-```bash
-# 1. Verify all tests pass and the build is clean
-npm test && npm run build
+```powershell
+# Verify active project and authenticated account
+firebase projects:list
+firebase use
 
-# 2. Deploy Firestore rules and indexes first
-#    - firestore.rules takes effect immediately
-#    - New composite indexes begin building (takes 2–10 min depending on volume)
-npx firebase-tools deploy --only firestore
+# Switch to a specific environment alias (e.g., staging or production) if needed
+firebase use production
 
-# 3. Deploy the frontend hosting bundle
-npx firebase-tools deploy --only hosting
+# Run linting, type-checking, and test suites
+npm run lint
+npm test
 ```
 
-Your live site at `https://schada.org` updates immediately after step 3. Clients never need to empty cache or perform a hard reload to see changes:
+---
+
+### Hosting Workflows
+
+#### Preview Channel Deploy (Staging / QA)
+
+To deploy web UI updates to a temporary preview URL without affecting the live production site:
+
+```powershell
+# 1. Build the production bundle
+npm run build
+
+# 2. Deploy to a named preview channel that expires in 7 days
+firebase hosting:channel:deploy staging-preview --expires 7d
+```
+
+#### Routine Hosting-Only Update
+
+To deploy web UI updates directly to the live channel:
+
+```powershell
+# 1. Build the production bundle
+npm run build
+
+# 2. Deploy hosting with a release message for audit history
+firebase deploy --only hosting -m "Deploy latest UI updates"
+```
+
+#### Promote Preview Channel to Live
+
+To promote a verified preview build directly to production without rebuilding:
+
+```powershell
+# Clone the verified preview channel to the live channel
+firebase hosting:clone SOURCE_SITE_ID:staging-preview SOURCE_SITE_ID:live
+```
+
+---
+
+### Database & Storage Workflows
+
+#### Firestore Security Rules Only
+
+To update access control rules immediately without rebuilding the frontend or touching indexes:
+
+```powershell
+firebase deploy --only firestore:rules
+```
+
+#### Firestore Composite Indexes Only
+
+To push new or modified query indexes defined in `firestore.indexes.json`:
+
+```powershell
+firebase deploy --only firestore:indexes
+```
+
+#### Both Firestore Rules and Indexes
+
+To deploy all Firestore configurations simultaneously:
+
+```powershell
+firebase deploy --only firestore
+```
+
+#### Cloud Storage Security Rules
+
+To deploy updated file upload and access rules:
+
+```powershell
+firebase deploy --only storage
+```
+
+---
+
+### Cloud Functions Workflows
+
+#### All Cloud Functions
+
+To deploy the entire backend function suite:
+
+```powershell
+firebase deploy --only functions
+```
+
+#### Single Function or Export Group
+
+To deploy a specific function or group (reducing deployment time, avoiding unnecessary cold starts, and preserving API quotas):
+
+```powershell
+# Deploy a single named function
+firebase deploy --only functions:processWebhook
+
+# Deploy multiple specific functions (quote comma-separated targets in PowerShell)
+firebase deploy --only "functions:apiGateway,functions:scheduledCleanup"
+```
+
+---
+
+### Combined & Multi-Target Workflows
+
+#### Selective Multi-Target Deploy
+
+To deploy a specific subset of services together (such as a UI update that depends on a new security rule):
+
+```powershell
+# 1. Build the production bundle
+npm run build
+
+# 2. Deploy selected targets (quote comma-separated lists in PowerShell)
+firebase deploy --only "hosting,firestore:rules" -m "Update UI and corresponding security rules"
+```
+
+#### Full Combined Deploy
+
+To deploy Hosting, Firestore Security Rules, Composite Indexes, and any other configured project targets together:
+
+```powershell
+# 1. Verify build
+npm run build
+
+# 2. Deploy rules, indexes, and hosting
+firebase deploy -m "Full production release"
+```
+
+---
+
+### Post-Deploy & Emergency Recovery
+
+#### Inspect Deployment History and Logs
+
+To monitor runtime behavior immediately following a release:
+
+```powershell
+# Stream recent Cloud Functions logs
+firebase functions:log --lines 50
+
+# List active hosting channels
+firebase hosting:channel:list
+```
+
+### Standard Everyday Deployment Workflow
+
+Use this sequential workflow for routine daily releases to ensure local checks pass and changes are verified before hitting the live production URL.
+
+#### Step 1: Environment Check & Local Validation
+
+Confirm you are targeting the right Firebase project, then run your quality checks and production build:
+
+```powershell
+# 1. Confirm active Firebase project target
+npx -y firebase-tools@latest use schada-online
+
+# 2. Run linter and test suite
+npm run lint
+npm test
+
+# 3. Compile the production bundle
+npm run build
+```
+
+#### Step 2: Stage to a Preview Channel (Smoke Test)
+
+Deploy the newly compiled build to a temporary preview URL to verify layout, assets, and routing in a live environment before exposing changes to users:
+
+```powershell
+# Deploy to a 24-hour preview channel
+firebase hosting:channel:deploy daily-qa --expires 1d
+```
+
+Open the generated preview URL in your browser and run a quick smoke test of the updated features.
+
+#### Step 3: Release to Production
+
+Once the preview build is verified, push the update to the live channel with a brief release note for the deployment history.
+
+Option A: Standard Hosting Release
+
+```powershell
+firebase deploy --only hosting -m "Routine daily UI and feature update"
+```
+
+Option B: Hosting + Firestore Rules Release (When Data Access Changes)
+
+```powershell
+firebase deploy --only "hosting,firestore:rules" -m "Daily release with updated security rules"
+```
+
+#### Step 4: Post-Deploy Verification
+
+Confirm the live deployment succeeded and clean up or inspect logs if backend services were touched:
+
+```powershell
+# Verify active hosting channels
+firebase hosting:channel:list
+
+# Check recent backend logs for any runtime errors (if using Cloud Functions)
+firebase functions:log --lines 25
+```
 
 - **Zero-Cache Entry Points**: `index.html`, `sw.js`, `manifest.webmanifest`, and `version.json` are served with `Cache-Control: no-cache, no-store, must-revalidate` (across both Firebase Hosting and Nginx / Cloud Run), while hashed assets in `/assets/` are cached immutably for 1 year.
 - **Service Worker Auto-Claim & Lifecycle**: Background update checks trigger on app mount, visibility change, window focus, network reconnection, and periodic intervals. When a new service worker installs, it immediately activates (`skipWaiting`) and claims clients (`clientsClaim`).
@@ -331,7 +531,7 @@ Your live site at `https://schada.org` updates immediately after step 3. Clients
 
 ---
 
-### Routine Hosting-Only Update
+### Routine Hosting-Only Updates
 
 When only source code changes (no `firestore.rules` or `firestore.indexes.json` modifications):
 
@@ -341,12 +541,38 @@ npm test && npm run build && npx firebase-tools deploy --only hosting
 
 ---
 
-### Full Combined Deploy
+### Full Combined Deployment
 
 To deploy everything (Firestore rules, indexes, and hosting) in a single command:
 
 ```bash
 npm run build && npx firebase-tools deploy
+```
+
+---
+
+### Fast-Track Daily Deploy (Single Copy-Paste Block)
+
+For minor, low-risk updates where a separate preview channel is unnecessary, run the complete validation, build, and live hosting deployment in one sequence:
+
+Option A: Standard Hosting Release
+
+```powershell
+npx -y firebase-tools@latest use schada-online
+npm run lint
+npm test
+npm run build
+npx -y firebase-tools@latest deploy --only hosting -m "Routine daily update"
+```
+
+Option B: Hosting + Firestore Rules Release (When Data Access Changes)
+
+```powershell
+npx -y firebase-tools@latest use schada-online
+npm run lint
+npm test
+npm run build
+npx -y firebase-tools@latest deploy --only "hosting,firestore:rules" -m "Daily release with updated security rules"
 ```
 
 ---
@@ -530,6 +756,7 @@ Always update **both** squares simultaneously to preserve board balance and engi
 ## 9. Security & Threat Modeling
 
 Schada employs an authoritative defense-in-depth security model:
+
 - **Zero-Trust Client Mindset**: Authoritative game state immutability, bounded Elo deltas, monotonic match counters, and granular room lifecycle rules enforced authoritatively at the database boundary via `firestore.rules`.
 - **Sensitive PII Segregation**: Registered user email addresses are omitted from public Firestore documents, eliminating database enumeration while hydrating seamlessly in memory via Firebase Auth tokens.
 - **HTTP Security Headers**: Strict hosting security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and CSP) deployed with zero-reload cache-control preservation.
@@ -544,7 +771,7 @@ Schada employs an authoritative defense-in-depth security model:
 
 This project is graphified — a queryable knowledge graph of the full codebase can be built and explored using [graphify](https://github.com/safishamsi/graphifyy).
 
-### Prerequisites
+### Graphify Prerequisites
 
 Install graphify via uv (recommended) or pip:
 
@@ -614,7 +841,7 @@ Schada provides first-class native mobile editions for **Android** and **iOS** p
 - **Hardware Back Button Handling**: On Android devices, the native back button closes open modals, steps back through navigation, or safely minimizes the application during active matches without accidental forfeits.
 - **Portrait Lock**: The native container enforces portrait orientation across handheld devices for an optimal 64-square vector board aspect ratio.
 - **OS-Anchored System Status Bar**: The phone's native system status bar (time, Wi-Fi, battery, notifications) is decoupled from the in-app theme toggle and anchored strictly to the device's native OS color scheme across Web/PWA and Capacitor containers. Toggling between dark and light mode inside the app updates the UI only, preserving status bar visibility.
-- **Store Compliance**: 
+- **Store Compliance**:
   - **Apple Guideline 3.1.1 & Google Play Billing**: Web donation and patron links are conditionally hidden within native application shells (`isNativePlatform()`).
   - **Apple Guideline 5.1.1(v)**: In-app account deletion is built into the Player Profile settings (`ProfileModal.tsx`), allowing immediate and permanent self-service deletion of user profiles, ratings, and usernames with password re-authentication.
 
@@ -635,9 +862,11 @@ Before packaging mobile builds for Google Play or the Apple App Store, complete 
 
 1. **Deploy Updated Firestore Security Rules**:
    The in-app account deletion feature requires the updated deletion authorization rule in production. Deploy rules to your live project:
+
    ```bash
    firebase deploy --only firestore:rules
    ```
+
    *(Without deploying this rule, player account deletion requests will be rejected by Firestore with `PERMISSION_DENIED`.)*
 
 2. **Verify Production Environment Variables (`.env`)**:
@@ -655,6 +884,7 @@ Before packaging mobile builds for Google Play or the Apple App Store, complete 
    Capacitor generates placeholder icons upon initial setup. Before publishing to app stores, generate official icon and splash assets:
    - Place `icon.png` (1024x1024) and `splash.png` (2732x2732) in an `assets/` folder.
    - Run the asset generator:
+
      ```bash
      npx @capacitor/assets generate
      ```
@@ -664,21 +894,28 @@ Before packaging mobile builds for Google Play or the Apple App Store, complete 
 ### Android Deployment (Google Play Store)
 
 #### 1. Prerequisites
+
 - Google Play Developer Account
 - Android Studio with Android SDK 34+ and JDK 21
 
 #### 2. Release Signing Configuration
+
 1. Generate an upload keystore (if not already existing):
+
    ```bash
    keytool -genkey -v -keystore android/release.keystore -alias schada -keyalg RSA -keysize 2048 -validity 10000
    ```
+
 2. Copy the template properties file:
+
    ```bash
    cp android/key.properties.example android/key.properties
    ```
+
 3. Edit `android/key.properties` with your keystore path, alias, and passwords (`key.properties` and `*.keystore` are strictly excluded from git).
 
 #### 3. Building Android App Bundle (AAB)
+
 ```bash
 # Build web assets and sync native container
 npm run build
@@ -688,9 +925,11 @@ npm run cap:sync
 cd android
 ./gradlew bundleRelease
 ```
+
 The output file is generated at `android/app/build/outputs/bundle/release/app-release.aab`.
 
 #### 4. Publishing to Google Play Console
+
 1. In the [Google Play Console](https://play.google.com/console), create or select the **Schada** application.
 2. Complete Store Listing (screenshots, description, privacy policy link).
 3. Under **Release** > **Testing** > **Internal testing**, create a new release and upload `app-release.aab`.
@@ -700,11 +939,13 @@ The output file is generated at `android/app/build/outputs/bundle/release/app-re
 
 ### iOS Deployment (Apple App Store)
 
-#### 1. Prerequisites
+#### 1. iOS Prerequisites
+
 - Apple Developer Program membership ($99/year)
 - macOS workstation with Xcode 15+ and CocoaPods / Swift Package Manager
 
 #### 2. Synchronize & Open Xcode
+
 ```bash
 npm run build
 npm run cap:sync
@@ -712,11 +953,13 @@ npm run cap:ios
 ```
 
 #### 3. Project Configuration & Signing
+
 1. In Xcode, select the root **App** project in the navigator.
 2. Under **Signing & Capabilities**, select your Apple Developer Team and ensure the Bundle Identifier matches `org.schada.app`.
 3. Verify that the deployment target is set to **iOS 15.0** or later.
 
 #### 4. Archiving & Submitting to App Store Connect
+
 1. Select the build target as **Any iOS Device (arm64)**.
 2. In the menu bar, select **Product** > **Archive**.
 3. Once the Organizer window appears, select the archive and click **Distribute App**.
@@ -732,5 +975,3 @@ npm run cap:ios
   - **Automated Tag Trigger**: Pushing a version tag (`v*`) automatically builds and archives release artifacts for both Android and iOS targets.
 - **CodeQL Security Analysis (`.github/workflows/codeql.yml`)**:
   - Automated SAST scanning for JavaScript & TypeScript code on `ubuntu-latest` without building native mobile boilerplate.
-
-

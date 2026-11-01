@@ -52,10 +52,37 @@ import {
 } from '../presenceService';
 import { localBackend } from '../localProvider';
 
+const firestoreMocks = vi.hoisted(() => ({
+  firebaseConfigured: false,
+  mockDb: null as unknown,
+  mockAuth: null as { currentUser: { uid: string } | null } | null,
+  setDoc: vi.fn(() => Promise.resolve()),
+  updateDoc: vi.fn(() => Promise.resolve()),
+  deleteDoc: vi.fn(() => Promise.resolve()),
+  doc: vi.fn((_db: unknown, col: string, id: string) => ({ path: `${col}/${id}` })),
+  serverTimestamp: vi.fn(() => 'SERVER_TIMESTAMP'),
+}));
+
+vi.mock('firebase/firestore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('firebase/firestore')>();
+  return {
+    ...actual,
+    setDoc: (...args: unknown[]) => firestoreMocks.setDoc(...(args as [])),
+    updateDoc: (...args: unknown[]) => firestoreMocks.updateDoc(...(args as [])),
+    deleteDoc: (...args: unknown[]) => firestoreMocks.deleteDoc(...(args as [])),
+    doc: (...args: unknown[]) => firestoreMocks.doc(...(args as [unknown, string, string])),
+    serverTimestamp: () => firestoreMocks.serverTimestamp(),
+  };
+});
+
 vi.mock('../config', () => ({
-  isFirebaseConfigured: () => false,
-  db: null,
-  auth: null,
+  isFirebaseConfigured: () => firestoreMocks.firebaseConfigured,
+  get db() {
+    return firestoreMocks.mockDb;
+  },
+  get auth() {
+    return firestoreMocks.mockAuth;
+  },
   app: null,
 }));
 
@@ -63,6 +90,13 @@ describe('User Online & Active Presence Service', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    firestoreMocks.firebaseConfigured = false;
+    firestoreMocks.mockDb = null;
+    firestoreMocks.mockAuth = null;
+    firestoreMocks.setDoc.mockClear();
+    firestoreMocks.updateDoc.mockClear();
+    firestoreMocks.deleteDoc.mockClear();
+    firestoreMocks.doc.mockClear();
     vi.useFakeTimers();
     resetPresenceStateForTesting();
   });
@@ -421,5 +455,86 @@ describe('User Online & Active Presence Service', () => {
     // Should complete cleanly without error even if unconfigured or user is registered/idle
     await expect(pruneStaleGuestSessions()).resolves.toBeUndefined();
   });
-});
 
+  it('deletes guest session in Firestore only once on idle transition and avoids repeated deletes on subsequent heartbeats', () => {
+    firestoreMocks.firebaseConfigured = true;
+    firestoreMocks.mockDb = {};
+
+    // Initial active guest heartbeat writes document once
+    recordUserActivity();
+    syncPresenceHeartbeat();
+    expect(firestoreMocks.setDoc).toHaveBeenCalledTimes(1);
+    expect(firestoreMocks.deleteDoc).toHaveBeenCalledTimes(0);
+
+    // Transition to idle (> 2 minutes without interaction)
+    vi.advanceTimersByTime(IDLE_TIMEOUT_MS + 1000);
+    syncPresenceHeartbeat();
+    expect(firestoreMocks.deleteDoc).toHaveBeenCalledTimes(1);
+
+    // Multiple subsequent 30s heartbeat intervals while still idle must NOT trigger additional deleteDoc calls
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS + 1000);
+      syncPresenceHeartbeat();
+    }
+    expect(firestoreMocks.deleteDoc).toHaveBeenCalledTimes(1);
+
+    // Closing an already-idle tab must NOT trigger another deleteDoc call
+    cleanupCurrentTabSession();
+    expect(firestoreMocks.deleteDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates guest session deletion across multiple unload invocations', () => {
+    firestoreMocks.firebaseConfigured = true;
+    firestoreMocks.mockDb = {};
+
+    recordUserActivity();
+    syncPresenceHeartbeat();
+    expect(firestoreMocks.setDoc).toHaveBeenCalledTimes(1);
+
+    // Simulate beforeunload + pagehide + component unmount firing sequentially
+    cleanupCurrentTabSession();
+    cleanupCurrentTabSession();
+    cleanupCurrentTabSession();
+
+    expect(firestoreMocks.deleteDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes offline status to Firestore only once when a registered user becomes idle', () => {
+    firestoreMocks.firebaseConfigured = true;
+    firestoreMocks.mockDb = {};
+    firestoreMocks.mockAuth = { currentUser: { uid: 'uid_registered_1' } };
+
+    recordUserActivity();
+    syncPresenceHeartbeat();
+    expect(firestoreMocks.updateDoc).toHaveBeenCalledTimes(1);
+
+    // Transition to idle
+    vi.advanceTimersByTime(IDLE_TIMEOUT_MS + 1000);
+    syncPresenceHeartbeat();
+    expect(firestoreMocks.updateDoc).toHaveBeenCalledTimes(2);
+
+    // Subsequent 30s heartbeats while still offline must not write to Firestore
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS + 1000);
+      syncPresenceHeartbeat();
+    }
+    expect(firestoreMocks.updateDoc).toHaveBeenCalledTimes(2);
+  });
+  it('deletes remote guest session in Firestore when client signs in as a registered user', () => {
+    firestoreMocks.firebaseConfigured = true;
+    firestoreMocks.mockDb = {};
+
+    // 1. Client starts as active guest
+    recordUserActivity();
+    syncPresenceHeartbeat();
+    expect(firestoreMocks.setDoc).toHaveBeenCalledTimes(1);
+    expect(firestoreMocks.deleteDoc).toHaveBeenCalledTimes(0);
+
+    // 2. Client logs in as registered user
+    localBackend.register('signedin@test.com', 'pass', 'SignedInUser');
+    syncPresenceHeartbeat();
+
+    // Guest document was deleted upon registration transition
+    expect(firestoreMocks.deleteDoc).toHaveBeenCalledTimes(1);
+  });
+});

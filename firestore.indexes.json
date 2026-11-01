@@ -279,7 +279,6 @@
     {
       "collectionGroup": "guest_sessions",
       "fieldPath": "lastSeen",
-      "ttl": true,
       "indexes": [
         {
           "order": "ASCENDING",
