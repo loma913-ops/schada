@@ -58,28 +58,27 @@ export const PwaProvider: React.FC<PwaProviderProps> = ({
   validatePwaConfig(config);
 
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      isNativePlatform() ||
+      window.matchMedia(config.mediaQueries.standalone).matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+      (typeof document !== 'undefined' &&
+        document.referrer.includes(config.referrerProtocols.androidApp))
+    );
+  });
+  const [isIOS] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    return config.userAgentPatterns.appleDeviceRegex.test(userAgent);
+  });
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? isMobileDevice() : false
   );
   const [installModalOpen, setInstallModalOpen] = useState(false);
 
   useEffect(() => {
-    // Detect iOS
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    const isAppleDevice = config.userAgentPatterns.appleDeviceRegex.test(userAgent);
-    setIsIOS(isAppleDevice);
-
-    // Detect standalone mode (already installed & opened from home screen)
-    const isStandaloneMode =
-      isNativePlatform() ||
-      window.matchMedia(config.mediaQueries.standalone).matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
-      document.referrer.includes(config.referrerProtocols.androidApp);
-
-    setIsStandalone(isStandaloneMode);
-
     const checkDevice = () => {
       setIsMobile(isMobileDevice());
     };
@@ -118,7 +117,7 @@ export const PwaProvider: React.FC<PwaProviderProps> = ({
 
     // Auto-prompt on iOS mobile devices if eligible and not dismissed
     const currentIsMobile = isMobileDevice();
-    if (isAppleDevice && currentIsMobile && !isStandaloneMode) {
+    if (isIOS && currentIsMobile && !isStandalone) {
       try {
         const dismissed = localStorage.getItem(config.storageKey);
         const inGame = window.location.pathname.startsWith(config.activeGamePathPrefix);
@@ -140,7 +139,7 @@ export const PwaProvider: React.FC<PwaProviderProps> = ({
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [config]);
+  }, [config, isIOS, isStandalone]);
 
   const promptInstall = async (): Promise<boolean> => {
     if (!deferredPrompt) {
@@ -177,4 +176,3 @@ export const PwaProvider: React.FC<PwaProviderProps> = ({
 };
 
 export const usePwa = () => useContext(PwaContext);
-

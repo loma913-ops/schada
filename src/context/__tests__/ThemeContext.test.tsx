@@ -110,6 +110,7 @@ describe('ThemeContext - Decoupled Status Bar and Theme Management', () => {
       let capturedTheme: string | undefined;
       function TestConsumer() {
         const { theme } = useTheme();
+        // eslint-disable-next-line react/globals
         capturedTheme = theme;
         return <div data-testid="theme">{theme}</div>;
       }

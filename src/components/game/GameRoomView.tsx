@@ -147,6 +147,7 @@ export const GameRoomView: React.FC<GameRoomViewProps> = ({ initialGame }) => {
   useEffect(() => {
     if (
       !gameId ||
+
       !game ||
       game.status !== 'in_progress' ||
       (typeof game.timeControlMinutes === 'number' &&
@@ -356,9 +357,10 @@ export const GameRoomView: React.FC<GameRoomViewProps> = ({ initialGame }) => {
   useEffect(() => {
     if (
       !gameId ||
-      !game ||
+
       !userColor ||
       isSpectator ||
+      !game ||
       game.status !== 'in_progress' ||
       (typeof game.timeControlMinutes === 'number' &&
         game.timeControlMinutes >= LOBBY_CONFIG.correspondenceCutoffMinutes)
@@ -373,13 +375,16 @@ export const GameRoomView: React.FC<GameRoomViewProps> = ({ initialGame }) => {
       disconnectReportedRef.current = false;
       setPlayerDisconnectedAction(gameId, userColor, false);
     }
-  }, [gameId, game?.whiteDisconnectedAt, game?.blackDisconnectedAt, userColor, isSpectator, game?.status, game?.timeControlMinutes]);
+  }, [gameId, game, userColor, isSpectator]);
 
   // Mark player as disconnected when leaving or unmounting the room during an in-progress real-time game
   const userColorRef = useRef(userColor);
-  userColorRef.current = userColor;
+
   const gameRef = useRef(game);
-  gameRef.current = game;
+  useEffect(() => {
+    userColorRef.current = userColor;
+    gameRef.current = game;
+  });
 
   useEffect(() => {
     if (!gameId) return;
@@ -588,6 +593,7 @@ export const GameRoomView: React.FC<GameRoomViewProps> = ({ initialGame }) => {
   };
 
   // Compute live synchronized clocks
+  // eslint-disable-next-line react/purity
   const now = Date.now();
   const elapsed = game.lastTurnStartTimeMs && game.status === 'in_progress' ? Math.max(0, now - game.lastTurnStartTimeMs) : 0;
   const rawWhiteTime = game.whiteTimeMs ?? 0;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import type { UserProfile, LocalFriendRequest } from '@/services/firebase/localProvider';
@@ -36,7 +36,7 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     if (!user) return;
     // Skip polling when the tab is hidden to eliminate background reads
     if (typeof document !== 'undefined' && document.hidden) return;
@@ -48,7 +48,7 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (!isOpen || !user) return;
@@ -69,7 +69,7 @@ export const FriendsDrawer: React.FC<FriendsDrawerProps> = ({
       window.removeEventListener('storage', handleStatusOrStorage);
       window.removeEventListener(LOCAL_CONFIG.events.userStatusChanged, handleStatusOrStorage);
     };
-  }, [isOpen, user]);
+  }, [isOpen, user, refreshData]);
 
   if (!isOpen) return null;
 

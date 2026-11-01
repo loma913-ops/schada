@@ -185,6 +185,7 @@ function formatLoss(delta: number, config: AnalysisConfig): string {
  * - Linear O(L) in character length.
  */
 function getVisibleWidth(str: string): number {
+  // eslint-disable-next-line no-control-regex
   const clean = str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
   let width = 0;
   for (const char of clean) {

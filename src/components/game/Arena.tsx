@@ -263,10 +263,13 @@ export const Arena: React.FC<ArenaProps> = ({
   }, [gameState.isGameOver, onGameComplete, gameState]);
 
   const gameStateRef = useRef<BoardState>(gameState);
-  gameStateRef.current = gameState;
+
 
   const viewMoveIndexRef = useRef<number>(viewMoveIndex);
-  viewMoveIndexRef.current = viewMoveIndex;
+  useEffect(() => {
+    gameStateRef.current = gameState;
+    viewMoveIndexRef.current = viewMoveIndex;
+  });
 
   const prevMoveCountRef = useRef<number>(gameState.moveHistory.length);
   const prevHistoryLenRef = useRef<number>(gameState.moveHistory.length);
@@ -463,7 +466,7 @@ export const Arena: React.FC<ArenaProps> = ({
     }
   }, [syncedBlackTimeMs]);
 
-  const lastTickRef = useRef<number>(Date.now());
+  const lastTickRef = useRef<number>(0);
 
   const handleTimeout = useCallback((timedOutColor: PieceColor) => {
     if (customTimeout) {
@@ -657,7 +660,7 @@ export const Arena: React.FC<ArenaProps> = ({
   // - Random-access history scrubbing for UI renders: O(1) constant time array lookup.
   const cumulativeGameStates = useMemo(() => {
     return computeCumulativeGameStates(gameState.moveHistory, gameState);
-  }, [gameState.moveHistory, gameState.isGameOver]);
+  }, [gameState]);
 
   const isViewingHistory =
     gameState.moveHistory.length > 0 && viewMoveIndex < gameState.moveHistory.length - 1;
@@ -701,7 +704,7 @@ export const Arena: React.FC<ArenaProps> = ({
       };
     }
     return null;
-  }, [whiteElo, blackElo, isRanked, whitePlayer, blackPlayer, gameState.result?.winner]);
+  }, [whiteElo, blackElo, isRanked, whitePlayer, blackPlayer, gameState.result]);
 
   const isWhiteOrientation = orientation === 'white';
   const topColor: PieceColor = isWhiteOrientation ? 'black' : 'white';

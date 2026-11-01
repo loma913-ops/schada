@@ -62,7 +62,6 @@ let detachStatsWatchers: (() => void) | null = null;
 // Remote sync and throttle state
 let lastRemoteHeartbeatTime = 0;
 let lastKnownRemoteStatus: 'online' | 'in-game' | 'offline' | null = null;
-let lastKnownRemoteActive: boolean | null = null;
 let hasRemoteGuestSession = false;
 let lastThrottleRecord = 0;
 let lastNotifiedStats: LobbyStats | null = null;
@@ -233,10 +232,9 @@ function updateUserStatusSync(userId: string, status: 'online' | 'in-game' | 'of
  * @param status Presence status state ('online' | 'in-game' | 'offline').
  * @param isActive Whether client is currently active.
  */
-export function markRemotePresenceSynced(status: 'online' | 'in-game' | 'offline', isActive: boolean = true): void {
+export function markRemotePresenceSynced(status: 'online' | 'in-game' | 'offline', _isActive: boolean = true): void {
   lastRemoteHeartbeatTime = Date.now();
   lastKnownRemoteStatus = status;
-  lastKnownRemoteActive = isActive;
 }
 
 /**
@@ -290,7 +288,6 @@ export function resetPresenceStateForTesting(): void {
   lastThrottleRecord = 0;
   lastRemoteHeartbeatTime = 0;
   lastKnownRemoteStatus = null;
-  lastKnownRemoteActive = null;
   hasRemoteGuestSession = false;
   lastNotifiedStats = null;
   hiddenSince = null;
@@ -435,18 +432,15 @@ export function syncPresenceHeartbeat(forceRemote: boolean = false): void {
 
       if (shouldWriteUser && userId) {
         lastRemoteHeartbeatTime = now;
-        lastKnownRemoteActive = active;
         lastKnownRemoteStatus = targetStatus;
         writeFirestoreUserStatus(userId, targetStatus);
       } else {
-        lastKnownRemoteActive = active;
         lastKnownRemoteStatus = targetStatus;
       }
     } else {
       if (active) {
         if (forceRemote || !hasRemoteGuestSession || isHeartbeatDue) {
           lastRemoteHeartbeatTime = now;
-          lastKnownRemoteActive = true;
           hasRemoteGuestSession = true;
           try {
             const guestDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId);
@@ -460,15 +454,12 @@ export function syncPresenceHeartbeat(forceRemote: boolean = false): void {
         }
       } else if (hasRemoteGuestSession) {
         hasRemoteGuestSession = false;
-        lastKnownRemoteActive = false;
         try {
           const guestDocRef = doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId);
           deleteDoc(guestDocRef).catch(() => {});
         } catch {
           // Ignore
         }
-      } else {
-        lastKnownRemoteActive = false;
       }
     }
   }
@@ -514,7 +505,6 @@ export function cleanupCurrentTabSession(): void {
   // Clean up guest session in Firestore once if client had an active remote guest document
   if (isFirebaseConfigured() && db && !isRegistered && hasRemoteGuestSession) {
     hasRemoteGuestSession = false;
-    lastKnownRemoteActive = false;
     try {
       deleteDoc(doc(db, MULTIPLAYER_SCALE_CONFIG.collections.guestSessions, sessionId)).catch(() => {});
     } catch {

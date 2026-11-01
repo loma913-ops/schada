@@ -48,6 +48,7 @@ describe('GamePreferencesContext', () => {
 
     function TestComponent() {
       const { showThreatIndicators } = useGamePreferences();
+      // eslint-disable-next-line react/globals
       capturedState = showThreatIndicators;
       return <div data-testid="threat">{String(showThreatIndicators)}</div>;
     }

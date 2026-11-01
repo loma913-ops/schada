@@ -57,6 +57,7 @@ describe('Analyze Game CLI Script', () => {
     expect(stdout).toContain('Move Quality Distribution');
 
     // Strip ANSI codes to measure monospaced column positions
+    // eslint-disable-next-line no-control-regex
     const cleanOutput = stdout.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
     const lines = cleanOutput.split('\n');
 
